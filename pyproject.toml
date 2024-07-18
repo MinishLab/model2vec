@@ -1,0 +1,16 @@
+[project]
+name = "tokenlearn"
+readme = "README.md"
+
+[tool.ruff]
+exclude = [".venv/"]
+line-length = 120
+lint.mccabe.max-complexity = 10
+lint.pydocstyle.convention = "numpy"
+target-version = "py310"
+lint.select = ["I"]  # Include Isort
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
+ignore_missing_imports = true
