@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sentence_transformers import SentenceTransformer
 
-from evaluation.word_sim_benchmarks.utilities import calculate_spearman_correlation
+from evaluation.word_sim_benchmarks.utilities import calculate_spearman_correlation, create_vocab_and_tasks_dict
 from model2vec.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -32,33 +32,27 @@ def main() -> None:
 
     # Define the path the JSONL file containing paths and info about the tasks to evaluate
     tasks_file_path = "evaluation/word_sim_benchmarks/tasks.jsonl"
-    # Define the path to the vocab file
-    vocab_path = "evaluation/word_sim_benchmarks/data/all_vocab.txt"
 
     # Read the JSONL data from the file into a list of tasks
     with open(tasks_file_path, "r") as file:
         tasks = [json.loads(line) for line in file]
 
-    # Read the vocab file into a list of words
-    with open(vocab_path, "r") as file:
-        vocab = [line.strip() for line in file]
+    # Create the vocabulary and tasks dictionary
+    vocab, tasks_dict = create_vocab_and_tasks_dict(tasks)
 
+    # Create the embeddings for the vocabulary
     embeddings_list = embedder.encode(vocab, batch_size=64)  # Adjust batch_size as needed
     embeddings = {word: embedding for word, embedding in zip(vocab, embeddings_list)}
 
-    # embeddings = {word: embedder.encode(word) for word in vocab}
     all_scores = {}
 
     # Iterate over the tasks and calculate the Spearman correlation
-    for task in tasks:
+    for task_name, task_data in tasks_dict.items():
         score = calculate_spearman_correlation(
-            file_path=task["file"],
-            vectors=embeddings,
-            index1=task["index1"],
-            index2=task["index2"],
-            index_target=task["target"],
+            data=task_data,
+            embeddings=embeddings,
         )
-        all_scores[task["task"]] = score
+        all_scores[task_name] = score
 
     # Calculate the average score
     all_scores["average"] = round(sum(all_scores.values()) / len(all_scores), 3)
