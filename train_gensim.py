@@ -1,5 +1,4 @@
 from gensim.models import Word2Vec
-
 from tokenlearn.logging_config import setup_logging
 
 

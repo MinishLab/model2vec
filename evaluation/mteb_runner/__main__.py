@@ -5,12 +5,10 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import mteb
-import torch
 from sentence_transformers import SentenceTransformer
-
-from evaluation.mteb_runner.encoders import StaticEmbedder, TorchEncoder
 from tokenlearn.logging_config import setup_logging
-from tokenlearn.model.mean_modeler import MeanModeler
+
+from evaluation.mteb_runner.encoders import StaticEmbedder
 
 # NOTE: we leave out "Retrieval" because it is too expensive to run.
 ALL_TASKS_TYPES = ("Classification", "Clustering", "PairClassification", "Reranking", "STS", "Summarization")
@@ -27,7 +25,7 @@ def main() -> None:
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
 
-    embedder: StaticEmbedder | SentenceTransformer | TorchEncoder
+    embedder: StaticEmbedder | SentenceTransformer
 
     if args.input and args.word_level:
         raise ValueError("Both input and word level were passed.")
@@ -47,13 +45,6 @@ def main() -> None:
             embedder = embedder.eval().to(args.device)
             model_name = Path(args.model_path).name.replace("_", "-")
             name = f"sentencetransformer_{model_name}"
-
-    elif args.torch_model:
-        module: MeanModeler = torch.load(args.torch_model).eval()
-
-        embedder = TorchEncoder(module).to(args.device)
-        model_name = Path(args.torch_model).parent.stem.replace("_", "-")
-        name = f"tokenlearn_{model_name}"
 
     if args.suffix:
         name = f"{name}_{args.suffix}"

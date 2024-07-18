@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
 from reach import Reach
 from sklearn.decomposition import PCA
 from tqdm import tqdm
@@ -115,4 +114,3 @@ class StaticEmbedder:
             output.append(vector)
 
         return np.stack(output)
-
