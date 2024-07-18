@@ -14,7 +14,7 @@ def create_vocab_and_tasks_dict(
     """
     vocab = []
     tasks_dict: dict[str, dict[str, list[str | float]]] = {}
-    for task in tasks: 
+    for task in tasks:
         tasks_dict[str(task["task"])] = {"words1": [], "words2": [], "targets": []}
         with open(task["file"], encoding="utf8") as file:
             for line in file:
@@ -31,7 +31,7 @@ def create_vocab_and_tasks_dict(
                     vocab.append(word1)
                 if word2 not in vocab:
                     vocab.append(word2)
-                    
+
                 # Add the words and target value to the task dictionary
                 tasks_dict[str(task["task"])]["words1"].append(word1)
                 tasks_dict[str(task["task"])]["words2"].append(word2)
@@ -52,6 +52,9 @@ def calculate_spearman_correlation(data: dict[str, list[str | float]], embedding
     gold_standard = []
 
     for word1, word2, target in zip(data["words1"], data["words2"], data["targets"]):
+        # Skip words that are not in the embeddings
+        if str(word1) not in embeddings or str(word2) not in embeddings:
+            continue
         # Reshape the vectors and calculate the cosine similarity
         v1, v2 = embeddings[str(word1)].reshape(1, -1), embeddings[str(word2)].reshape(1, -1)
         similarity_score = cosine_similarity(v1, v2)[0][0]

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("--model-name", help="The model to use.", required=True)
-    parser.add_argument("--vocabulary", help="The vocabulary to use (optional).", required=False)
+    parser.add_argument("--vocabulary-path", help="The vocabulary to use (optional).", required=False)
     parser.add_argument("--suffix", default="")
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
@@ -39,6 +39,11 @@ def main() -> None:
 
     # Create the vocabulary and tasks dictionary
     vocab, tasks_dict = create_vocab_and_tasks_dict(tasks)
+
+    # If a vocabulary path is provided, use that instead
+    if args.vocabulary_path:
+        with open(args.vocabulary_path) as file:
+            vocab = [line.strip() for line in file]
 
     # Create the embeddings for the vocabulary
     embeddings_list = embedder.encode(vocab, batch_size=64)  # Adjust batch_size as needed
