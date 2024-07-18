@@ -4,8 +4,8 @@ from typing import Annotated, Optional
 
 import typer
 
-from tokenlearn.logging_config import setup_logging
-from tokenlearn.model.utilities import (
+from model2vec.logging_config import setup_logging
+from model2vec.model.utilities import (
     create_output_embeddings_from_model_name_and_reach,
     create_output_embeddings_from_model_name_and_tokens,
     safe_load_reach,

@@ -12,8 +12,8 @@ from tqdm import tqdm
 from transformers import PreTrainedTokenizerFast
 from typing_extensions import Annotated
 
-from tokenlearn.data import stream_text_from_dataset
-from tokenlearn.logging_config import setup_logging
+from model2vec.data import stream_text_from_dataset
+from model2vec.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 

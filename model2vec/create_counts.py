@@ -7,8 +7,8 @@ from typing import Annotated
 import typer
 from tokenizers.pre_tokenizers import Whitespace
 
-from tokenlearn.data import stream_text_from_dataset
-from tokenlearn.logging_config import setup_logging
+from model2vec.data import stream_text_from_dataset
+from model2vec.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 

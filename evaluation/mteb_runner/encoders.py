@@ -13,8 +13,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, PreTrainedTokenizer
 from wordfreq import word_frequency
 
-from tokenlearn.model.mean_modeler import MeanModeler
-from tokenlearn.model.utilities import (
+from model2vec.model.utilities import (
     add_token_to_reach,
     create_input_embeddings_from_model_name,
     create_tokenizer_from_vocab,
@@ -38,17 +37,6 @@ class StaticEmbedder:
         self.vectors = vectors
         self.tokenizer = tokenizer
         self.unk_token = self.vectors.indices[self.vectors.unk_index]
-
-    def __call__(self, text: str) -> np.ndarray:
-        """
-        Encode a single word/text.
-
-        :param text: The text to encode.
-        :return: The encoded text.
-        """
-        tokens = [token for token in self.tokenizer.tokenize(text) if token != self.unk_token]
-        vector = self.vectors.mean_pool(tokens, safeguard=False)
-        return vector
 
     @property
     def name(self) -> str:
@@ -128,35 +116,3 @@ class StaticEmbedder:
 
         return np.stack(output)
 
-
-class TorchEncoder:
-    name: str = ""
-
-    def __init__(self, model: MeanModeler) -> None:
-        """
-        Initialize the TorchEncoder.
-
-        :param model: The MeanModeler model to use.
-        """
-        self.model = model.eval()
-
-    def to(self, device: torch.device) -> TorchEncoder:
-        self.model = self.model.to(device)
-        return self
-
-    @torch.no_grad()
-    def encode(self, sentences: list[str], batch_size: int = 32, **kwargs: Any) -> torch.Tensor:
-        """
-        Encode a list of sentences.
-
-        :param sentences: The list of sentences to encode.
-        :param batch_size: The batch size to use.
-        :return: The encoded sentences.
-        """
-        results = []
-        for batch_index in tqdm(range(0, len(sentences), batch_size)):
-            batch = sentences[batch_index : batch_index + batch_size]
-            result = self.model(self.model.tokenize(batch)["input_ids"])
-            results.append(result)
-
-        return torch.cat(results)
