@@ -9,7 +9,7 @@ import pandas as pd
 from huggingface_hub import hf_hub_download, metadata_load
 from mteb import MTEB_MAIN_EN, get_task
 
-_FORBIDDEN_JSONS = ("model_meta.json",)
+_FORBIDDEN_JSONS = ("model_meta.json", "word_sim_benchmarks.json")
 
 
 @dataclass

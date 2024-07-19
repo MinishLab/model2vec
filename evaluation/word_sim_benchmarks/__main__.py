@@ -42,12 +42,8 @@ def main() -> None:
 
     logger.info(f"Loading model: {args.model_name}")
     model_name = Path(args.model_name).name.replace("_", "-")
-    name = f"sentencetransformer_{model_name}"
 
     logger.info(f"Model loaded")
-
-    if args.suffix:
-        name = f"{name}_{args.suffix}"
 
     # Define the path the JSONL file containing paths and info about the tasks to evaluate
     tasks_file_path = "evaluation/word_sim_benchmarks/tasks.jsonl"
@@ -89,6 +85,10 @@ def main() -> None:
     all_scores, _ = zip(*task_scores.values())
     average_score = round(sum(all_scores) / len(all_scores))
     task_scores["average"] = average_score
+
+    name = embeddings.name
+    if args.suffix:
+        name = f"{name}_{args.suffix}"
 
     # Create the results directory if it does not exist
     Path(f"results/{name}").mkdir(parents=True, exist_ok=True)
