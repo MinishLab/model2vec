@@ -6,9 +6,9 @@ from pathlib import Path
 
 import mteb
 from sentence_transformers import SentenceTransformer
-from tokenlearn.logging_config import setup_logging
 
 from evaluation.mteb_runner.encoders import StaticEmbedder
+from model2vec.logging_config import setup_logging
 
 # NOTE: we leave out "Retrieval" because it is too expensive to run.
 ALL_TASKS_TYPES = ("Classification", "Clustering", "PairClassification", "Reranking", "STS", "Summarization")
