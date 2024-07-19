@@ -5,11 +5,13 @@ import json
 import logging
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Literal
 
 from sentence_transformers import SentenceTransformer
 
 from evaluation.word_sim_benchmarks.utilities import calculate_spearman_correlation, create_vocab_and_tasks_dict
 from model2vec.logging_config import setup_logging
+from model2vec.model.utilities import create_output_embeddings_from_model_name_and_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +22,29 @@ def main() -> None:
     parser.add_argument("--vocabulary-path", help="The vocabulary to use (optional).", required=False)
     parser.add_argument("--suffix", default="")
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--embedding-type", default="token_embeddings_no_eos")
     args = parser.parse_args()
 
-    embedder = SentenceTransformer(model_name_or_path=args.model_name, device="cpu")
-    embedder = embedder.eval().to(args.device)
+    embedding_type_used: Literal["token_embeddings", "sentence_embedding"]
+
+    match args.embedding_type:
+        case "token_embeddings":
+            include_eos_bos = True
+            embedding_type_used = "token_embeddings"
+        case "sentence_embedding":
+            include_eos_bos = True
+            embedding_type_used = "sentence_embedding"
+        case "token_embeddings_no_eos":
+            include_eos_bos = False
+            embedding_type_used = "token_embeddings"
+        case _:
+            raise ValueError(f"Invalid option passed to --embedding-type: {args.embedding_type}")
+
+    logger.info(f"Loading model: {args.model_name}")
     model_name = Path(args.model_name).name.replace("_", "-")
     name = f"sentencetransformer_{model_name}"
+
+    logger.info(f"Model loaded")
 
     if args.suffix:
         name = f"{name}_{args.suffix}"
@@ -40,36 +59,45 @@ def main() -> None:
     # Create the vocabulary and tasks dictionary
     vocab, tasks_dict = create_vocab_and_tasks_dict(tasks)
 
-    # If a vocabulary path is provided, use that instead
+    # If a vocabulary path is provided, use the intersection
+    # of that vocabulary and the task vocabulary instead
     if args.vocabulary_path:
         with open(args.vocabulary_path) as file:
-            vocab = [line.strip() for line in file]
+            vocab = list(set(line.strip() for line in file) | set(vocab))
 
     # Create the embeddings for the vocabulary
-    embeddings_list = embedder.encode(vocab, batch_size=64)  # Adjust batch_size as needed
-    embeddings = {word: embedding for word, embedding in zip(vocab, embeddings_list)}
+    logger.info("Inferring vocabulary.")
+    embeddings = create_output_embeddings_from_model_name_and_tokens(
+        model_name=args.model_name,
+        tokens=vocab,
+        device=args.device,
+        output_value=embedding_type_used,
+        include_eos_bos=include_eos_bos,
+    )
 
-    all_scores = {}
+    task_scores = {}
 
     # Iterate over the tasks and calculate the Spearman correlation
     for task_name, task_data in tasks_dict.items():
-        score = calculate_spearman_correlation(
-            data=task_data,
+        score, n_oov_trials = calculate_spearman_correlation(
+            task=task_data,
             embeddings=embeddings,
         )
-        all_scores[task_name] = score
+        task_scores[task_name] = score, n_oov_trials
 
     # Calculate the average score
-    all_scores["average"] = round(sum(all_scores.values()) / len(all_scores), 3)
+    all_scores, _ = zip(*task_scores.values())
+    average_score = round(sum(all_scores) / len(all_scores))
+    task_scores["average"] = average_score
 
     # Create the results directory if it does not exist
     Path(f"results/{name}").mkdir(parents=True, exist_ok=True)
 
     # Save the scores json to a file
     with open(f"results/{name}/word_sim_benchmarks.json", "w") as file:
-        json.dump(all_scores, file, indent=4)
+        json.dump(task_scores, file, indent=4)
 
-    logger.info(all_scores)
+    logger.info(task_scores)
     logger.info(f"Results saved to results/{name}/word_sim_benchmarks.json")
 
 

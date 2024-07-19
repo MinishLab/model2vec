@@ -132,7 +132,7 @@ def create_output_embeddings_from_model_name_and_tokens(
     :param include_eos_bos: Whether to include the eos and bos tokens in the mean. Only applied if output_value == "token_embeddings".
     :return: The Reach output embeddings.
     """
-    embedder = SentenceTransformer(str(model_name)).to(device)
+    embedder = SentenceTransformer(str(model_name), device=device)
     out_weights: np.ndarray
     if output_value == "token_embeddings":
         intermediate_weights: list[np.ndarray] = []
