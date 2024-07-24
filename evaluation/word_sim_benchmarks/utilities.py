@@ -1,9 +1,13 @@
+import logging
 from typing import TypedDict
 
 import numpy as np
-from reach import Reach
-from scipy import stats
-from sklearn.metrics.pairwise import cosine_similarity
+from reach import normalize
+from scipy.stats import spearmanr
+
+from evaluation.utilities import Embedder
+
+logger = logging.getLogger(__name__)
 
 
 class TaskDescription(TypedDict):
@@ -15,6 +19,7 @@ class TaskDescription(TypedDict):
 
 
 class Task(TypedDict):
+    name: str
     words1: list[str]
     words2: list[str]
     targets: list[float]
@@ -32,7 +37,7 @@ def create_vocab_and_tasks_dict(
     vocab = set()
     tasks_dict: dict[str, Task] = {}
     for task in tasks:
-        tasks_dict[task["task"]] = {"words1": [], "words2": [], "targets": []}
+        tasks_dict[task["task"]] = {"name": task["task"], "words1": [], "words2": [], "targets": []}
         with open(task["file"], encoding="utf8") as file:
             for line in file:
                 # Split the line into words and target value
@@ -54,7 +59,7 @@ def create_vocab_and_tasks_dict(
     return list(sorted(vocab)), tasks_dict
 
 
-def calculate_spearman_correlation(task: Task, embeddings: Reach) -> tuple[float, int]:
+def calculate_spearman_correlation(task: Task, embedder: Embedder) -> tuple[float, int]:
     """
     Calculate the Spearman correlation between the similarities of word vectors and a target value.
 
@@ -62,22 +67,28 @@ def calculate_spearman_correlation(task: Task, embeddings: Reach) -> tuple[float
     :param embeddings: A dictionary containing the word embeddings.
     :return: The Spearman correlation
     """
+    logger.info(f"Doing task {task['name']}")
     similarities = []
     gold_standard = []
 
     n_oov_trials = 0
 
-    for word1, word2, target in zip(task["words1"], task["words2"], task["targets"]):
+    vecs_1 = normalize(embedder.encode(task["words1"]))
+    vecs_2 = normalize(embedder.encode(task["words2"]))
+
+    for vec1, vec2, target in zip(vecs_1, vecs_2, task["targets"]):
         # Skip words that are not in the embeddings
-        if word1 not in embeddings.items or word2 not in embeddings.items:
+
+        if np.allclose(vec1, 0) or np.allclose(vec2, 0):
             n_oov_trials += 1
             continue
+
         # Reshape the vectors and calculate the cosine similarity
-        similarity_score = embeddings.similarity(word1, word2)[0][0]
+        similarity_score = normalize(vec1) @ normalize(vec2).T
         similarities.append(similarity_score)
         gold_standard.append(target)
 
     # Calculate the Spearman correlation
-    spearman_score = stats.spearmanr(similarities, gold_standard)[0] * 100
+    spearman_score = spearmanr(similarities, gold_standard)[0] * 100
 
     return spearman_score, n_oov_trials

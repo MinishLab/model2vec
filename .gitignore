@@ -170,3 +170,5 @@ features/*
 model2vec_models
 results/*
 counts/*
+results_old/*
+lightning_logs/*

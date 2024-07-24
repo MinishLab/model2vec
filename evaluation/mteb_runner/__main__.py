@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from argparse import ArgumentParser
-from pathlib import Path
-
 import mteb
-from sentence_transformers import SentenceTransformer
 
-from evaluation.mteb_runner.encoders import StaticEmbedder
+from evaluation.utilities import get_default_argparser, load_embedder
 from model2vec.logging_config import setup_logging
 
 # NOTE: we leave out "Retrieval" because it is too expensive to run.
@@ -15,36 +11,11 @@ ALL_TASKS_TYPES = ("Classification", "Clustering", "PairClassification", "Rerank
 
 
 def main() -> None:
-    parser = ArgumentParser()
-    parser.add_argument("--model_path", help="The model to use.", required=False)
-    parser.add_argument("--task_types", nargs="+", default=ALL_TASKS_TYPES)
-    parser.add_argument("--torch_model", required=False)
-    parser.add_argument("--input", action="store_true")
-    parser.add_argument("--word-level", action="store_true")
-    parser.add_argument("--suffix", default="")
-    parser.add_argument("--device", default="cpu")
+    parser = get_default_argparser()
+    parser.add_argument("--task-types", nargs="+", default=ALL_TASKS_TYPES)
     args = parser.parse_args()
 
-    embedder: StaticEmbedder | SentenceTransformer
-
-    if args.input and args.word_level:
-        raise ValueError("Both input and word level were passed.")
-
-    if not (args.model_path or args.torch_model):
-        raise ValueError("Either model path or torch model should be passed.")
-    if args.model_path:
-        if args.input:
-            embedder = StaticEmbedder.from_model(args.model_path)
-            name = embedder.name
-        elif args.word_level:
-            embedder = StaticEmbedder.from_vectors(args.model_path)
-            name = embedder.name
-        else:
-            # Always load on CPU
-            embedder = SentenceTransformer(model_name_or_path=args.model_path, device="cpu")
-            embedder = embedder.eval().to(args.device)
-            model_name = Path(args.model_path).name.replace("_", "-")
-            name = f"sentencetransformer_{model_name}"
+    embedder, name = load_embedder(args.model_path, args.input, args.word_level, args.device)
 
     if args.suffix:
         name = f"{name}_{args.suffix}"
