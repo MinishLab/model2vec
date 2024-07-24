@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from argparse import ArgumentParser
-
 import mteb
 
 from evaluation.utilities import get_default_argparser, load_embedder
