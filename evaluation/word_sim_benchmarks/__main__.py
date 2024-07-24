@@ -16,7 +16,7 @@ def main() -> None:
     parser = get_default_argparser()
     args = parser.parse_args()
 
-    embedder, name = load_embedder(args.input, args.word_level, args.model_path, args.device)
+    embedder, name = load_embedder(args.model_path, args.input, args.word_level, args.device)
     # Define the path the JSONL file containing paths and info about the tasks to evaluate
     tasks_file_path = "evaluation/word_sim_benchmarks/tasks.jsonl"
 

@@ -166,7 +166,7 @@ def main() -> None:
     parser = get_default_argparser()
     args = parser.parse_args()
 
-    embedder, name = load_embedder(args.input, args.word_level, args.model_path, args.device)
+    embedder, name = load_embedder(args.model_path, args.input, args.word_level, args.device)
 
     ppdb_dataset = load_dataset("Lihuchen/pearl_benchmark", "ppdb", split="test")
     ppbd_score = eval_ppdb(embedder, ppdb_dataset)

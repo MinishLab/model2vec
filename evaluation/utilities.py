@@ -20,7 +20,7 @@ def get_default_argparser() -> ArgumentParser:
     return parser
 
 
-def load_embedder(input_level: bool, word_level: bool, model_path: str, device: str) -> tuple[Embedder, str]:
+def load_embedder(model_path: str, input_level: bool, word_level: bool, device: str) -> tuple[Embedder, str]:
     embedder: Embedder
 
     if input_level and word_level:
