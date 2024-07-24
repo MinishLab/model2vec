@@ -71,7 +71,8 @@ class StaticEmbedder:
 
         if apply_zipf:
             # NOTE: zipf weighting
-            embeddings._vectors *= np.log(np.arange(1, len(embeddings) + 1))[:, None]
+            w = np.log(np.arange(1, len(embeddings) + 1))
+            embeddings._vectors *= w[:, None]
         if apply_frequency:
             weight = np.zeros(len(embeddings))
             for idx, word in enumerate(embeddings.sorted_items):
