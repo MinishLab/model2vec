@@ -72,8 +72,8 @@ class MultiwordModel2VecTokenizer(Model2VecTokenizer):
         tokenizer = _create_hf_tokenizer_from_vocab(vocabulary, unk_token, pad_token)
         automaton: AutomatonProtocol = Automaton()
         for token in tokenizer.vocab:
-            token = token.replace(" ", delimiter)
-            automaton.add_word(f" {token} ", token)
+            delim_token = token.replace(" ", delimiter)
+            automaton.add_word(f" {delim_token} ", token)
 
         automaton.make_automaton()
 
