@@ -80,7 +80,9 @@ class MultiwordModel2VecTokenizer(Model2VecTokenizer):
         return cls(tokenizer, automaton, delimiter)
 
 
-def create_model2vec_tokenizer(vocabulary: dict[str, int], unk_token: str, pad_token: str) -> Model2VecTokenizer:
+def create_model2vec_tokenizer_from_vocab(
+    vocabulary: dict[str, int], unk_token: str, pad_token: str
+) -> Model2VecTokenizer:
     if any(" " in token for token in vocabulary):
         return MultiwordModel2VecTokenizer.from_vocab(vocabulary, unk_token, pad_token)
     return Model2VecTokenizer.from_vocab(vocabulary, unk_token, pad_token)

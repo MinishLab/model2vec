@@ -145,10 +145,12 @@ def create_output_embeddings_from_model_name_and_tokens(
                     # NOTE: remove BOS/EOS
                     token_vectors = token_vectors[1:-1]
                 if len(token_vectors) == 0:
-                    logger.warning(f"Got empty token vectors for word {batch[idx]}")
+                    str_repr = batch[idx]
+                    bytes_repr = str_repr.encode("utf-8")
+                    logger.warning(f"Got empty token vectors for word {str_repr} with bytes {bytes_repr!r}")
                     mean_vector = np.zeros_like(intermediate_weights[-1])
                 else:
-                    mean_vector = token_vectors.cpu().numpy().mean(0)
+                    mean_vector = cast(np.ndarray, token_vectors.cpu().numpy()).mean(0)
                 intermediate_weights.append(mean_vector)
         out_weights = np.stack(intermediate_weights)
     else:

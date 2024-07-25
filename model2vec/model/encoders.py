@@ -12,7 +12,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 from wordfreq import word_frequency
 
-from model2vec.model.tokenizer import Model2VecTokenizer, create_model2vec_tokenizer
+from model2vec.model.tokenizer import Model2VecTokenizer, create_model2vec_tokenizer_from_vocab
 from model2vec.model.utilities import (
     add_token_to_reach,
     create_input_embeddings_from_model_name,
@@ -79,7 +79,7 @@ class StaticEmbedder:
                 weight[idx] = word_frequency(word, "en")
             embeddings._vectors *= np.log(1 / weight[:, None])
 
-        tokenizer = create_model2vec_tokenizer(embeddings.items, unk_token="[UNK]", pad_token="[PAD]")
+        tokenizer = create_model2vec_tokenizer_from_vocab(embeddings.items, unk_token="[UNK]", pad_token="[PAD]")
         return cls(embeddings, tokenizer)
 
     @classmethod
