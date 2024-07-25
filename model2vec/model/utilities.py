@@ -8,9 +8,6 @@ import torch
 from reach import Reach
 from sentence_transformers import SentenceTransformer
 from tokenizers import Tokenizer
-from tokenizers.models import WordLevel
-from tokenizers.normalizers import NFKC, Lowercase, Sequence
-from tokenizers.pre_tokenizers import Whitespace
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizerFast
 
@@ -148,10 +145,12 @@ def create_output_embeddings_from_model_name_and_tokens(
                     # NOTE: remove BOS/EOS
                     token_vectors = token_vectors[1:-1]
                 if len(token_vectors) == 0:
-                    logger.warning(f"Got empty token vectors for word {batch[idx]}")
+                    str_repr = batch[idx]
+                    bytes_repr = str_repr.encode("utf-8")
+                    logger.warning(f"Got empty token vectors for word {str_repr} with bytes {bytes_repr!r}")
                     mean_vector = np.zeros_like(intermediate_weights[-1])
                 else:
-                    mean_vector = token_vectors.cpu().numpy().mean(0)
+                    mean_vector = cast(np.ndarray, token_vectors.cpu().numpy()).mean(0)
                 intermediate_weights.append(mean_vector)
         out_weights = np.stack(intermediate_weights)
     else:
@@ -185,37 +184,6 @@ def _get_tokens_from_tokenizer(tokenizer: PreTrainedTokenizerFast) -> tuple[str,
     tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
 
     return tokens
-
-
-def create_tokenizer_from_vocab(vocabulary: dict[str, int], unk_token: str, pad_token: str) -> PreTrainedTokenizerFast:
-    """
-    Creates a _word_ level tokenizer from a pre-specified vocabulary and an unk token.
-
-    This tokenizer automatically normalizes, and splits using the Whitespace splitter.
-
-    :param vocabulary: The vocabulary mapping from strings to integers.
-    :param unk_token: The string representing the unk token.
-    :return: A word-level tokenizer.
-    """
-    if unk_token not in vocabulary:
-        raise ValueError(f"unk token: {unk_token} was not in your vocabulary.")
-
-    model = WordLevel(vocab=vocabulary, unk_token=unk_token)
-    tokenizer = Tokenizer(model)
-    tokenizer.pre_tokenizer = Whitespace()
-
-    # NOTE: unk token can be cased, doesn't matter.
-    is_cased = any(token != token.lower() for token in vocabulary if token not in {unk_token, pad_token})
-
-    normalization_steps = [NFKC()]
-    if not is_cased:
-        normalization_steps.append(Lowercase())
-    tokenizer.normalizer = Sequence(normalization_steps)
-
-    tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer)
-    tokenizer.add_special_tokens({"unk_token": unk_token, "pad_token": pad_token})
-
-    return tokenizer
 
 
 def safe_load_reach(path: PathLike) -> Reach:

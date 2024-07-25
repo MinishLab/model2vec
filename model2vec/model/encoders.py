@@ -9,13 +9,13 @@ import numpy as np
 from reach import Reach
 from sklearn.decomposition import PCA
 from tqdm import tqdm
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoTokenizer
 from wordfreq import word_frequency
 
+from model2vec.model.tokenizer import Model2VecTokenizer, create_model2vec_tokenizer_from_vocab
 from model2vec.model.utilities import (
     add_token_to_reach,
     create_input_embeddings_from_model_name,
-    create_tokenizer_from_vocab,
     safe_load_reach,
 )
 
@@ -26,7 +26,7 @@ logger = getLogger(__name__)
 
 
 class StaticEmbedder:
-    def __init__(self, vectors: Reach, tokenizer: PreTrainedTokenizer) -> None:
+    def __init__(self, vectors: Reach, tokenizer: Model2VecTokenizer) -> None:
         """
         Initialize the StaticEmbedder.
 
@@ -71,14 +71,15 @@ class StaticEmbedder:
 
         if apply_zipf:
             # NOTE: zipf weighting
-            embeddings._vectors *= np.log(np.arange(1, len(embeddings) + 1))[:, None]
+            w = np.log(np.arange(1, len(embeddings) + 1))
+            embeddings._vectors *= w[:, None]
         if apply_frequency:
             weight = np.zeros(len(embeddings))
             for idx, word in enumerate(embeddings.sorted_items):
                 weight[idx] = word_frequency(word, "en")
             embeddings._vectors *= np.log(1 / weight[:, None])
 
-        tokenizer = create_tokenizer_from_vocab(embeddings.items, unk_token="[UNK]", pad_token="[PAD]")
+        tokenizer = create_model2vec_tokenizer_from_vocab(embeddings.items, unk_token="[UNK]", pad_token="[PAD]")
         return cls(embeddings, tokenizer)
 
     @classmethod
