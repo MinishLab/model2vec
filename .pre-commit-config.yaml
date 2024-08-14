@@ -24,13 +24,3 @@ repos:
     rev: v1.10.0
     hooks:
       - id: mypy
-  - repo: local
-    hooks:
-      - id: unittest
-        name: unittest
-        entry: pytest .
-        language: system
-        types: [ python ]
-        pass_filenames: false
-        always_run: true
-        stages: [ commit ]
