@@ -1,14 +1,72 @@
 [project]
 name = "model2vec"
+description = "Amazing static embeddings"
 readme = "README.md"
+version = "0.1.0"
+
+dependencies = [
+    "click",
+    "datasets",
+    "huggingface-hub",
+    "more_itertools",
+    "numpy<2.0.0",
+    "pyahocorasick",
+    "reach",
+    "rich",
+    "scikit-learn",
+    "sentence_transformers",
+    "tokenizers",
+    "torch",
+    "tqdm",
+    "transformers",
+    "typer",
+    "wordfreq",
+]
+
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "ipython",
+    "mypy",
+    "pre-commit",
+    "pytest",
+    "pytest-coverage",
+    "ruff",
+]
 
 [tool.ruff]
 exclude = [".venv/"]
 line-length = 120
-lint.mccabe.max-complexity = 10
-lint.pydocstyle.convention = "numpy"
 target-version = "py310"
-lint.select = ["I"]  # Include Isort
+
+[tool.ruff.lint]
+select = [
+    # Annotations: Enforce type annotations
+    "ANN",
+    # Complexity: Enforce a maximum cyclomatic complexity
+    "C90",
+    # Pydocstyle: Enforce docstrings
+    "D",
+    # Isort: Enforce import order
+    "I",
+    # Numpy: Enforce numpy style
+    "NPY",
+    # Print: Forbid print statements
+    "T20",
+]
+
+ignore = [
+    # Allow self and cls to be untyped, and allow Any type
+    "ANN101", "ANN102", "ANN401",
+    # Pydocstyle ignores
+    "D203", "D213",
+    # Allow use of f-strings in logging
+    "G004"
+]
 
 [tool.mypy]
 python_version = "3.10"
