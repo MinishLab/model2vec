@@ -11,16 +11,24 @@ repos:
       - id: end-of-file-fixer
         description: Makes sure files end in a newline and only a newline.
       - id: check-added-large-files
+        args: ['--maxkb=5000']
         description: Prevent giant files from being committed.
       - id: check-case-conflict
         description: Check for files with names that would conflict on case-insensitive filesystems like MacOS/Windows.
+  - repo: https://github.com/jsh9/pydoclint
+    rev: 0.5.3
+    hooks:
+      - id: pydoclint
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.4.10
     hooks:
       - id: ruff
         args: [ --fix ]
       - id: ruff-format
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+  - repo: local
     hooks:
       - id: mypy
+        name: mypy
+        entry: mypy
+        language: python
+        types: [python]
