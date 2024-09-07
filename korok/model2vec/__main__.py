@@ -4,12 +4,12 @@ from typing import Annotated, Optional
 
 import typer
 
-from model2vec.logging_config import setup_logging
-from model2vec.model.utilities import (
+from korok.model2vec.utils import (
     create_output_embeddings_from_model_name_and_reach,
     create_output_embeddings_from_model_name_and_tokens,
     safe_load_reach,
 )
+from korok.utils import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def main(
     device: Annotated[str, typer.Option(help="The device to train the model on.")] = "cpu",
 ) -> None:
     """
-    This script creates output embeddings for a bunch of tokens from a model name and reach instance.
+    Create output embeddings for a bunch of tokens from a model name and reach instance.
 
     It does a forward pass for all tokens in the reach vocabulary.
     """

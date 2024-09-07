@@ -9,13 +9,11 @@ import numpy as np
 from reach import Reach
 from sklearn.decomposition import PCA
 from tqdm import tqdm
-from transformers import AutoTokenizer
 from wordfreq import word_frequency
 
-from model2vec.model.tokenizer import Model2VecTokenizer, create_model2vec_tokenizer_from_vocab
-from model2vec.model.utilities import (
+from korok.model2vec.tokenizer import Model2VecTokenizer, create_model2vec_tokenizer_from_vocab
+from korok.model2vec.utils import (
     add_token_to_reach,
-    create_input_embeddings_from_model_name,
     safe_load_reach,
 )
 
@@ -51,10 +49,14 @@ class StaticEmbedder:
         apply_frequency: bool = False,
     ) -> StaticEmbedder:
         """
-        This function creates a static embeddder by creating a word-level tokenizer.
+        Create a static embeddder by creating a word-level tokenizer.
 
-        :param vectors: A reach vector instance.
+        :param vector_path: The path to the vectors.
+        :param apply_pca: Whether to apply PCA to the vectors.
+        :param apply_zipf: Whether to apply Zipf weighting to the vectors.
+        :param apply_frequency: Whether to apply frequency weighting to the vectors.
         :return: A StaticEmbedder
+        :raises ValueError: If both apply_zipf and apply_frequency are True.
         """
         path = Path(vector_path)
         embeddings = safe_load_reach(path)
@@ -82,30 +84,12 @@ class StaticEmbedder:
         tokenizer = create_model2vec_tokenizer_from_vocab(embeddings.items, unk_token="[UNK]", pad_token="[PAD]")
         return cls(embeddings, tokenizer)
 
-    @classmethod
-    def from_model(
-        cls: type[StaticEmbedder], model_name: PathLike, module_path: tuple[str, ...] | None = None
-    ) -> StaticEmbedder:
-        """
-        Classmethod to create a StaticEmbedder from a model name.
-
-        :param model_name: The model name to use.
-        :param module_path: The module path to use.
-        :return: A StaticEmbedder.
-        """
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        if module_path is not None:
-            embeddings = create_input_embeddings_from_model_name(model_name, module_path)
-        else:
-            embeddings = create_input_embeddings_from_model_name(model_name)
-
-        return cls(embeddings, tokenizer)
-
     def encode(self, sentences: list[str], **kwargs: Any) -> np.ndarray:
         """
         Encode a list of sentences.
 
         :param sentences: The list of sentences to encode.
+        :param **kwargs: Additional keyword arguments.
         :return: The encoded sentences.
         """
         output = []
@@ -115,3 +99,16 @@ class StaticEmbedder:
             output.append(vector)
 
         return np.stack(output)
+
+
+def load_embedder(model_path: str) -> StaticEmbedder:
+    """
+    Load the embedder.
+
+    :param model_path: The path to the model.
+    :return: The embedder.
+    """
+    logger.info("Loading word level model")
+    embedder = StaticEmbedder.from_vectors(model_path, apply_pca=True, apply_zipf=True)
+
+    return embedder

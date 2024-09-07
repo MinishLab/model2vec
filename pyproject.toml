@@ -1,17 +1,16 @@
 [project]
-name = "model2vec"
+name = "korok"
 description = "Amazing static embeddings"
 readme = "README.md"
 version = "0.1.0"
-python-version = ">=3.10"
+requires-python = ">=3.10"
 
 dependencies = [
     "click",
     "datasets",
-    "huggingface-hub",
-    "more_itertools",
+    "evaluation@git+https://github.com/MinishLab/evaluation@main",
     "numpy<2.0.0",
-    "pyahocorasick",
+    "pretokenizers@git+https://github.com/MinishLab/pretokenizers@main",
     "reach",
     "rich",
     "scikit-learn",
@@ -27,6 +26,9 @@ dependencies = [
 [build-system]
 requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["korok"]
 
 [project.optional-dependencies]
 dev = [
