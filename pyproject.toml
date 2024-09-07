@@ -8,7 +8,7 @@ python-version = ">=3.10"
 dependencies = [
     "click",
     "datasets",
-    "evaluation@git+https://github.com/MinishLab/evaluation@add-package-data",
+    "evaluation@git+https://github.com/MinishLab/evaluation@main",
     "huggingface-hub",
     "more_itertools",
     "numpy<2.0.0",
