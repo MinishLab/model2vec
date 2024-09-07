@@ -19,7 +19,7 @@ attrs==24.2.0
 autofj==0.0.6
     # via evaluation
 black==24.8.0
-    # via model2vec (pyproject.toml)
+    # via korok (pyproject.toml)
 blis==0.7.11
     # via thinc
 catalogue==2.0.10
@@ -35,7 +35,7 @@ charset-normalizer==3.3.2
     # via requests
 click==8.1.7
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   black
     #   nltk
     #   typer
@@ -54,7 +54,7 @@ cymem==2.0.8
     #   thinc
 datasets==2.21.0
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   evaluation
     #   mteb
 decorator==5.1.1
@@ -70,7 +70,7 @@ editdistance==0.8.1
 eval-type-backport==0.2.0
     # via mteb
 evaluation @ git+https://github.com/MinishLab/evaluation@8a0c5b219a27927f290d6bcc6fa92817f6bcc944
-    # via model2vec (pyproject.toml)
+    # via korok (pyproject.toml)
 exceptiongroup==1.2.2
     # via
     #   ipython
@@ -101,7 +101,7 @@ ftfy==6.2.3
     # via wordfreq
 huggingface-hub==0.24.6
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   datasets
     #   evaluation
     #   sentence-transformers
@@ -116,7 +116,7 @@ idna==3.8
 iniconfig==2.0.0
     # via pytest
 ipython==8.27.0
-    # via model2vec (pyproject.toml)
+    # via korok (pyproject.toml)
 jedi==0.19.1
     # via ipython
 jellyfish==1.1.0
@@ -151,8 +151,8 @@ matplotlib-inline==0.1.7
     # via ipython
 mdurl==0.1.2
     # via markdown-it-py
-more-itertools==10.4.0
-    # via model2vec (pyproject.toml)
+more-itertools==10.5.0
+    # via korok (pyproject.toml)
 mpmath==1.3.0
     # via sympy
 msgpack==1.0.8
@@ -171,7 +171,7 @@ murmurhash==1.0.10
     #   spacy
     #   thinc
 mypy==1.11.2
-    # via model2vec (pyproject.toml)
+    # via korok (pyproject.toml)
 mypy-extensions==1.0.0
     # via
     #   black
@@ -186,7 +186,7 @@ nodeenv==1.9.1
     # via pre-commit
 numpy==1.26.4
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   autofj
     #   blis
     #   datasets
@@ -270,13 +270,13 @@ pluggy==1.5.0
 polars==1.6.0
     # via mteb
 pre-commit==3.8.0
-    # via model2vec (pyproject.toml)
+    # via korok (pyproject.toml)
 preshed==3.0.9
     # via
     #   spacy
     #   thinc
-pretokenizers @ git+https://github.com/MinishLab/pretokenizers@40bb430d302fdb5b5203e48985d7994cca547eba
-    # via model2vec (pyproject.toml)
+pretokenizers @ git+https://github.com/MinishLab/pretokenizers@ace46971d0c04f47b4c5b8551779ba73ae2ba2eb
+    # via korok (pyproject.toml)
 prompt-toolkit==3.0.47
     # via ipython
 ptyprocess==0.7.0
@@ -284,19 +284,19 @@ ptyprocess==0.7.0
 pure-eval==0.2.3
     # via stack-data
 pyahocorasick==2.1.0
-    # via model2vec (pyproject.toml)
+    # via korok (pyproject.toml)
 pyarrow==17.0.0
     # via datasets
 pybind11==2.13.5
     # via fasttext
-pydantic==2.8.2
+pydantic==2.9.0
     # via
     #   confection
     #   mteb
     #   spacy
     #   thinc
     #   weasel
-pydantic-core==2.20.1
+pydantic-core==2.23.2
     # via pydantic
 pygments==2.18.0
     # via
@@ -304,14 +304,14 @@ pygments==2.18.0
     #   rich
 pytest==8.3.2
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   pytest-cov
 pytest-cov==5.0.0
     # via pytest-cover
 pytest-cover==3.0.0
     # via pytest-coverage
 pytest-coverage==0.0
-    # via model2vec (pyproject.toml)
+    # via korok (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via pandas
 pytorch-lightning==2.4.0
@@ -329,7 +329,7 @@ pyyaml==6.0.2
     #   transformers
 reach==4.1.1
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   evaluation
 regex==2024.7.24
     # via
@@ -347,16 +347,16 @@ requests==2.32.3
     #   weasel
 rich==13.8.0
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   mteb
     #   typer
-ruff==0.6.3
-    # via model2vec (pyproject.toml)
-safetensors==0.4.4
+ruff==0.6.4
+    # via korok (pyproject.toml)
+safetensors==0.4.5
     # via transformers
 scikit-learn==1.5.1
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   evaluation
     #   mteb
     #   sentence-transformers
@@ -368,10 +368,10 @@ scipy==1.14.1
     #   sentence-transformers
 sentence-transformers==3.0.1
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   evaluation
     #   mteb
-setuptools==74.1.1
+setuptools==74.1.2
     # via
     #   fasttext
     #   lightning-utilities
@@ -410,7 +410,7 @@ threadpoolctl==3.5.0
     # via scikit-learn
 tokenizers==0.19.1
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   transformers
 tomli==2.0.1
     # via
@@ -418,9 +418,9 @@ tomli==2.0.1
     #   coverage
     #   mypy
     #   pytest
-torch==2.4.0
+torch==2.4.1
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   evaluation
     #   mteb
     #   pytorch-lightning
@@ -430,7 +430,7 @@ torchmetrics==1.4.1
     # via pytorch-lightning
 tqdm==4.66.5
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   datasets
     #   huggingface-hub
     #   mteb
@@ -446,13 +446,13 @@ traitlets==5.14.3
     #   matplotlib-inline
 transformers==4.44.2
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   sentence-transformers
 triton==3.0.0
     # via torch
 typer==0.12.5
     # via
-    #   model2vec (pyproject.toml)
+    #   korok (pyproject.toml)
     #   spacy
     #   weasel
 typing-extensions==4.12.2
@@ -470,7 +470,9 @@ typing-extensions==4.12.2
     #   torch
     #   typer
 tzdata==2024.1
-    # via pandas
+    # via
+    #   pandas
+    #   pydantic
 urllib3==2.2.2
     # via requests
 virtualenv==20.26.3
@@ -487,10 +489,10 @@ wcwidth==0.2.13
 weasel==0.4.1
     # via spacy
 wordfreq==3.1.1
-    # via model2vec (pyproject.toml)
+    # via korok (pyproject.toml)
 wrapt==1.16.0
     # via smart-open
 xxhash==3.5.0
     # via datasets
-yarl==1.9.8
+yarl==1.10.0
     # via aiohttp
