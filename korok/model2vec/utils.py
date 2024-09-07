@@ -24,39 +24,6 @@ class ModulewithWeights(Protocol):
     weight: torch.nn.Parameter
 
 
-def create_input_embeddings_from_model_name(
-    model_name: PathLike, module_path: tuple[str, ...] = ("embeddings", "word_embeddings")
-) -> Reach:
-    """
-    This function creates input embeddings from a model name and a module path.
-
-    :param model_name: The model name to use.
-    :param module_path: The module path to use.
-    :return: The Reach input embeddings.
-    """
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    transformer = AutoModel.from_pretrained(model_name)
-    tokens = _get_tokens_from_tokenizer(tokenizer)
-
-    module: ModulewithWeights = transformer
-    for path in module_path:
-        module = getattr(module, path)
-
-    weight: torch.Tensor = module.weight.detach()
-    if len(tokens) > weight.shape[0]:
-        raise ValueError("Got more tokens than embedding weights. No idea what to do.")
-    if weight.shape[0] > len(tokens):
-        logger.warning(
-            "Num input embeddings and num tokens does not match. Truncating embeddings. Please check if this is correct."
-        )
-        weight = weight[: len(tokens)]
-
-    name = Path(model_name).stem.replace("_", "-")
-    embeddings = Reach(weight.numpy(), list(tokens), name=f"input_{name}")
-
-    return embeddings
-
-
 def create_output_embeddings_from_model_name(
     model_name: PathLike,
     device: str = "cpu",
@@ -64,7 +31,7 @@ def create_output_embeddings_from_model_name(
     include_eos_bos: bool = False,
 ) -> Reach:
     """
-    This function creates output embeddings from a model name.
+    Create output embeddings from a model name.
 
     It does a forward pass for all tokens in the vocabulary.
 
@@ -94,7 +61,7 @@ def create_output_embeddings_from_model_name_and_reach(
     include_eos_bos: bool = False,
 ) -> Reach:
     """
-    This function creates output embeddings for a bunch of tokens from a model name and reach instance.
+    Create output embeddings for a bunch of tokens from a model name and reach instance.
 
     It does a forward pass for all tokens in the reach vocabulary.
 
@@ -119,9 +86,9 @@ def create_output_embeddings_from_model_name_and_tokens(
     include_eos_bos: bool,
 ) -> Reach:
     """
-    This function creates output embeddings for a bunch of tokens from a model name
+    Create output embeddings for a bunch of tokens from a model name.
 
-    It does a forward pass for all tokens passed in tokens
+    It does a forward pass for all tokens passed in tokens.
 
     :param model_name: The model name to use.
     :param device: The torch device to use.
@@ -175,7 +142,7 @@ def create_output_embeddings_from_model_name_and_tokens(
 
 def _get_tokens_from_tokenizer(tokenizer: PreTrainedTokenizerFast) -> tuple[str, ...]:
     """
-    Gets all tokens from the vocabulary of a tokenizer in sort order.
+    Get all tokens from the vocabulary of a tokenizer in sort order.
 
     :param tokenizer: The tokenizer from which to get the vocabulary.
     :return: A list of tokens, sorted by vocabulary index.
@@ -203,7 +170,7 @@ def safe_load_reach(path: PathLike) -> Reach:
 
 def add_token_to_reach(embeddings: Reach, token: str, set_as_unk: bool) -> Reach:
     """
-    Adds a token to a reach instance if it does not already exist.
+    Add a token to a reach instance if it does not already exist.
 
     NOTE: this function modifies the input embeddings in place.
 

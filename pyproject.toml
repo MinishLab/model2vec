@@ -1,5 +1,5 @@
 [project]
-name = "model2vec"
+name = "korok"
 description = "Amazing static embeddings"
 readme = "README.md"
 version = "0.1.0"
@@ -7,9 +7,11 @@ version = "0.1.0"
 dependencies = [
     "click",
     "datasets",
+    "evaluation@git+https://github.com/MinishLab/evaluation@add-package-data",
     "huggingface-hub",
     "more_itertools",
     "numpy<2.0.0",
+    "pretokenizers@git+https://github.com/MinishLab/pretokenizers@main",
     "pyahocorasick",
     "reach",
     "rich",
@@ -26,6 +28,9 @@ dependencies = [
 [build-system]
 requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["korok"]
 
 [project.optional-dependencies]
 dev = [
@@ -58,15 +63,22 @@ select = [
     # Print: Forbid print statements
     "T20",
 ]
-
 ignore = [
     # Allow self and cls to be untyped, and allow Any type
     "ANN101", "ANN102", "ANN401",
     # Pydocstyle ignores
-    "D203", "D213",
+    "D100", "D101", "D104", "D203", "D212", "D401",
     # Allow use of f-strings in logging
     "G004"
 ]
+
+[tool.pydoclint]
+style = "sphinx"
+exclude = "test_"
+allow-init-docstring = true
+arg-type-hints-in-docstring = false
+check-return-types = false
+require-return-section-when-returning-nothing = false
 
 [tool.mypy]
 python_version = "3.10"

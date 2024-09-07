@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterator, Protocol, TypeVar
+from typing import Any, Iterator, Protocol, TypeVar
 
 from ahocorasick import Automaton
 from tokenizers import Tokenizer
@@ -11,26 +11,44 @@ from transformers import PreTrainedTokenizerFast
 
 
 class AutomatonProtocol(Protocol):
-    def __init__(self, *args, **kwargs) -> None: ...
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the automaton."""
+        ...
 
-    def add_word(self, word: str, value: str) -> None: ...
+    def add_word(self, word: str, value: str) -> None:
+        """Add a word to the automaton."""
+        ...
 
-    def make_automaton(self) -> None: ...
+    def make_automaton(self) -> None:
+        """Make the automaton."""
+        ...
 
-    def iter_long(self, text: str) -> Iterator[tuple[int, str]]: ...
+    def iter_long(self, text: str) -> Iterator[tuple[int, str]]:
+        """Iterate over the longest matches."""
+        ...
 
 
 class Model2VecTokenizer:
     def __init__(self, tokenizer: PreTrainedTokenizerFast) -> None:
+        """Initialize the Model2VecTokenizer."""
         self.tokenizer = tokenizer
 
     def tokenize(self, text: str) -> list[str]:
+        """Tokenize the text."""
         return self.tokenizer.tokenize(text)
 
     @classmethod
     def from_vocab(
         cls: type[TokenizerType], vocabulary: dict[str, int], unk_token: str, pad_token: str
     ) -> TokenizerType:
+        """
+        Create a Model2VecTokenizer from a vocabulary.
+
+        :param vocabulary: The vocabulary mapping from strings to integers.
+        :param unk_token: The string representing the unk token.
+        :param pad_token: The string representing the pad token.
+        :return: A Model2VecTokenizer.
+        """
         tokenizer = _create_hf_tokenizer_from_vocab(vocabulary, unk_token, pad_token)
 
         return cls(tokenizer)
@@ -41,6 +59,13 @@ TokenizerType = TypeVar("TokenizerType", bound=Model2VecTokenizer)
 
 class MultiwordModel2VecTokenizer(Model2VecTokenizer):
     def __init__(self, tokenizer: PreTrainedTokenizerFast, automaton: AutomatonProtocol, delimiter: str) -> None:
+        """
+        Initialize the MultiwordModel2VecTokenizer.
+
+        :param tokenizer: The tokenizer to use.
+        :param automaton: The automaton to use.
+        :param delimiter: The delimiter to use.
+        """
         super().__init__(tokenizer)
         self.automaton = automaton
         self.delimiter = delimiter
@@ -48,12 +73,14 @@ class MultiwordModel2VecTokenizer(Model2VecTokenizer):
         self.normalizer: Sequence = self.tokenizer.backend_tokenizer.normalizer
 
     def _pseudo_tokenize(self, text: str) -> str:
+        """Pseudo-tokenize the text."""
         normalized = self.normalizer.normalize_str(text)
         tokens, _ = zip(*self.pre_tokenizer.pre_tokenize_str(normalized))
 
         return f"{self.delimiter}{self.delimiter.join(tokens)}{self.delimiter}"
 
     def tokenize(self, text: str) -> list[str]:
+        """Tokenize the text."""
         delimited = self._pseudo_tokenize(text)
 
         tokens = []
@@ -69,6 +96,15 @@ class MultiwordModel2VecTokenizer(Model2VecTokenizer):
         pad_token: str,
         delimiter: str = "   ",
     ) -> MultiwordModel2VecTokenizer:
+        """
+        Create a MultiwordModel2VecTokenizer from a vocabulary.
+
+        :param vocabulary: The vocabulary mapping from strings to integers.
+        :param unk_token: The string representing the unk token.
+        :param pad_token: The string representing the pad token.
+        :param delimiter: The delimiter to use.
+        :return: A MultiwordModel2VecTokenizer.
+        """
         tokenizer = _create_hf_tokenizer_from_vocab(vocabulary, unk_token, pad_token)
         automaton: AutomatonProtocol = Automaton()
         for token in tokenizer.vocab:
@@ -83,6 +119,14 @@ class MultiwordModel2VecTokenizer(Model2VecTokenizer):
 def create_model2vec_tokenizer_from_vocab(
     vocabulary: dict[str, int], unk_token: str, pad_token: str
 ) -> Model2VecTokenizer:
+    """
+    Create a Model2VecTokenizer from a vocabulary.
+
+    :param vocabulary: The vocabulary mapping from strings to integers.
+    :param unk_token: The string representing the unk token.
+    :param pad_token: The string representing the pad token.
+    :return: A Model2VecTokenizer.
+    """
     if any(" " in token for token in vocabulary):
         return MultiwordModel2VecTokenizer.from_vocab(vocabulary, unk_token, pad_token)
     return Model2VecTokenizer.from_vocab(vocabulary, unk_token, pad_token)

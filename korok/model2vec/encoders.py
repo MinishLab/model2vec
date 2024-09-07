@@ -6,16 +6,17 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from mteb.encoder_interface import Encoder
 from reach import Reach
+from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 from transformers import AutoTokenizer
 from wordfreq import word_frequency
 
-from model2vec.model.tokenizer import Model2VecTokenizer, create_model2vec_tokenizer_from_vocab
-from model2vec.model.utilities import (
+from korok.model2vec.tokenizer import Model2VecTokenizer, create_model2vec_tokenizer_from_vocab
+from korok.model2vec.utils import (
     add_token_to_reach,
-    create_input_embeddings_from_model_name,
     safe_load_reach,
 )
 
@@ -51,7 +52,7 @@ class StaticEmbedder:
         apply_frequency: bool = False,
     ) -> StaticEmbedder:
         """
-        This function creates a static embeddder by creating a word-level tokenizer.
+        Create a static embeddder by creating a word-level tokenizer.
 
         :param vectors: A reach vector instance.
         :return: A StaticEmbedder
@@ -82,25 +83,6 @@ class StaticEmbedder:
         tokenizer = create_model2vec_tokenizer_from_vocab(embeddings.items, unk_token="[UNK]", pad_token="[PAD]")
         return cls(embeddings, tokenizer)
 
-    @classmethod
-    def from_model(
-        cls: type[StaticEmbedder], model_name: PathLike, module_path: tuple[str, ...] | None = None
-    ) -> StaticEmbedder:
-        """
-        Classmethod to create a StaticEmbedder from a model name.
-
-        :param model_name: The model name to use.
-        :param module_path: The module path to use.
-        :return: A StaticEmbedder.
-        """
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        if module_path is not None:
-            embeddings = create_input_embeddings_from_model_name(model_name, module_path)
-        else:
-            embeddings = create_input_embeddings_from_model_name(model_name)
-
-        return cls(embeddings, tokenizer)
-
     def encode(self, sentences: list[str], **kwargs: Any) -> np.ndarray:
         """
         Encode a list of sentences.
@@ -115,3 +97,29 @@ class StaticEmbedder:
             output.append(vector)
 
         return np.stack(output)
+
+
+def load_embedder(model_path: str, word_level: bool, device: str = "cpu") -> tuple[Encoder, str]:
+    """
+    Load the embedder.
+
+    :param model_path: The path to the model.
+    :param word_level: Whether to use word level embeddings.
+    :param device: The device to use.
+    :return: The embedder and the name of the model.
+    """
+    embedder: Encoder
+
+    if word_level:
+        logger.info("Loading word level model")
+        embedder = StaticEmbedder.from_vectors(model_path, apply_pca=True, apply_zipf=True)
+        name = embedder.name
+    else:
+        logger.info("Loading SentenceTransformer model")
+        # Always load on CPU
+        embedder = SentenceTransformer(model_name_or_path=model_path, device="cpu")
+        embedder = embedder.eval().to(device)
+        model_name = Path(model_path).name.replace("_", "-")
+        name = f"sentencetransformer_{model_name}"
+
+    return embedder, name
