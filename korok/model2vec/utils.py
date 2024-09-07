@@ -9,7 +9,7 @@ from reach import Reach
 from sentence_transformers import SentenceTransformer
 from tokenizers import Tokenizer
 from tqdm import tqdm
-from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizerFast
+from transformers import PreTrainedTokenizerFast
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +91,7 @@ def create_output_embeddings_from_model_name_and_tokens(
     It does a forward pass for all tokens passed in tokens.
 
     :param model_name: The model name to use.
+    :param tokens: The tokens to use.
     :param device: The torch device to use.
     :param output_value: The output value to pass to sentence transformers. If this is 'sentence_embedding', get pooled output, if this is 'token_embedding', get token means.
     :param include_eos_bos: Whether to include the eos and bos tokens in the mean. Only applied if output_value == "token_embeddings".

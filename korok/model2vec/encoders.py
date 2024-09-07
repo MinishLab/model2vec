@@ -3,15 +3,13 @@ from __future__ import annotations
 
 from logging import getLogger
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 import numpy as np
-from mteb.encoder_interface import Encoder
 from reach import Reach
 from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
 from tqdm import tqdm
-from transformers import AutoTokenizer
 from wordfreq import word_frequency
 
 from korok.model2vec.tokenizer import Model2VecTokenizer, create_model2vec_tokenizer_from_vocab
@@ -54,8 +52,12 @@ class StaticEmbedder:
         """
         Create a static embeddder by creating a word-level tokenizer.
 
-        :param vectors: A reach vector instance.
+        :param vector_path: The path to the vectors.
+        :param apply_pca: Whether to apply PCA to the vectors.
+        :param apply_zipf: Whether to apply Zipf weighting to the vectors.
+        :param apply_frequency: Whether to apply frequency weighting to the vectors.
         :return: A StaticEmbedder
+        :raises ValueError: If both apply_zipf and apply_frequency are True.
         """
         path = Path(vector_path)
         embeddings = safe_load_reach(path)
@@ -88,6 +90,7 @@ class StaticEmbedder:
         Encode a list of sentences.
 
         :param sentences: The list of sentences to encode.
+        :param **kwargs: Additional keyword arguments.
         :return: The encoded sentences.
         """
         output = []
@@ -97,6 +100,9 @@ class StaticEmbedder:
             output.append(vector)
 
         return np.stack(output)
+
+
+Encoder: TypeAlias = StaticEmbedder | SentenceTransformer
 
 
 def load_embedder(model_path: str, word_level: bool, device: str = "cpu") -> tuple[Encoder, str]:
