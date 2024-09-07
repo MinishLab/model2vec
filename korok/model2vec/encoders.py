@@ -3,11 +3,10 @@ from __future__ import annotations
 
 from logging import getLogger
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any
 
 import numpy as np
 from reach import Reach
-from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 from wordfreq import word_frequency
@@ -102,30 +101,14 @@ class StaticEmbedder:
         return np.stack(output)
 
 
-Encoder: TypeAlias = StaticEmbedder | SentenceTransformer
-
-
-def load_embedder(model_path: str, word_level: bool, device: str = "cpu") -> tuple[Encoder, str]:
+def load_embedder(model_path: str) -> StaticEmbedder:
     """
     Load the embedder.
 
     :param model_path: The path to the model.
-    :param word_level: Whether to use word level embeddings.
-    :param device: The device to use.
-    :return: The embedder and the name of the model.
+    :return: The embedder.
     """
-    embedder: Encoder
+    logger.info("Loading word level model")
+    embedder = StaticEmbedder.from_vectors(model_path, apply_pca=True, apply_zipf=True)
 
-    if word_level:
-        logger.info("Loading word level model")
-        embedder = StaticEmbedder.from_vectors(model_path, apply_pca=True, apply_zipf=True)
-        name = embedder.name
-    else:
-        logger.info("Loading SentenceTransformer model")
-        # Always load on CPU
-        embedder = SentenceTransformer(model_name_or_path=model_path, device="cpu")
-        embedder = embedder.eval().to(device)
-        model_name = Path(model_path).name.replace("_", "-")
-        name = f"sentencetransformer_{model_name}"
-
-    return embedder, name
+    return embedder
