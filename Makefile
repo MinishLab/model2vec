@@ -4,7 +4,7 @@ clean:
 venv:
 	uv venv
 
-install: venv
+install:
 	uv sync --all-extras
 	uv run pre-commit install
 
@@ -12,4 +12,4 @@ fix:
 	uv run pre-commit run --all-files
 
 test:
-	uv run pytest --cov=model2vec --cov-report=term-missing
+	uv run pytest --cov=korok --cov-report=term-missing
