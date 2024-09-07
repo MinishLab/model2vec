@@ -1,9 +1,10 @@
+import json
 import logging
 from pathlib import Path
 from typing import Annotated
 
 import typer
-from datasets import Dataset
+from datasets import Dataset, DatasetInfo
 
 from korok.model2vec.utils import create_output_embeddings_from_model_name_and_tokens
 from korok.utils import setup_logging
@@ -35,7 +36,14 @@ def main(
 
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
-    dataset = Dataset.from_dict({"tokens": tokens, "vectors": vectors}).with_format("numpy")
+    metadata_dict = {
+        "description": "Model2Vec embeddings.",
+        "vocabulary_path": Path(vocabulary_path).name,
+        "model_name": model_name,
+        "tokenizer": "word",
+    }
+    info = DatasetInfo(description=json.dumps(metadata_dict))
+    dataset = Dataset.from_dict({"tokens": tokens, "vectors": vectors}, info=info).with_format("numpy")
     dataset.save_to_disk(save_path)
 
 
