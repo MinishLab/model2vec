@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
+from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizer
+from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 
 logger = logging.getLogger(__name__)
 
@@ -71,3 +73,41 @@ def create_output_embeddings_from_model_name_and_tokens(
         )
 
     return tokens, out_weights
+
+
+def create_output_embeddings_from_model_name(
+    model_name: PathLike,
+    device: str,
+) -> tuple[list[str], np.ndarray]:
+    """
+    Create output embeddings for a bunch of tokens from a model name.
+
+    It does a forward pass for all ids in the tokenizer.
+
+    :param model_name: The model name to use.
+    :param device: The torch device to use.
+    :return: The tokens and output emnbeddings.
+    """
+    model: PreTrainedModel = AutoModel.from_pretrained(model_name).to(device)
+    tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(model_name)
+    ids = torch.arange(tokenizer.vocab_size)
+
+    # Work-around
+    dummy_encoding = tokenizer.encode("A")
+    eos_token_id, bos_token_id = dummy_encoding[0], dummy_encoding[-1]
+
+    eos = torch.full([len(ids)], fill_value=eos_token_id)
+    bos = torch.full([len(ids)], fill_value=bos_token_id)
+
+    stacked = torch.stack([bos, ids, eos], dim=1)
+
+    intermediate_weights: list[np.ndarray] = []
+    for batch_idx in tqdm(range(0, len(stacked), _DEFAULT_BATCH_SIZE)):
+        batch = stacked[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]
+        with torch.no_grad():
+            encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(input_ids=batch.to(device))
+            out: torch.Tensor = encoded.last_hidden_state
+        intermediate_weights.append(out[:, 1].cpu().numpy())
+    out_weights = np.concatenate(intermediate_weights)
+
+    return tokenizer.convert_ids_to_tokens(ids), out_weights
