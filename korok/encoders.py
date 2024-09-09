@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from collections import Counter
 from logging import getLogger
 from pathlib import Path
 from typing import Any
