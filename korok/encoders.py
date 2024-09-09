@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from collections import Counter
 from logging import getLogger
 from pathlib import Path
 from typing import Any
@@ -9,9 +10,8 @@ import numpy as np
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 from transformers import PreTrainedTokenizerFast
-from wordfreq import word_frequency
 
-from korok.utils import load_pretrained
+from korok.utils import load_pretrained, save_pretrained
 
 PathLike = Path | str
 
@@ -35,13 +35,20 @@ class StaticEmbedder:
         self.unk_index = tokenizer.get_vocab()[self.tokenizer.unk_token]
         self.config = config
 
+    def save_pretrained(self, path: PathLike) -> None:
+        """
+        Save the pretrained model.
+
+        :param path: The path to save to.
+        """
+        save_pretrained(Path(path), self.vectors, self.tokenizer, self.config)
+
     @classmethod
     def from_pretrained(
         cls: type[StaticEmbedder],
         path: PathLike,
         apply_pca: bool = True,
         apply_zipf: bool = True,
-        apply_frequency: bool = False,
     ) -> StaticEmbedder:
         """
         Create a static embeddder by creating a word-level tokenizer.
@@ -49,32 +56,20 @@ class StaticEmbedder:
         :param path: The path to point to.
         :param apply_pca: Whether to apply PCA to the vectors.
         :param apply_zipf: Whether to apply Zipf weighting to the vectors.
-        :param apply_frequency: Whether to apply frequency weighting to the vectors.
         :return: A StaticEmbedder
-        :raises ValueError: If both apply_zipf and apply_frequency are True.
         """
         path = Path(path)
 
         embeddings, tokenizer, config = load_pretrained(path)
 
-        tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
-
         if apply_pca and embeddings.shape[1] > 300:
             p = PCA(n_components=300, whiten=False)
             embeddings = p.fit_transform(embeddings)
-
-        if apply_zipf and apply_frequency:
-            raise ValueError("Cannot apply both zipf and frequency weighting.")
 
         if apply_zipf:
             # NOTE: zipf weighting
             w = np.log(np.arange(1, len(embeddings) + 1))
             embeddings *= w[:, None]
-        if apply_frequency:
-            weight = np.zeros(len(embeddings))
-            for idx, word in enumerate(tokens):
-                weight[idx] = word_frequency(word, "en", minimum=1e-8)
-            embeddings *= 1 / weight[:, None]
 
         return cls(embeddings, tokenizer, config)
 
