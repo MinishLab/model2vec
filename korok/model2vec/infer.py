@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 PathLike = str | Path
 
 _DEFAULT_BATCH_SIZE = 1024
+
 OutputValue = Literal["sentence_embedding", "token_embeddings"]
 
 

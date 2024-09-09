@@ -7,16 +7,14 @@ from tokenizers.pre_tokenizers import Whitespace
 from transformers import PreTrainedTokenizerFast
 
 
-def create_model2vec_tokenizer_from_vocab(
-    vocabulary: list[str], unk_token: str, pad_token: str
-) -> PreTrainedTokenizerFast:
+def create_tokenizer_from_vocab(vocabulary: list[str], unk_token: str, pad_token: str) -> PreTrainedTokenizerFast:
     """
-    Create a Model2VecTokenizer from a vocabulary.
+    Create a word level tokenizer from a vocabulary.
 
     :param vocabulary: The vocabulary mapping from strings to integers.
     :param unk_token: The string representing the unk token.
     :param pad_token: The string representing the pad token.
-    :return: A Model2VecTokenizer.
+    :return: A word level tokenizer.
     :raises ValueError: If the unk_token or pad_token is not in the vocabulary.
     """
     vocabulary_indexed = {token: idx for idx, token in enumerate(vocabulary)}
