@@ -26,10 +26,15 @@ class StaticEmbedder:
         :param vectors: The vectors to use.
         :param tokenizer: The Transformers tokenizer to use.
         :param config: Any metadata config.
+        :raises: ValueError if the number of tokens does not match the number of vectors.
         """
         tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
         self.vectors = vectors
         self.tokens = tokens
+
+        if len(tokens) != vectors.shape[0]:
+            raise ValueError(f"Number of tokens ({len(tokens)}) does not match number of vectors ({vectors.shape[0]})")
+
         self.tokenizer = tokenizer
         self.unk_index = tokenizer.get_vocab()[self.tokenizer.unk_token]
         self.config = config
