@@ -7,17 +7,12 @@ requires-python = ">=3.10"
 
 dependencies = [
     "click",
-    "datasets",
-    "evaluation@git+https://github.com/MinishLab/evaluation@main",
     "numpy",
     "rich",
     "scikit-learn",
-    "sentence_transformers",
-    "tokenizers",
-    "torch",
     "tqdm",
-    "transformers",
     "typer",
+    "transformers"
 ]
 
 [build-system]
@@ -37,6 +32,8 @@ dev = [
     "pytest-coverage",
     "ruff",
 ]
+model2vec = ["torch", "sentence_transformers", "tokenizers"]
+evaluation = ["evaluation@git+https://github.com/MinishLab/evaluation@main"]
 
 [tool.ruff]
 exclude = [".venv/"]
