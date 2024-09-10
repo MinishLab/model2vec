@@ -9,9 +9,7 @@ dependencies = [
     "click",
     "datasets",
     "evaluation@git+https://github.com/MinishLab/evaluation@main",
-    "numpy<2.0.0",
-    "pretokenizers@git+https://github.com/MinishLab/pretokenizers@main",
-    "reach",
+    "numpy",
     "rich",
     "scikit-learn",
     "sentence_transformers",
@@ -20,7 +18,6 @@ dependencies = [
     "tqdm",
     "transformers",
     "typer",
-    "wordfreq",
 ]
 
 [build-system]
