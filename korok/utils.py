@@ -11,6 +11,8 @@ from rich.logging import RichHandler
 from safetensors.numpy import save_file
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
+logger = logging.getLogger(__name__)
+
 
 class SafeOpenProtocol(Protocol):
     """Protocol to fix safetensors safe open."""
@@ -46,6 +48,8 @@ def save_pretrained(
     tokenizer.save_pretrained(folder_path)
     json.dump(config, open(folder_path / "config.json", "w"))
 
+    logger.info(f"Saved model to {folder_path}")
+
 
 def load_pretrained(folder_path: Path) -> tuple[np.ndarray, PreTrainedTokenizerFast, dict[str, Any]]:
     """Loads a pretrained model from a folder."""
@@ -56,5 +60,10 @@ def load_pretrained(folder_path: Path) -> tuple[np.ndarray, PreTrainedTokenizerF
 
     tokenizer = AutoTokenizer.from_pretrained(folder_path)
     config = json.load(open(folder_path / "config.json"))
+
+    if len(tokenizer.get_vocab()) != len(embeddings):
+        logger.warning(
+            f"Number of tokens does not match number of embeddings: `{len(tokenizer.get_vocab())}` vs `{len(embeddings)}`"
+        )
 
     return embeddings, tokenizer, config
