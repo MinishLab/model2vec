@@ -47,7 +47,7 @@ def main(
         if "[UNK]" not in tokens:
             tokens = ["[UNK]"] + tokens
         tokens, embeddings = create_output_embeddings_from_model_name_and_tokens(
-            model_name, tokens, device=device, output_value="token_embeddings", include_eos_bos=False
+            model_name=model_name, tokens=tokens, device=device, output_value="token_embeddings", include_eos_bos=False
         )
         vocabulary_path_name = Path(vocabulary_path).name
         tokenizer_name = "word_level"

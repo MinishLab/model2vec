@@ -44,6 +44,9 @@ def create_output_embeddings_from_model_name_and_tokens(
     :return: The tokens and output emnbeddings.
     """
     embedder = SentenceTransformer(str(model_name), device=device)
+
+    embedder_output_dim = _get_embedder_output_dim(output_value, embedder)
+
     out_weights: np.ndarray
     if output_value == "token_embeddings":
         intermediate_weights: list[np.ndarray] = []
@@ -62,7 +65,7 @@ def create_output_embeddings_from_model_name_and_tokens(
                     str_repr = batch[idx]
                     bytes_repr = str_repr.encode("utf-8")
                     logger.warning(f"Got empty token vectors for word `{str_repr}` with bytes `{bytes_repr!r}`")
-                    mean_vector = np.zeros_like(intermediate_weights[-1])
+                    mean_vector = np.zeros(embedder_output_dim)
                 else:
                     mean_vector = cast(np.ndarray, token_vectors.cpu().numpy()).mean(0)
                 intermediate_weights.append(mean_vector)
@@ -74,6 +77,13 @@ def create_output_embeddings_from_model_name_and_tokens(
         )
 
     return tokens, out_weights
+
+
+def _get_embedder_output_dim(output_value: OutputValue, embedder: SentenceTransformer) -> int:
+    """Get the embeddings dimension of a sentence transformer, given an output value."""
+    embedder_output_dim = embedder.encode(["a"], show_progress_bar=False, output_value=output_value)[0].shape[0]
+
+    return embedder_output_dim
 
 
 def create_output_embeddings_from_model_name(
