@@ -24,7 +24,7 @@ def main(
     save_path: Annotated[str, typer.Option(help="The folder to save the model to.")],
     vocabulary_path: Annotated[
         Optional[str],
-        typer.Option(help="The path to the vocabulary file. If this is passed, the features_path option is ignored."),
+        typer.Option(help="The path to the vocabulary file. If this is not passed, we use the model's vocabulary."),
     ] = None,
     device: Annotated[str, typer.Option(help="The device to train the model on.")] = "cpu",
 ) -> None:
