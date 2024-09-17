@@ -803,14 +803,9 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
-    { name = "datasets" },
-    { name = "evaluation" },
     { name = "numpy" },
     { name = "rich" },
     { name = "scikit-learn" },
-    { name = "sentence-transformers" },
-    { name = "tokenizers" },
-    { name = "torch" },
     { name = "tqdm" },
     { name = "transformers" },
     { name = "typer" },
@@ -826,13 +821,20 @@ dev = [
     { name = "pytest-coverage" },
     { name = "ruff" },
 ]
+evaluation = [
+    { name = "evaluation" },
+]
+model2vec = [
+    { name = "sentence-transformers" },
+    { name = "tokenizers" },
+    { name = "torch" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "click" },
-    { name = "datasets" },
-    { name = "evaluation", git = "https://github.com/MinishLab/evaluation?rev=main" },
+    { name = "evaluation", marker = "extra == 'evaluation'", git = "https://github.com/MinishLab/evaluation?rev=main" },
     { name = "ipython", marker = "extra == 'dev'" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numpy" },
@@ -842,9 +844,9 @@ requires-dist = [
     { name = "rich" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "scikit-learn" },
-    { name = "sentence-transformers" },
-    { name = "tokenizers" },
-    { name = "torch" },
+    { name = "sentence-transformers", marker = "extra == 'model2vec'" },
+    { name = "tokenizers", marker = "extra == 'model2vec'" },
+    { name = "torch", marker = "extra == 'model2vec'" },
     { name = "tqdm" },
     { name = "transformers" },
     { name = "typer" },
