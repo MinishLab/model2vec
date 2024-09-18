@@ -77,7 +77,11 @@ def distill(
         tokenizer = AutoTokenizer.from_pretrained(model_name)
     else:
         tokens, embeddings = create_output_embeddings_from_model_name_and_tokens(
-            model_name=model_name, tokens=tokens, device=device, output_value="token_embeddings", include_eos_bos=False
+            model_name=model_name,
+            tokens=vocabulary,
+            device=device,
+            output_value="token_embeddings",
+            include_eos_bos=False,
         )
         tokenizer_name = "word_level"
         tokenizer = create_tokenizer_from_vocab(tokens, unk_token="[UNK]", pad_token="[PAD]")
