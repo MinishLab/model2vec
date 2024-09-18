@@ -46,10 +46,10 @@ python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-pat
 from model2vec import StaticEmbedder
 
 model_name = "model2vec_model"
-model2vec_model = StaticEmbedder.from_pretrained(model_name)
+model = StaticEmbedder.from_pretrained(model_name)
 
 # Get embeddings
-embeddings = model2vec_model.encode["It's dangerous to go alone!", "It's a secret to everyone."]
+embeddings = model.encode["It's dangerous to go alone!", "It's a secret to everyone."]
 ```
 
 ### Evaluating a Model2Vec model
@@ -82,6 +82,10 @@ print(make_leaderboard(task_scores))
 ```
 
 ## What is Model2Vec?
+Model2Vec is a simple and effective method to turn any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
+
+This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as Glove.
+
 
 ## Who is this for?
 
