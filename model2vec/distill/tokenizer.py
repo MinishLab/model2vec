@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from tempfile import NamedTemporaryFile
 
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.normalizers import NFKC, Lowercase, Sequence
 from tokenizers.pre_tokenizers import Whitespace
+
+logger = logging.getLogger(__name__)
 
 
 def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenizer:
@@ -20,10 +23,15 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     with NamedTemporaryFile(mode="w+") as temp_file:
         tokenizer.save(temp_file.name)
         data = json.load(open(temp_file.name))
-
         vocab: dict[str, int] = data["model"]["vocab"]
+
+        n_tokens = len(vocab)
         for token in tokens_to_remove:
-            vocab.pop(token)
+            if vocab.pop(token, None) is None:
+                logger.warning(f"Token {token} was not in the vocabulary.")
+
+        n_removed = n_tokens - len(vocab)
+        logger.info(f"Removed {n_removed} tokens from the vocabulary.")
 
         reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
         data["model"]["vocab"] = reindexed
