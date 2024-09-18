@@ -35,10 +35,6 @@ def main(
     """Creates output embeddings for a sentencetransformer."""
     if vocabulary_path is not None:
         vocabulary = open(vocabulary_path).read().splitlines()
-        if "[PAD]" not in vocabulary:
-            vocabulary = ["[PAD]"] + vocabulary
-        if "[UNK]" not in vocabulary:
-            vocabulary = ["[UNK]"] + vocabulary
     else:
         vocabulary = None
 
@@ -76,6 +72,11 @@ def distill(
         tokenizer_name = model_name
         tokenizer = AutoTokenizer.from_pretrained(model_name)
     else:
+        if "[PAD]" not in vocabulary:
+            vocabulary = ["[PAD]"] + vocabulary
+        if "[UNK]" not in vocabulary:
+            vocabulary = ["[UNK]"] + vocabulary
+
         tokens, embeddings = create_output_embeddings_from_model_name_and_tokens(
             model_name=model_name,
             tokens=vocabulary,
