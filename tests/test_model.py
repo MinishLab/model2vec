@@ -47,7 +47,7 @@ def test_initialization_token_vector_mismatch(
     mock_tokenizer: PreTrainedTokenizerFast, mock_config: dict[str, str]
 ) -> None:
     """Test if error is raised when number of tokens and vectors don't match."""
-    mock_vectors = np.array([[0.1, 0.2], [0.2, 0.3]])  # Mismatch in size
+    mock_vectors = np.array([[0.1, 0.2], [0.2, 0.3]])
     with pytest.raises(ValueError):
         StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
 
@@ -58,7 +58,7 @@ def test_encode_single_sentence(
     """Test encoding of a single sentence."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     encoded = model.encode("test sentence")
-    assert encoded.shape == (2,)  # 2-dimensional vector
+    assert encoded.shape == (2,)
 
 
 def test_encode_multiple_sentences(
@@ -67,7 +67,7 @@ def test_encode_multiple_sentences(
     """Test encoding of multiple sentences."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     encoded = model.encode(["sentence 1", "sentence 2"])
-    assert encoded.shape == (2, 2)  # Two 2-dimensional vectors
+    assert encoded.shape == (2, 2)
 
 
 def test_encode_empty_sentence(
@@ -76,7 +76,7 @@ def test_encode_empty_sentence(
     """Test encoding with an empty sentence."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     encoded = model.encode("")
-    assert np.array_equal(encoded, np.zeros((2,)))  # Should return a zero vector if sentence is empty
+    assert np.array_equal(encoded, np.zeros((2,)))
 
 
 def test_normalize() -> None:
@@ -90,7 +90,7 @@ def test_normalize() -> None:
 def test_save_pretrained(
     tmp_path: Path, mock_vectors: np.ndarray, mock_tokenizer: PreTrainedTokenizerFast, mock_config: dict[str, str]
 ) -> None:
-    """Test saving a pretrained model using a tmp_path."""
+    """Test saving a pretrained model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
 
     # Save the model to the tmp_path
@@ -104,3 +104,21 @@ def test_save_pretrained(
     assert (save_path / "tokenizer_config.json").exists()
     assert (save_path / "config.json").exists()
     assert (save_path / "special_tokens_map.json").exists()
+
+
+def test_load_pretrained(
+    tmp_path: Path, mock_vectors: np.ndarray, mock_tokenizer: PreTrainedTokenizerFast, mock_config: dict[str, str]
+) -> None:
+    """Test loading a pretrained model after saving it."""
+    # Save the model to a temporary path
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    save_path = tmp_path / "saved_model"
+    model.save_pretrained(save_path)
+
+    # Load the model back from the same path
+    loaded_model = StaticModel.from_pretrained(save_path)
+
+    # Assert that the loaded model has the same properties as the original one
+    np.testing.assert_array_equal(loaded_model.vectors, mock_vectors)
+    assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
+    assert loaded_model.config == mock_config
