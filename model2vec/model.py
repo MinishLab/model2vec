@@ -19,7 +19,7 @@ logger = getLogger(__name__)
 class StaticModel:
     def __init__(self, vectors: np.ndarray, tokenizer: PreTrainedTokenizerFast, config: dict[str, Any]) -> None:
         """
-        Initialize the StaticEmbedder.
+        Initialize the StaticModel.
 
         :param vectors: The vectors to use.
         :param tokenizer: The Transformers tokenizer to use.
