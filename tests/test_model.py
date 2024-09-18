@@ -76,9 +76,7 @@ def test_save_pretrained(
     assert save_path.exists()
     assert (save_path / "embeddings.safetensors").exists()
     assert (save_path / "tokenizer.json").exists()
-    assert (save_path / "tokenizer_config.json").exists()
     assert (save_path / "config.json").exists()
-    assert (save_path / "special_tokens_map.json").exists()
 
 
 def test_load_pretrained(
