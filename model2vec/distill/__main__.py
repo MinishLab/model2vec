@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -64,6 +65,7 @@ def distill(
     :param pca_dims: The number of components to use for PCA. If this is None, we don't apply PCA.
     :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
     :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
+    :raises: ValueError if the vocabulary contains duplicate tokens.
     :return: A StaticModdel
 
     """
@@ -72,6 +74,12 @@ def distill(
         tokenizer_name = model_name
         tokenizer = AutoTokenizer.from_pretrained(model_name)
     else:
+        vocabulary_counts = Counter(vocabulary)
+        duplicates = [k for k, v in vocabulary_counts.items() if v > 1]
+        if duplicates:
+            duplicate_str = ", ".join(duplicates)
+            raise ValueError(f"Vocabulary contains duplicate tokens: {duplicate_str}")
+
         if "[PAD]" not in vocabulary:
             vocabulary = ["[PAD]"] + vocabulary
         if "[UNK]" not in vocabulary:
