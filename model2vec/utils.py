@@ -85,7 +85,7 @@ def load_pretrained(
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     embeddings = opened_tensor_file.get_tensor("embeddings")
 
-    tokenizer = AutoTokenizer.from_pretrained(folder_or_repo_path)
+    tokenizer = AutoTokenizer.from_pretrained(folder_or_repo_path, token=huggingface_token)
     config = json.load(open(config_path))
 
     if len(tokenizer.get_vocab()) != len(embeddings):
