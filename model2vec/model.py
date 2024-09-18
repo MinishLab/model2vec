@@ -90,12 +90,16 @@ class StaticModel:
         """
         Encode a list of sentences.
 
-        :param sentences: The list of sentences to encode.
+        This function encodes a list of sentences by averaging the word embeddings of the tokens in the sentence.
+        For ease of use, we don't batch sentences together.
+
+        :param sentences: The list of sentences to encode. You can also pass a single sentence.
         :param show_progressbar: Whether to show the progress bar.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
+            If this is None, no truncation is done.
         :param norm: Whether to normalize the embeddings to unit length.
         :param **kwargs: Any additional arguments. These are ignored.
-        :return: The encoded sentences.
+        :return: The encoded sentences. If a single sentence was passed, a vector is returned.
         """
         was_single = False
         if isinstance(sentences, str):
