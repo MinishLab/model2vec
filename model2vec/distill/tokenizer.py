@@ -1,13 +1,39 @@
 from __future__ import annotations
 
+import json
+from tempfile import NamedTemporaryFile
+
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.normalizers import NFKC, Lowercase, Sequence
 from tokenizers.pre_tokenizers import Whitespace
-from transformers import PreTrainedTokenizerFast
 
 
-def create_tokenizer_from_vocab(vocabulary: list[str], unk_token: str, pad_token: str) -> PreTrainedTokenizerFast:
+def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenizer:
+    """
+    Remove tokens from a tokenizer.
+
+    :param tokenizer: The tokenizer to remove tokens from.
+    :param tokens_to_remove: The tokens to remove.
+    :return: The modified tokenizer.
+    """
+    with NamedTemporaryFile(mode="w+") as temp_file:
+        tokenizer.save(temp_file.name)
+        data = json.load(open(temp_file.name))
+
+        vocab: dict[str, int] = data["model"]["vocab"]
+        for token in tokens_to_remove:
+            vocab.pop(token)
+
+        reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
+        data["model"]["vocab"] = reindexed
+
+        tokenizer = Tokenizer.from_str(json.dumps(data))
+
+    return tokenizer
+
+
+def create_tokenizer_from_vocab(vocabulary: list[str], unk_token: str, pad_token: str) -> Tokenizer:
     """
     Create a word level tokenizer from a vocabulary.
 
@@ -35,8 +61,5 @@ def create_tokenizer_from_vocab(vocabulary: list[str], unk_token: str, pad_token
     if not is_cased:
         normalization_steps.append(Lowercase())
     tokenizer.normalizer = Sequence(normalization_steps)
-
-    tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer)
-    tokenizer.add_special_tokens({"unk_token": unk_token, "pad_token": pad_token})
 
     return tokenizer
