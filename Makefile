@@ -15,4 +15,4 @@ fix:
 	uv run pre-commit run --all-files
 
 test:
-	uv run pytest --cov=korok --cov-report=term-missing
+	uv run pytest --cov=model2vec --cov-report=term-missing
