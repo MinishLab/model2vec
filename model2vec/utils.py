@@ -91,7 +91,7 @@ def load_pretrained(
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     embeddings = opened_tensor_file.get_tensor("embeddings")
 
-    tokenizer: Tokenizer = Tokenizer.from_file(tokenizer_path)
+    tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
     config = json.load(open(config_path))
 
     if len(tokenizer.get_vocab()) != len(embeddings):
