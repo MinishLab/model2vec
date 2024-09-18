@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Model2Vec: Turn any Sentence Transformer into a Small Fast Model
 
 
@@ -109,3 +110,6 @@ Model2Vec allows anyone to create their own static embeddings from any Sentence 
 ## Roadmap
 
 ## Citing
+=======
+# Model2vec
+>>>>>>> 72dfa98fab02c35ffeaca5c1db22f3499c433487

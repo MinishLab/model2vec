@@ -1,6 +1,6 @@
 [project]
-name = "korok"
-description = "Amazing static embeddings"
+name = "model2vec"
+description = "Distill your sentencetransformers to small fast models."
 readme = "README.md"
 version = "0.1.0"
 requires-python = ">=3.10"
@@ -9,10 +9,13 @@ dependencies = [
     "click",
     "numpy",
     "rich",
-    "scikit-learn",
     "tqdm",
     "typer",
-    "transformers"
+    "transformers",
+    "torch",
+    "sentence_transformers",
+    "tokenizers",
+    "scikit-learn",
 ]
 
 [build-system]
@@ -20,7 +23,7 @@ requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["korok"]
+packages = ["model2vec"]
 
 [project.optional-dependencies]
 dev = [
@@ -32,7 +35,6 @@ dev = [
     "pytest-coverage",
     "ruff",
 ]
-model2vec = ["torch", "sentence_transformers", "tokenizers"]
 evaluation = ["evaluation@git+https://github.com/MinishLab/evaluation@main"]
 
 [tool.ruff]
