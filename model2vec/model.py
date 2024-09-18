@@ -84,7 +84,7 @@ class StaticModel:
         sentences: list[str] | str,
         show_progressbar: bool = False,
         max_length: int | None = 512,
-        norm: bool = True,
+        norm: bool = False,
         **kwargs: Any,
     ) -> np.ndarray:
         """
