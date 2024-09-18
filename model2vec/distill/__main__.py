@@ -12,7 +12,7 @@ from model2vec.distill.inference import (
     create_output_embeddings_from_model_name_and_tokens,
 )
 from model2vec.distill.tokenizer import create_tokenizer_from_vocab
-from model2vec.encoders import StaticModel
+from model2vec.model import StaticModel
 from model2vec.utils import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ def distill(
         if pca_dims < embeddings.shape[1]:
             logger.info(f"Applying PCA with n_components {pca_dims}")
 
-            p = PCA(n_components=300, whiten=False)
+            p = PCA(n_components=pca_dims, whiten=False)
             embeddings = p.fit_transform(embeddings)
         else:
             raise ValueError(
