@@ -80,9 +80,9 @@ def distill(
             duplicate_str = ", ".join(duplicates)
             raise ValueError(f"Vocabulary contains duplicate tokens: {duplicate_str}")
 
-        if "[PAD]" not in vocabulary:
+        if "[PAD]" not in vocabulary_counts:
             vocabulary = ["[PAD]"] + vocabulary
-        if "[UNK]" not in vocabulary:
+        if "[UNK]" not in vocabulary_counts:
             vocabulary = ["[UNK]"] + vocabulary
 
         tokens, embeddings = create_output_embeddings_from_model_name_and_tokens(
