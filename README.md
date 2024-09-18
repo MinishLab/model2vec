@@ -33,15 +33,52 @@ TODO: add optional installation for evaluation/reproduction of results
 
 ### Distilling a Model2Vec model
 ```python
+from model2vec import ...
+```
+
+Alternatively, you can use the command line interface:
+```bash
+python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-path vocab.txt --device mps --save-path model2vec_model
 ```
 
 ### Inferencing a Model2Vec model
 ```python
+from model2vec import StaticEmbedder
+
+model_name = "model2vec_model"
+model2vec_model = StaticEmbedder.from_pretrained(model_name)
+
+# Get embeddings
+embeddings = model2vec_model.encode["It's dangerous to go alone!", "It's a secret to everyone."]
 ```
 
 ### Evaluating a Model2Vec model
 ```python
-```python
+from evaluation import CustomMTEB, get_tasks, parse_mteb_results, make_leaderboard, summarize_results
+from mteb import ModelMeta
+
+# Get all available tasks
+tasks = get_tasks()
+# Define the CustomMTEB object with the specified tasks
+evaluation = CustomMTEB(tasks=tasks)
+
+# Load the model
+model_name = "model2vec_model"
+model = StaticEmbedder.from_pretrained(model_name)
+
+# Optionally, add model metadata in MTEB format
+model.mteb_model_meta = ModelMeta(
+            name=model_name, revision="no_revision_available", release_date=None, languages=None
+        )
+
+# Run the evaluation
+results = evaluation.run(model, eval_splits=["test"], output_folder=f"results/{model_name}")
+
+# Parse the results and summarize them
+parsed_results = parse_mteb_results(mteb_results=results, model_name=model_name)
+task_scores = summarize_results(parsed_results)
+# Print the results in a leaderboard format
+print(make_leaderboard(task_scores))
 ```
 
 ## What is Model2Vec?
