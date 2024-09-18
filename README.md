@@ -88,6 +88,7 @@ This technique creates a small, fast, and powerful model that outperforms other 
 
 
 ## Who is this for?
+Model2Vec allows anyone to create their own static embeddings from any Sentence Transformer model in minutes. It can easily be applied to other languages by using a language-specific Sentence Transformer model and vocab. Similarly, it can be applied to specific domains by using a domain specific model, vocab, or both. This makes it an ideal tool for fast prototyping, research, and production use cases where speed and size are more important than performance.
 
 ## Results
 
