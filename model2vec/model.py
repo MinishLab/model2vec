@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
-from transformers import PreTrainedTokenizerFast
 
 from model2vec.utils import load_pretrained, save_pretrained
 
@@ -17,7 +17,7 @@ logger = getLogger(__name__)
 
 
 class StaticModel:
-    def __init__(self, vectors: np.ndarray, tokenizer: PreTrainedTokenizerFast, config: dict[str, Any]) -> None:
+    def __init__(self, vectors: np.ndarray, tokenizer: Tokenizer, config: dict[str, Any]) -> None:
         """
         Initialize the StaticModel.
 
@@ -34,7 +34,12 @@ class StaticModel:
             raise ValueError(f"Number of tokens ({len(tokens)}) does not match number of vectors ({vectors.shape[0]})")
 
         self.tokenizer = tokenizer
-        self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.unk_token]
+        self.unk_token_id: int | None
+        if getattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
+            self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.model.unk_token]
+        else:
+            self.unk_token_id = None
+
         self.config = config
 
     def save_pretrained(self, path: PathLike) -> None:
@@ -108,15 +113,18 @@ class StaticModel:
 
         out_array = np.zeros((len(sentences), self.dim))
         for idx, sentence in enumerate(tqdm(sentences, disable=not show_progressbar)):
-            encoded = self.tokenizer.encode(
-                sentence, add_special_tokens=False, max_length=max_length, truncation=bool(max_length)
-            )
-            # NOTE: Remove the unknown token: necessary for word-level models.
-            encoded = [token_id for token_id in encoded if token_id != self.unk_token_id]
-            if not encoded:
+            encoding: Encoding = self.tokenizer.encode(sentence, add_special_tokens=False)
+            token_ids: list[int] = encoding.ids
+            if self.unk_token_id is not None:
+                # NOTE: Remove the unknown token: necessary for word-level models.
+                token_ids = [token_id for token_id in token_ids if token_id != self.unk_token_id]
+            if max_length is not None:
+                token_ids = token_ids[:max_length]
+
+            if not token_ids:
                 logger.info(f"Got empty tokens for sentence: `{sentence}`")
                 continue
-            out_array[idx] = np.mean(self.vectors[encoded], axis=0)
+            out_array[idx] = np.mean(self.vectors[token_ids], axis=0)
 
         if norm:
             out_array = self.normalize(out_array)
