@@ -13,14 +13,15 @@
 - [Citing](#citing)
 
 ## Main Features
-- **Small**: Model2Vec can reduce the size of a Sentence Transformer model by a factor of X.
-- **Fast distillation**: Model2Vec can distill a Sentence Transformer model in X.
+- **Small**: Model2Vec can reduce the size of a Sentence Transformer model by a factor of .
+- **Fast distillation**: Model2Vec can distill a Sentence Transformer model in X minutes.
 - **Fast inference**: Model2Vec creates static embeddings that are up to X times faster than the original model.
-- **Simple**: Model2Vec is easy to use and can be applied to any Sentence Transformer model, requiring only a few lines of code.
+- **No data needed**: Distillation happens directly on a token leven, so no dataset is needed.
+- **Simple to use**: Model2Vec provides an easy to use interface for distilling and inferencing Model2Vec models.
 - **Bring your own model**: Model2Vec can be applied to any Sentence Transformer model.
 - **Bring your own vocabulary**: Model2Vec can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary.
 - **Multi-lingual**: Model2Vec can easily be applied to any language.
-- **Evaluation**: Model2Vec comes with a set of evaluation tasks to measure the performance of the distilled model.
+- **Easy Evaluation**: Model2Vec comes with a set of evaluation tasks to measure the performance of the distilled model.
 
 ## Installation
 ```bash
@@ -91,20 +92,40 @@ Model2Vec allows anyone to create their own static embeddings from any Sentence 
 
 ## Results
 
+### Main Results
+
+Model2Vec is evaluated on MTEB, as well as two additional tasks: PEARL (a phrase representation task) and WordSim (a word similarity task). The results are shown in the table below.
+
+
+
+
+| Model            | Avg (All)   | Avg (MTEB) | Class | Clust | PairClass | Rank  | Ret   | STS   | Sum   | Pearl | WordSim |
+|------------------|-------------|------------|-------|-------|-----------|-------|-------|-------|-------|-------|---------|
+| all-MiniLM-L6-v2 | 56.08       | 56.09      | 62.62 | 41.94 | 82.37     | 58.04 | 41.95 | 78.90 | 30.81 | 60.83 | 49.91   |
+| M2V_base_glove   | 48.58       | 47.60      | 61.35 | 30.52 | 75.34     | 48.50 | 29.26 | 70.31 | 31.50 | 50.28 | 54.29   |
+| M2V_base_output  | 46.79       | 45.34      | 61.25 | 25.58 | 74.90     | 47.63 | 26.14 | 68.58 | 29.20 | 54.02 | 49.18   |
+| GloVe_300d       | 42.84       | 42.36      | 57.31 | 27.66 | 72.48     | 43.30 | 22.78 | 61.90 | 28.81 | 45.65 | 43.05   |
+| WL256*           | 48.88       | 49.36      | 58.98 | 33.34 | 74.00     | 52.03 | 33.12 | 73.34 | 29.05 | 48.81 | 45.16   |
+
+
+
+Talk about wordllama
+
+### Classification and Speed Benchmarks
+
+In addition to the MTEB evaluation, Model2Vec is evaluated on a number of classification datasets. These are used as additional analysis to avoid overfitting to the MTEB dataset and to benchmark the speed of the model. The results are shown in the table below.
+
+![Description](assets/images/sentences_per_second_vs_average_score.png)
+
 ```markdown
-| Model                                         |   Average (All) |   Average (MTEB) |   Classification |   Clustering |   PairClassification |   Reranking |   Retrieval |   STS |   Summarization |   PEARL |   WordSim |
-|:----------------------------------------------|----------------:|-----------------:|-----------------:|-------------:|---------------------:|------------:|------------:|------:|----------------:|--------:|----------:|
-| WL256                                         |          nan    |           nan    |            58.98 |        33.34 |                74    |       52.03 |      nan    | 73.34 |           29.05 |   48.81 |     45.16 |
-| model2vec-bge_base-glove-zipf-pca             |           49.08 |            47.86 |            61.89 |        30.36 |                75.64 |       48.6  |       29.71 | 70.59 |           30.78 |   52.66 |     54.2  |
-| model2vec-bge_large-glove-zipf-pca            |           48.94 |            47.56 |            62.48 |        30.02 |                75.41 |       47.9  |       28.72 | 70.31 |           31.61 |   51.51 |     56.65 |
-| model2vec-bge_base-glove-zipf                 |           46.69 |            45.5  |            62.81 |        23.46 |                72.11 |       45.72 |       29.56 | 66.29 |           30.97 |   50.23 |     51.67 |
-| model2vec-bge_base-output_embeddings-zipf-pca |           45.27 |            43.34 |            60.64 |        23.14 |                74.62 |       46.61 |       23.22 | 65.68 |           29.35 |   54.16 |     49.25 |
-| model2vec-bge_base-glove-pca                  |           43.32 |            40.91 |            60.68 |        23.96 |                66.23 |       45.11 |       19.43 | 59.83 |           30.48 |   49.84 |     54.22 |
-| komninos                                      |           43.11 |            42.86 |            57.7  |        28.86 |                73    |       44.75 |       22.45 | 62.52 |           30.5  |   46.63 |     40.54 |
-| glove                                         |           42.84 |            42.36 |            57.31 |        27.66 |                72.48 |       43.3  |       22.78 | 61.9  |           28.81 |   45.65 |     43.05 |
-| model2vec-bge_base-glove                      |           40.54 |            38.2  |            60.99 |        21.4  |                57.54 |       41.9  |       17.98 | 53.14 |           30.87 |   46.32 |     51.85 |
+
+```markdown
+
+```markdown
 ```
 
+Picture
+Table
 ## Roadmap
 
 ## Citing
