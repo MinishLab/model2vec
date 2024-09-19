@@ -5,16 +5,17 @@
 ## Table of Contents
 - [Main Features](#main-features)
 - [Installation](#installation)
-- [Useage](#useage)
 - [What is Model2Vec?](#what-is-model2vec)
 - [Who is this for?](#who-is-this-for)
+- [Useage](#useage)
 - [Results](#results)
 - [Citing](#citing)
 
 ## Main Features
 - **Small**: Model2Vec can reduce the size of a Sentence Transformer model by a factor of 15 *.
-- **Fast distillation**: Model2Vec can distill a Sentence Transformer model in ~5 minutes *.
+- **Fast distillation**: Model2Vec can distill a Sentence Transformer model in ~5 minutes on CPU *.
 - **Fast inference**: Model2Vec creates static embeddings that are up to 500 times * faster than the original model.
+- **State-of-the-art static embedding performance**: Model2Vec outperforms traditional static embeddings by a large margin on a number of benchmarks.
 - **No data needed**: Distillation happens directly on a token leven, so no dataset is needed.
 - **Simple to use**: Model2Vec provides an easy to use interface for distilling and inferencing Model2Vec models.
 - **Bring your own model**: Model2Vec can be applied to any Sentence Transformer model.
@@ -37,7 +38,7 @@ pip install model2vec[evaluation]
 ## What is Model2Vec?
 Model2Vec is a simple and effective method to turn any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
 
-This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as Glove.
+This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as GloVe, without need for a dataset.
 
 
 ## Who is this for?
