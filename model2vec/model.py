@@ -37,7 +37,6 @@ class StaticModel:
             raise ValueError(f"Number of tokens ({len(tokens)}) does not match number of vectors ({vectors.shape[0]})")
 
         self.tokenizer = tokenizer
-        self.max_token_length = max(len(token) for token in tokens)
         self.unk_token_id: int | None
         if getattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
             self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.model.unk_token]
