@@ -4,10 +4,9 @@
 
 ## Table of Contents
 - [Main Features](#main-features)
-- [Installation](#installation)
+- [Quickstart](#quickstart)
 - [What is Model2Vec?](#what-is-model2vec)
 - [Who is this for?](#who-is-this-for)
-- [Quickstart](#quickstart)
 - [Useage](#useage)
     - [Distilling a Model2Vec model](#distilling-a-model2vec-model)
     - [Inferencing a Model2Vec model](#inferencing-a-model2vec-model)
