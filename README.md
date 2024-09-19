@@ -99,7 +99,7 @@ Model2Vec is evaluated on MTEB, as well as two additional tasks: PEARL (a phrase
 
 
 
-| Model            | Avg (All)   | Avg (MTEB) | Class | Clust | PairClass | Rank  | Ret   | STS   | Sum   | Pearl | WordSim |
+| Model            | Avg (All)   | Avg (MTEB) | Class | Clust | PairClass | Rank  | Ret   | STS   | Sum   | PEARL | WordSim |
 |------------------|-------------|------------|-------|-------|-----------|-------|-------|-------|-------|-------|---------|
 | all-MiniLM-L6-v2 | 56.08       | 56.09      | 62.62 | 41.94 | 82.37     | 58.04 | 41.95 | 78.90 | 30.81 | 60.83 | 49.91   |
 | M2V_base_glove   | 48.58       | 47.60      | 61.35 | 30.52 | 75.34     | 48.50 | 29.26 | 70.31 | 31.50 | 50.28 | 54.29   |
@@ -107,22 +107,35 @@ Model2Vec is evaluated on MTEB, as well as two additional tasks: PEARL (a phrase
 | GloVe_300d       | 42.84       | 42.36      | 57.31 | 27.66 | 72.48     | 43.30 | 22.78 | 61.90 | 28.81 | 45.65 | 43.05   |
 | WL256*           | 48.88       | 49.36      | 58.98 | 33.34 | 74.00     | 52.03 | 33.12 | 73.34 | 29.05 | 48.81 | 45.16   |
 
+For readability, the mteb task names are abbreviated as follows:
+- Class: Classification
+- Clust: Clustering
+- PairClass: PairClassification
+- Rank: Reranking
+- Ret: Retrieval
+- STS: Semantic Textual Similarity
+- Sum: Summarization
 
-
-Talk about wordllama
+* WL256, introduced in the [WordLlama](https://github.com/dleemiller/WordLlama/tree/main) package is included for comparison. However, we believe it is heavily overfit to the MTEB dataset due to the training data used for the model. This can be seen by the fact that the WL256 model performs much worse on the non MTEB tasks (PEARL and WordSim) than our models. The results shown in the [Classification and Speed Benchmarks](#classification-and-speed-benchmarks) further support this.
 
 ### Classification and Speed Benchmarks
 
 In addition to the MTEB evaluation, Model2Vec is evaluated on a number of classification datasets. These are used as additional analysis to avoid overfitting to the MTEB dataset and to benchmark the speed of the model. The results are shown in the table below.
 
+| model            |   Average |     sst2 |   imdb |     trec |   ag_news |
+|:-----------------|----------:|---------:|-------:|---------:|----------:|
+| bge-base-en-v1.5 |  0.900079 | 0.915367 | 0.9188 | 0.851648 |  0.9145   |
+| all-MiniLM-L6-v2 |  0.840987 | 0.839495 | 0.8136 | 0.813187 |  0.897667 |
+| M2V_base_output  |  0.822326 | 0.809206 | 0.8456 | 0.752747 |  0.88175  |
+| M2V_base_glove   |  0.807597 | 0.830735 | 0.8524 | 0.661172 |  0.886083 |
+| WL256            |  0.78479  | 0.76882  | 0.8012 | 0.692308 |  0.876833 |
+| GloVe_300d       |  0.77768  | 0.816778 | 0.84   | 0.556777 |  0.897167 |
+
+As can be seen, the Model2Vec models outperforms the GloVe and WL256 models on all classification tasks, and is competitive with the all-MiniLM-L6-v2 model while being much faster.
+
+The scatterplot below shows the relationship between the number of sentences per second and the average classification score. The bubble sizes correspond to the number of parameters in the models (larger = more parameters), and the colors correspond to the sentences per second (greener = more sentences per second). This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of classification performance.
+
 ![Description](assets/images/sentences_per_second_vs_average_score.png)
-
-```markdown
-
-```markdown
-
-```markdown
-```
 
 Picture
 Table
