@@ -37,7 +37,7 @@ Install the package with:
 pip install model2vec
 ```
 
-The easiest way to get started with Model2Vec is to download one of our flagship models from the HuggingFace hub. These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
+The easiest way to get started with Model2Vec is to download one of our [flagship models from the HuggingFace hub](https://huggingface.co/minishlab). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
 ```python
 from model2vec import StaticModel
 
