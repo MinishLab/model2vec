@@ -7,7 +7,7 @@
 - [Quickstart](#quickstart)
 - [What is Model2Vec?](#what-is-model2vec)
 - [Who is this for?](#who-is-this-for)
-- [Useage](#useage)
+- [Usage](#usage)
     - [Distilling a Model2Vec model](#distilling-a-model2vec-model)
     - [Inferencing a Model2Vec model](#inferencing-a-model2vec-model)
     - [Evaluating a Model2Vec model](#evaluating-a-model2vec-model)
@@ -75,7 +75,7 @@ Model2Vec allows anyone to create their own static embeddings from any Sentence 
 
 
 
-## Useage
+## Usage
 
 ### Distilling a Model2Vec model
 
@@ -218,12 +218,12 @@ In addition to the MTEB evaluation, Model2Vec is evaluated on a number of classi
 
 | model            |   Average |     sst2 |   imdb |     trec |   ag_news |
 |:-----------------|----------:|---------:|-------:|---------:|----------:|
-| bge-base-en-v1.5 |  0.900079 | 0.915367 | 0.9188 | 0.851648 |  0.9145   |
-| all-MiniLM-L6-v2 |  0.840987 | 0.839495 | 0.8136 | 0.813187 |  0.897667 |
-| M2V_base_output  |  0.822326 | 0.809206 | 0.8456 | 0.752747 |  0.88175  |
-| M2V_base_glove   |  0.807597 | 0.830735 | 0.8524 | 0.661172 |  0.886083 |
-| WL256            |  0.78479  | 0.76882  | 0.8012 | 0.692308 |  0.876833 |
-| GloVe_300d       |  0.77768  | 0.816778 | 0.84   | 0.556777 |  0.897167 |
+| bge-base-en-v1.5 |  90.00 | 91.54 | 91.88 | 85.16 |  91.45   |
+| all-MiniLM-L6-v2 |  84.10 | 83.95 | 81.36 | 81.31 |  89.77 |
+| M2V_base_output  |  82.23 | 80.92 | 84.56 | 75.27 |  88.17  |
+| M2V_base_glove   |  80.76 | 83.07 | 85.24 | 66.12 | 88.61 |
+| WL256            |  78.48  | 76.88  | 80.12 | 69.23 |  87.68 |
+| GloVe_300d       |  77.77  | 81.68 | 84.00   | 55.67 |  89.71 |
 
 As can be seen, the Model2Vec models outperforms the GloVe and WL256 models on all classification tasks, and is competitive with the all-MiniLM-L6-v2 model while being much faster.
 
