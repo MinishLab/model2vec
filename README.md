@@ -21,7 +21,7 @@
 - **Bring your own model**: Model2Vec can be applied to any Sentence Transformer model.
 - **Bring your own vocabulary**: Model2Vec can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary.
 - **Multi-lingual**: Model2Vec can easily be applied to any language.
-- **Tightly integrated withHuggingFace hub**: Model2Vec models can be easily shared and loaded from the HuggingFace hub.
+- **Tightly integrated with HuggingFace hub**: Model2Vec models can be easily shared and loaded from the HuggingFace hub. Our models can be found [here](https://huggingface.co/minishlab).
 - **Easy Evaluation**: Model2Vec comes with a set of evaluation tasks to measure the performance of the distilled model.
 
 \* Based on the [bge-base-en-v1.5 model](https://huggingface.co/BAAI/bge-base-en-v1.5).
