@@ -9,34 +9,76 @@
 - [What is Model2Vec?](#what-is-model2vec)
 - [Who is this for?](#who-is-this-for)
 - [Results](#results)
-- [Roadmap](#roadmap)
 - [Citing](#citing)
 
 ## Main Features
-- **Small**: Model2Vec can reduce the size of a Sentence Transformer model by a factor of .
-- **Fast distillation**: Model2Vec can distill a Sentence Transformer model in X minutes.
-- **Fast inference**: Model2Vec creates static embeddings that are up to X times faster than the original model.
+- **Small**: Model2Vec can reduce the size of a Sentence Transformer model by a factor of 15 *.
+- **Fast distillation**: Model2Vec can distill a Sentence Transformer model in ~5 minutes *.
+- **Fast inference**: Model2Vec creates static embeddings that are up to 500 times * faster than the original model.
 - **No data needed**: Distillation happens directly on a token leven, so no dataset is needed.
 - **Simple to use**: Model2Vec provides an easy to use interface for distilling and inferencing Model2Vec models.
 - **Bring your own model**: Model2Vec can be applied to any Sentence Transformer model.
 - **Bring your own vocabulary**: Model2Vec can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary.
 - **Multi-lingual**: Model2Vec can easily be applied to any language.
+- **Tightly integrated withHuggingFace hub**: Model2Vec models can be easily shared and loaded from the HuggingFace hub.
 - **Easy Evaluation**: Model2Vec comes with a set of evaluation tasks to measure the performance of the distilled model.
 
+\* Based on the bge-base-en-v1.5 model.
 ## Installation
 ```bash
 pip install model2vec
 ```
-TODO: add optional installation for evaluation/reproduction of results
+
+Optionally, install the evaluation dependencies:
+```bash
+pip install model2vec[evaluation]
+```
+
+## What is Model2Vec?
+Model2Vec is a simple and effective method to turn any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
+
+This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as Glove.
+
+
+## Who is this for?
+Model2Vec allows anyone to create their own static embeddings from any Sentence Transformer model in minutes. It can easily be applied to other languages by using a language-specific Sentence Transformer model and vocab. Similarly, it can be applied to specific domains by using a domain specific model, vocab, or both. This makes it an ideal tool for fast prototyping, research, and production use cases where speed and size are more important than performance.
 
 ## Useage
 
 ### Distilling a Model2Vec model
+
+Distilling a model from the output embeddings of a Sentence Transformer model:
 ```python
-from model2vec import ...
+from model2vec.distill import distill
+
+# Choose a Sentence Transformer model
+model_name = "BAAI/bge-base-en-v1.5"
+
+# Distill the model
+m2v_model = distill(model_name=model_name, pca_dims=256)
+
+# Save the model
+m2v_model.save_pretrained("m2v_model")
+
 ```
 
-Alternatively, you can use the command line interface:
+Distilling with a custom vocabulary:
+```python
+from model2vec.distill import distill
+
+# Load a vocabulary as a list of strings
+vocabulary = ["word1", "word2", "word3"]
+# Choose a Sentence Transformer model
+model_name = "BAAI/bge-base-en-v1.5"
+
+# Distill the model with the custom vocabulary
+m2v_model = distill(model_name=model_name, vocabulary=vocabulary, pca_dims=256)
+
+# Save the model
+m2v_model.save_pretrained("m2v_model")
+```
+
+Alternatively, the command line interface can be used to distill a model:
 ```bash
 python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-path vocab.txt --device mps --save-path model2vec_model
 ```
@@ -45,10 +87,11 @@ python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-pat
 ```python
 from model2vec import StaticEmbedder
 
-model_name = "model2vec_model"
+# Load a saved model
+model_name = "m2v_model"
 model = StaticEmbedder.from_pretrained(model_name)
 
-# Get embeddings
+# Make embeddings
 embeddings = model.encode["It's dangerous to go alone!", "It's a secret to everyone."]
 ```
 
@@ -63,7 +106,7 @@ tasks = get_tasks()
 evaluation = CustomMTEB(tasks=tasks)
 
 # Load the model
-model_name = "model2vec_model"
+model_name = "m2v_model"
 model = StaticEmbedder.from_pretrained(model_name)
 
 # Optionally, add model metadata in MTEB format
@@ -80,15 +123,6 @@ task_scores = summarize_results(parsed_results)
 # Print the results in a leaderboard format
 print(make_leaderboard(task_scores))
 ```
-
-## What is Model2Vec?
-Model2Vec is a simple and effective method to turn any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
-
-This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as Glove.
-
-
-## Who is this for?
-Model2Vec allows anyone to create their own static embeddings from any Sentence Transformer model in minutes. It can easily be applied to other languages by using a language-specific Sentence Transformer model and vocab. Similarly, it can be applied to specific domains by using a domain specific model, vocab, or both. This makes it an ideal tool for fast prototyping, research, and production use cases where speed and size are more important than performance.
 
 ## Results
 
@@ -116,7 +150,7 @@ For readability, the mteb task names are abbreviated as follows:
 - STS: Semantic Textual Similarity
 - Sum: Summarization
 
-* WL256, introduced in the [WordLlama](https://github.com/dleemiller/WordLlama/tree/main) package is included for comparison. However, we believe it is heavily overfit to the MTEB dataset due to the training data used for the model. This can be seen by the fact that the WL256 model performs much worse on the non MTEB tasks (PEARL and WordSim) than our models. The results shown in the [Classification and Speed Benchmarks](#classification-and-speed-benchmarks) further support this.
+\* WL256, introduced in the [WordLlama](https://github.com/dleemiller/WordLlama/tree/main) package is included for comparison. However, we believe it is heavily overfit to the MTEB dataset since it is trained on datasets used in MTEB itself. This can be seen by the fact that the WL256 model performs much worse on the non MTEB tasks (PEARL and WordSim) than our models. The results shown in the [Classification and Speed Benchmarks](#classification-and-speed-benchmarks) further support this.
 
 ### Classification and Speed Benchmarks
 
@@ -137,8 +171,14 @@ The scatterplot below shows the relationship between the number of sentences per
 
 ![Description](assets/images/sentences_per_second_vs_average_score.png)
 
-Picture
-Table
-## Roadmap
-
 ## Citing
+
+If you use Model2Vec in your research, please cite the following:
+```bibtex
+@software{minishlab2024word2vec,
+  authors = {Stephan Tulkens, Thomas van Dongen},
+  title = {Model2Vec: Turn any Sentence Transformer into a Small Fast Model},
+  year = {2024},
+  url = {https://github.com/MinishLab/model2vec},
+}
+```
