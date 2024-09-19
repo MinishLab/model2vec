@@ -47,6 +47,7 @@ Model2Vec allows anyone to create their own static embeddings from any Sentence 
 
 ## Useage
 
+
 ### Distilling a Model2Vec model
 
 Distilling a model from the output embeddings of a Sentence Transformer model:
@@ -86,15 +87,29 @@ python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-pat
 ```
 
 ### Inferencing a Model2Vec model
+Inferencing with one of our flagship Model2Vec models:
 ```python
-from model2vec import StaticEmbedder
+from model2vec import StaticModel
+
+# Load a model from the HuggingFace hub
+model_name = "minishlab/M2V_base_output"
+model = StaticModel.from_pretrained(model_name)
+
+# Make embeddings
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everyone."])
+```
+
+
+Inferencing with a saved Model2Vec model:
+```python
+from model2vec import StaticModel
 
 # Load a saved model
 model_name = "m2v_model"
-model = StaticEmbedder.from_pretrained(model_name)
+model = StaticModel.from_pretrained(model_name)
 
 # Make embeddings
-embeddings = model.encode["It's dangerous to go alone!", "It's a secret to everyone."]
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everyone."])
 ```
 
 ### Evaluating a Model2Vec model
@@ -102,6 +117,8 @@ embeddings = model.encode["It's dangerous to go alone!", "It's a secret to every
 Model2Vec models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation):
 
 ```python
+from model2vec import StaticModel
+
 from evaluation import CustomMTEB, get_tasks, parse_mteb_results, make_leaderboard, summarize_results
 from mteb import ModelMeta
 
@@ -112,7 +129,7 @@ evaluation = CustomMTEB(tasks=tasks)
 
 # Load the model
 model_name = "m2v_model"
-model = StaticEmbedder.from_pretrained(model_name)
+model = StaticModel.from_pretrained(model_name)
 
 # Optionally, add model metadata in MTEB format
 model.mteb_model_meta = ModelMeta(
