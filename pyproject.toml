@@ -51,8 +51,6 @@ dev = [
     "pytest-coverage",
     "ruff",
 ]
-evaluation = ["evaluation@git+https://github.com/MinishLab/evaluation@main"]
-
 
 
 [project.urls]

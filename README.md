@@ -145,7 +145,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 Model2Vec models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). To run this, first install the optionall evaluation package:
 ```bash
-pip install model2vec[evaluation]
+pip install evaluation@git+https://github.com/MinishLab/evaluation@main
 ```
 
 Then, the following code snippet shows how to evaluate a Model2Vec model:
