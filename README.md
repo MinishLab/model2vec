@@ -197,7 +197,7 @@ Model2Vec is evaluated on MTEB, as well as two additional tasks: PEARL (a phrase
 <details>
   <summary>  Task Abbreviations </summary>
 
-For readability, the mteb task names are abbreviated as follows:
+For readability, the MTEB task names are abbreviated as follows:
 - Class: Classification
 - Clust: Clustering
 - PairClass: PairClassification
@@ -206,7 +206,6 @@ For readability, the mteb task names are abbreviated as follows:
 - STS: Semantic Textual Similarity
 - Sum: Summarization
 </details>
-
 
 \
 \* WL256, introduced in the [WordLlama](https://github.com/dleemiller/WordLlama/tree/main) package is included for comparison due to its similarities to Model2Vec. However, we believe it is heavily overfit to the MTEB dataset since it is trained on datasets used in MTEB itself. This can be seen by the fact that the WL256 model performs much worse on the non-MTEB tasks (PEARL and WordSim) than our models. The results shown in the [Classification and Speed Benchmarks](#classification-and-speed-benchmarks) further support this.
