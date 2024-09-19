@@ -7,7 +7,11 @@
 - [Installation](#installation)
 - [What is Model2Vec?](#what-is-model2vec)
 - [Who is this for?](#who-is-this-for)
+- [Quickstart](#quickstart)
 - [Useage](#useage)
+    - [Distilling a Model2Vec model](#distilling-a-model2vec-model)
+    - [Inferencing a Model2Vec model](#inferencing-a-model2vec-model)
+    - [Evaluating a Model2Vec model](#evaluating-a-model2vec-model)
 - [Results](#results)
 - [Citing](#citing)
 
@@ -45,8 +49,36 @@ This technique creates a small, fast, and powerful model that outperforms other 
 ## Who is this for?
 Model2Vec allows anyone to create their own static embeddings from any Sentence Transformer model in minutes. It can easily be applied to other languages by using a language-specific Sentence Transformer model and vocab. Similarly, it can be applied to specific domains by using a domain specific model, vocab, or both. This makes it an ideal tool for fast prototyping, research, and production use cases where speed and size are more important than performance.
 
-## Useage
 
+## Quickstart
+The easiest way to get started with Model2Vec is to download one of our flagship models from the HuggingFace hub. These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
+```python
+python
+from model2vec import StaticModel
+
+# Load a model from the HuggingFace hub (in this case the M2V_base_output model)
+model_name = "minishlab/M2V_base_output"
+model = StaticModel.from_pretrained(model_name)
+
+# Make embeddings
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everyone."])
+```
+
+Alternatively, you can distill your own Model2Vec model from a Sentence Transformer model. The following code snippet shows how to distill a model:
+```python
+from model2vec.distill import distill
+
+# Choose a Sentence Transformer model
+model_name = "BAAI/bge-base-en-v1.5"
+
+# Distill the model
+m2v_model = distill(model_name=model_name, pca_dims=256)
+
+# Save the model
+m2v_model.save_pretrained("m2v_model")
+```
+
+## Useage
 
 ### Distilling a Model2Vec model
 
