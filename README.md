@@ -30,27 +30,14 @@
 
 \* Based on the [bge-base-en-v1.5 model](https://huggingface.co/BAAI/bge-base-en-v1.5).
 
-## Installation
+
+## Quickstart
+
+Install the package with:
 ```bash
 pip install model2vec
 ```
 
-Optionally, install the evaluation dependencies:
-```bash
-pip install model2vec[evaluation]
-```
-
-## What is Model2Vec?
-Model2Vec is a simple and effective method to turn any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
-
-This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as GloVe, without need for a dataset.
-
-
-## Who is this for?
-Model2Vec allows anyone to create their own static embeddings from any Sentence Transformer model in minutes. It can easily be applied to other languages by using a language-specific Sentence Transformer model and vocab. Similarly, it can be applied to specific domains by using a domain specific model, vocab, or both. This makes it an ideal tool for fast prototyping, research, and production use cases where speed and size are more important than performance.
-
-
-## Quickstart
 The easiest way to get started with Model2Vec is to download one of our flagship models from the HuggingFace hub. These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
 ```python
 from model2vec import StaticModel
@@ -76,6 +63,18 @@ m2v_model = distill(model_name=model_name, pca_dims=256)
 # Save the model
 m2v_model.save_pretrained("m2v_model")
 ```
+
+## What is Model2Vec?
+Model2Vec is a simple and effective method to turn any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
+
+This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as GloVe, without need for a dataset.
+
+
+## Who is this for?
+Model2Vec allows anyone to create their own static embeddings from any Sentence Transformer model in minutes. It can easily be applied to other languages by using a language-specific Sentence Transformer model and vocab. Similarly, it can be applied to specific domains by using a domain specific model, vocab, or both. This makes it an ideal tool for fast prototyping, research, and production use cases where speed and size are more important than performance.
+
+
+
 
 ## Useage
 
@@ -145,8 +144,12 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 ### Evaluating a Model2Vec model
 
-Model2Vec models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation):
+Model2Vec models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). To run this, first install the optionall evaluation package:
+```bash
+pip install model2vec[evaluation]
+```
 
+Then, the following code snippet shows how to evaluate a Model2Vec model:
 ```python
 from model2vec import StaticModel
 
