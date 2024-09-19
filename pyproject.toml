@@ -1,6 +1,6 @@
 [project]
 name = "model2vec"
-description = "Turn any Sentence Transformer into a Small Fast Model."
+description = "Turn any Sentence Transformer into a Small Fast Model"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
 version = "0.1.0"

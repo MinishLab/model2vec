@@ -24,7 +24,8 @@
 - **Tightly integrated withHuggingFace hub**: Model2Vec models can be easily shared and loaded from the HuggingFace hub.
 - **Easy Evaluation**: Model2Vec comes with a set of evaluation tasks to measure the performance of the distilled model.
 
-\* Based on the bge-base-en-v1.5 model.
+\* Based on the [bge-base-en-v1.5 model](https://huggingface.co/BAAI/bge-base-en-v1.5).
+
 ## Installation
 ```bash
 pip install model2vec
