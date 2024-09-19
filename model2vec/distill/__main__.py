@@ -1,17 +1,18 @@
 import logging
+from collections import Counter
 from pathlib import Path
 from typing import Annotated, Optional
 
 import numpy as np
 import typer
 from sklearn.decomposition import PCA
-from transformers import AutoTokenizer
+from tokenizers import Tokenizer
 
 from model2vec.distill.inference import (
     create_output_embeddings_from_model_name,
     create_output_embeddings_from_model_name_and_tokens,
 )
-from model2vec.distill.tokenizer import create_tokenizer_from_vocab
+from model2vec.distill.tokenizer import create_tokenizer_from_vocab, remove_tokens
 from model2vec.model import StaticModel
 from model2vec.utils import setup_logging
 
@@ -35,10 +36,6 @@ def main(
     """Creates output embeddings for a sentencetransformer."""
     if vocabulary_path is not None:
         vocabulary = open(vocabulary_path).read().splitlines()
-        if "[PAD]" not in vocabulary:
-            vocabulary = ["[PAD]"] + vocabulary
-        if "[UNK]" not in vocabulary:
-            vocabulary = ["[UNK]"] + vocabulary
     else:
         vocabulary = None
 
@@ -50,7 +47,7 @@ def distill(
     model_name: str,
     vocabulary: list[str] | None = None,
     device: str = "cpu",
-    pca_dims: int | None = 300,
+    pca_dims: int | None = 256,
     apply_zipf: bool = True,
 ) -> StaticModel:
     """
@@ -68,22 +65,43 @@ def distill(
     :param pca_dims: The number of components to use for PCA. If this is None, we don't apply PCA.
     :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
     :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
+    :raises: ValueError if the vocabulary contains duplicate tokens.
     :return: A StaticModdel
 
     """
     if vocabulary is None:
+        tokenizer: Tokenizer = Tokenizer.from_pretrained(model_name)
         tokens, embeddings = create_output_embeddings_from_model_name(model_name, device=device)
         tokenizer_name = model_name
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+        wrong_tokens = [x for x in tokens if x.startswith("[unused")]
+        vocab = tokenizer.get_vocab()
+        wrong_token_ids = [vocab[token] for token in wrong_tokens]
+        tokenizer = remove_tokens(tokenizer, wrong_tokens)
+        embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
+        logger.info("Removed unused tokens from the tokenizer and embeddings.")
+
     else:
+        vocabulary_counts = Counter(vocabulary)
+        duplicates = [k for k, v in vocabulary_counts.items() if v > 1]
+        if duplicates:
+            duplicate_str = ", ".join(duplicates)
+            raise ValueError(f"Vocabulary contains duplicate tokens: {duplicate_str}")
+
+        if "[PAD]" not in vocabulary_counts:
+            vocabulary = ["[PAD]"] + vocabulary
+        if "[UNK]" not in vocabulary_counts:
+            vocabulary = ["[UNK]"] + vocabulary
+
         tokens, embeddings = create_output_embeddings_from_model_name_and_tokens(
-            model_name=model_name, tokens=tokens, device=device, output_value="token_embeddings", include_eos_bos=False
+            model_name=model_name,
+            tokens=vocabulary,
+            device=device,
+            output_value="token_embeddings",
+            include_eos_bos=False,
         )
         tokenizer_name = "word_level"
         tokenizer = create_tokenizer_from_vocab(tokens, unk_token="[UNK]", pad_token="[PAD]")
-
-    # Set the maximum length to a large number
-    tokenizer.model_max_length = 100_000_000
 
     if pca_dims is not None:
         if pca_dims < embeddings.shape[1]:

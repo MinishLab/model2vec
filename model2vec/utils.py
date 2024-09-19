@@ -10,7 +10,7 @@ import numpy as np
 import safetensors
 from rich.logging import RichHandler
 from safetensors.numpy import save_file
-from transformers import AutoTokenizer, PreTrainedTokenizerFast
+from tokenizers import Tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +33,7 @@ def setup_logging() -> None:
     )
 
 
-def save_pretrained(
-    folder_path: Path, embeddings: np.ndarray, tokenizer: PreTrainedTokenizerFast, config: dict[str, Any]
-) -> None:
+def save_pretrained(folder_path: Path, embeddings: np.ndarray, tokenizer: Tokenizer, config: dict[str, Any]) -> None:
     """
     Save a model to a folder.
 
@@ -46,7 +44,7 @@ def save_pretrained(
     """
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "embeddings.safetensors")
-    tokenizer.save_pretrained(folder_path)
+    tokenizer.save(str(folder_path / "tokenizer.json"))
     json.dump(config, open(folder_path / "config.json", "w"))
 
     logger.info(f"Saved model to {folder_path}")
@@ -54,7 +52,7 @@ def save_pretrained(
 
 def load_pretrained(
     folder_or_repo_path: str | Path, huggingface_token: str | None = None
-) -> tuple[np.ndarray, PreTrainedTokenizerFast, dict[str, Any]]:
+) -> tuple[np.ndarray, Tokenizer, dict[str, Any]]:
     """
     Loads a pretrained model from a folder.
 
@@ -75,17 +73,25 @@ def load_pretrained(
         config_path = folder_or_repo_path / "config.json"
         if not config_path.exists():
             raise FileNotFoundError(f"Config file does not exist in {folder_or_repo_path}")
+
+        tokenizer_path = folder_or_repo_path / "tokenizer.json"
+        if not tokenizer_path.exists():
+            raise FileNotFoundError(f"Tokenizer file does not exist in {folder_or_repo_path}")
+
     else:
         logger.info("Folder does not exist locally, attempting to use huggingface hub.")
         embeddings_path = huggingface_hub.hf_hub_download(
             str(folder_or_repo_path), "embeddings.safetensors", token=huggingface_token
         )
         config_path = huggingface_hub.hf_hub_download(str(folder_or_repo_path), "config.json", token=huggingface_token)
+        tokenizer_path = huggingface_hub.hf_hub_download(
+            str(folder_or_repo_path), "tokenizer.json", token=huggingface_token
+        )
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     embeddings = opened_tensor_file.get_tensor("embeddings")
 
-    tokenizer = AutoTokenizer.from_pretrained(folder_or_repo_path, token=huggingface_token)
+    tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
     config = json.load(open(config_path))
 
     if len(tokenizer.get_vocab()) != len(embeddings):
