@@ -100,3 +100,17 @@ def load_pretrained(
         )
 
     return embeddings, tokenizer, config
+
+
+def push_folder_to_hub(folder_path: Path, repo_id: str, huggingface_token: str | None) -> None:
+    """
+    Push a model folder to the huggingface hub.
+
+    :param folder_path: The path to the folder.
+    :param repo_id: The repo name.
+    :param huggingface_token: The huggingface token.
+    """
+    if not huggingface_hub.repo_exists(repo_id=repo_id, token=huggingface_token):
+        huggingface_hub.create_repo(repo_id, token=huggingface_token)
+    huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=huggingface_token)
+    logger.info(f"Pushed model to {repo_id}")
