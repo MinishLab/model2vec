@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from logging import getLogger
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Iterator
 
 import numpy as np
@@ -10,7 +11,7 @@ from tokenizers import Encoding, Tokenizer
 from torch.nn import EmbeddingBag
 from tqdm import tqdm
 
-from model2vec.utils import load_pretrained, save_pretrained
+from model2vec.utils import load_pretrained, push_folder_to_hub, save_pretrained
 
 PathLike = Path | str
 
@@ -154,3 +155,14 @@ class StaticModel:
     def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:
         """Batch the sentences into equal-sized."""
         return (sentences[i : i + batch_size] for i in range(0, len(sentences), batch_size))
+
+    def push_to_hub(self, repo_id: str, token: str | None) -> None:
+        """
+        Push the model to the huggingface hub.
+
+        :param repo_id: The repo id to push to.
+        :param token: The huggingface token to use.
+        """
+        with TemporaryDirectory() as temp_dir:
+            self.save_pretrained(temp_dir)
+            push_folder_to_hub(Path(temp_dir), repo_id, token)
