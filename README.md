@@ -53,7 +53,6 @@ Model2Vec allows anyone to create their own static embeddings from any Sentence 
 ## Quickstart
 The easiest way to get started with Model2Vec is to download one of our flagship models from the HuggingFace hub. These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
 ```python
-python
 from model2vec import StaticModel
 
 # Load a model from the HuggingFace hub (in this case the M2V_base_output model)
