@@ -1,9 +1,11 @@
 [project]
 name = "model2vec"
-description = "Distill your sentencetransformers to small fast models."
-readme = "README.md"
+description = "Turn any Sentence Transformer into a Small Fast Model."
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { file = "LICENSE" }
 version = "0.1.0"
 requires-python = ">=3.10"
+authors = [{ name = "Stéphan Tulkens", email = "stephantul@gmail.com"}, {name = "Thomas van Dongen", email = "thomas123@live.nl"}]
 
 dependencies = [
     "click",
@@ -36,6 +38,26 @@ dev = [
     "ruff",
 ]
 evaluation = ["evaluation@git+https://github.com/MinishLab/evaluation@main"]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Natural Language :: English",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/MinishLab"
+"Bug Reports" = "https://github.com/MinishLab/model2vec/issues"
+"Source" = "https://github.com/MinishLab/model2vec"
+
 
 [tool.ruff]
 exclude = [".venv/"]
