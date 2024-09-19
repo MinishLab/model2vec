@@ -1,6 +1,6 @@
-# Model2Vec: Turn any Sentence Transformer into a Small Fast Model
+# Model2Vec: Distill a Small Fast Model from any Sentence Transformer
 
-**Model2Vec** is a method to turn any Sentence Transformer model into a small, fast model.
+**Model2Vec** is a method to distill a small, fast model from any Sentence Transformer model.
 
 ## Table of Contents
 - [Main Features](#main-features)
@@ -64,7 +64,7 @@ m2v_model.save_pretrained("m2v_model")
 ```
 
 ## What is Model2Vec?
-Model2Vec is a simple and effective method to turn any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
+Model2Vec is a simple and effective method to distill any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
 
 This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as GloVe, without need for a dataset.
 
