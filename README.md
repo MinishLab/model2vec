@@ -112,7 +112,7 @@ vocabulary = ["word1", "word2", "word3"]
 model_name = "BAAI/bge-base-en-v1.5"
 
 # Distill the model with the custom vocabulary
-m2v_model = distill(model_name=model_name, vocabulary=vocabulary, pca_dims=256)
+m2v_model = distill(model_name=model_name, vocabulary=vocabulary, pca_dims=None)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
