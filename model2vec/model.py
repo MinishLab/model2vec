@@ -68,7 +68,7 @@ class StaticModel(nn.Module):
         """Update the config if the value of normalize changes."""
         config_normalize = self.config.get("normalize", False)
         self._normalize = value
-        if config_normalize is not None and value != config_normalize:
+        if value != config_normalize:
             logger.warning(
                 f"Set normalization to `{value}`, which does not match config value `{config_normalize}`. Updating config."
             )
