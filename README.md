@@ -18,6 +18,7 @@
     - [Evaluating a Model2Vec model](#evaluating-a-model2vec-model)
 - [Model List](#model-list)
 - [Results](#results)
+- [Related Work](#related-work)
 - [Citing](#citing)
 
 ## Quickstart
