@@ -96,3 +96,30 @@ def test_load_pretrained(
     np.testing.assert_array_equal(loaded_model.embedding.weight.numpy(), mock_vectors)
     assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
     assert loaded_model.config == mock_config
+
+
+def test_initialize_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Tests whether the normalization initialization is correct."""
+    model = StaticModel(mock_vectors, mock_tokenizer, {}, normalize=None)
+    assert not model.normalize
+
+    model = StaticModel(mock_vectors, mock_tokenizer, {}, normalize=False)
+    assert not model.normalize
+
+    model = StaticModel(mock_vectors, mock_tokenizer, {}, normalize=True)
+    assert model.normalize
+
+    model = StaticModel(mock_vectors, mock_tokenizer, {"normalize": False}, normalize=True)
+    assert model.normalize
+
+    model = StaticModel(mock_vectors, mock_tokenizer, {"normalize": True}, normalize=False)
+    assert not model.normalize
+
+
+def test_set_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Tests whether the normalize is set correctly."""
+    model = StaticModel(mock_vectors, mock_tokenizer, {}, normalize=True)
+    model.normalize = False
+    assert model.config == {"normalize": False}
+    model.normalize = True
+    assert model.config == {"normalize": True}

@@ -49,7 +49,10 @@ class StaticModel(nn.Module):
             self.unk_token_id = None
 
         self.config = config
-        self.normalize = config.get("normalize", normalize if normalize is not None else False)
+        if normalize is not None:
+            self.normalize = normalize
+        else:
+            self.normalize = config.get("normalize", False)
 
     @property
     def normalize(self) -> bool:
