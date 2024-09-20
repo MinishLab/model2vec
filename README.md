@@ -11,6 +11,7 @@
     - [Distilling a Model2Vec model](#distilling-a-model2vec-model)
     - [Inferencing a Model2Vec model](#inferencing-a-model2vec-model)
     - [Evaluating a Model2Vec model](#evaluating-a-model2vec-model)
+- [Model List](#model-list)
 - [Results](#results)
 - [Citing](#citing)
 
@@ -64,7 +65,7 @@ m2v_model.save_pretrained("m2v_model")
 ```
 
 ## What is Model2Vec?
-Model2Vec is a simple and effective method to distill any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
+Model2Vec is a simple and effective method to distill any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format. When a vocabulary is passed, a word-level tokenizer is created on the fly based on the vocabulary. When output embeddings are used, the subword tokenizer from the Sentence Transformer is used.
 
 This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as GloVe, without need for a dataset.
 
@@ -143,7 +144,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 ### Evaluating a Model2Vec model
 
-Model2Vec models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). To run this, first install the optionall evaluation package:
+Model2Vec models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). To run this, first install the optional evaluation package:
 ```bash
 pip install evaluation@git+https://github.com/MinishLab/evaluation@main
 ```
@@ -170,15 +171,23 @@ model.mteb_model_meta = ModelMeta(
         )
 
 # Run the evaluation
-results = evaluation.run(model, eval_splits=["test"], output_folder=f"results/{model_name}")
+results = evaluation.run(model, eval_splits=["test"], output_folder=f"results")
 
 # Parse the results and summarize them
 parsed_results = parse_mteb_results(mteb_results=results, model_name=model_name)
 task_scores = summarize_results(parsed_results)
+
 # Print the results in a leaderboard format
 print(make_leaderboard(task_scores))
 ```
 
+## Model List
+
+
+| Model                  | Language    | Description                                                           | Vocab | Sentence Transformer | Params       |
+|------------------------|-------------|-----------------------------------------------------------------------|----------------|-----------------------|--------------|
+| [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)           | English     | Flagship embedding model based on GloVe vocab.           | GloVe        | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                   | 102M         |
+| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)          | English     | Flagship embedding model based on bge-base-en-v1.5 vocab. Uses a subword tokenizer.                    | Output          | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                         | 7.5M         |
 ## Results
 
 ### Main Results
