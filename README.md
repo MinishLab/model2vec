@@ -11,6 +11,7 @@
     - [Distilling a Model2Vec model](#distilling-a-model2vec-model)
     - [Inferencing a Model2Vec model](#inferencing-a-model2vec-model)
     - [Evaluating a Model2Vec model](#evaluating-a-model2vec-model)
+- [Model List](#model-list)
 - [Results](#results)
 - [Citing](#citing)
 
@@ -179,6 +180,13 @@ task_scores = summarize_results(parsed_results)
 print(make_leaderboard(task_scores))
 ```
 
+## Model List
+
+
+| Model                  | Language    | Description                                                           | Vocab | Sentence Transformer | Params       |
+|------------------------|-------------|-----------------------------------------------------------------------|----------------|-----------------------|--------------|
+| [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)           | English     | Flagship embedding model based on GloVe vocab.           | GloVe        | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                   | 102M         |
+| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)          | English     | Flagship embedding model based on bge-base-en-v1.5 vocab. Uses a sub-word tokenizer.                    | Output          | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                         | 7.5M         |
 ## Results
 
 ### Main Results
