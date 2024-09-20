@@ -78,7 +78,7 @@ Model2Vec is:
 - **No data needed**: Distillation happens directly on the token level, so no dataset is needed.
 - **Simple to use**: An easy to use interface for distilling and inferencing.
 - **Bring your own model**: Can be applied to any Sentence Transformer model.
-- **Bring your own vocabulary**: Can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary. Need biomedical? Just get a dictionary, a biomedical model, and inference it.
+- **Bring your own vocabulary**: Can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary. Need biomedical? Just get a medical dictionary, a biomedical model, and inference it.
 - **Multi-lingual**: Use any language. Need a French model? [Pick one](https://huggingface.co/models?library=sentence-transformers&language=fr&sort=trending). Need multilingual? [Here you go](https://huggingface.co/sentence-transformers/LaBSE).
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab). Feel free to share your own.
 - **Easy Evaluation**: evaluate your models on MTEB and some of our own tasks to measure the performance of the distilled model. Model2Vec models work out of the box on [MTEB](https://huggingface.co/spaces/mteb/leaderboard).
@@ -116,6 +116,9 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, pca_dims=None)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
+
+# Or push it to the hub
+m2v_model.push_to_hub("my_organization/my_model", token="<it's a secret to everybody>")
 ```
 
 We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
@@ -227,14 +230,14 @@ In addition to the MTEB evaluation, we evaluate Model2Vec on a number of classif
 
 As can be seen, Model2Vec models outperform the GloVe and WL256 models on all classification tasks, and are competitive with the all-MiniLM-L6-v2 model, while being much faster.
 
-The figure below shows the relationship between the number of sentences per second and the average classification score. The bubble sizes correspond to the number of parameters in the models (larger = more parameters).
+The figure below shows the relationship between the number of sentences per second and the average classification score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
 This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of classification performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
 
 | ![Description](assets/images/speed_vs_accuracy.png) |
 |:--:|
 |*Figure: The average accuracy over all classification datasets plotted against sentence per second. The circle size indicates model size.*|
 
-### Related work
+## Related work
 
 If you are interested in fast small models, also consider looking at these techniques:
 * [BPEmb](https://bpemb.h-its.org/): GLoVE embeddings trained on BPE-encoded Wikipedias. Huge inspiration to this project, multilingual, very fast. If you don't find a sentence transformer in the language you need, check this out.
