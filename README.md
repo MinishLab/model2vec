@@ -144,7 +144,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 ### Evaluating a Model2Vec model
 
-Model2Vec models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). To run this, first install the optionall evaluation package:
+Model2Vec models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). To run this, first install the optional evaluation package:
 ```bash
 pip install evaluation@git+https://github.com/MinishLab/evaluation@main
 ```
@@ -171,11 +171,12 @@ model.mteb_model_meta = ModelMeta(
         )
 
 # Run the evaluation
-results = evaluation.run(model, eval_splits=["test"], output_folder=f"results/{model_name}")
+results = evaluation.run(model, eval_splits=["test"], output_folder=f"results")
 
 # Parse the results and summarize them
 parsed_results = parse_mteb_results(mteb_results=results, model_name=model_name)
 task_scores = summarize_results(parsed_results)
+
 # Print the results in a leaderboard format
 print(make_leaderboard(task_scores))
 ```
