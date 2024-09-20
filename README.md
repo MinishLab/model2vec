@@ -65,7 +65,7 @@ m2v_model.save_pretrained("m2v_model")
 ```
 
 ## What is Model2Vec?
-Model2Vec is a simple and effective method to distill any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format.
+Model2Vec is a simple and effective method to distill any sentence transformer into static embeddings. It works by inferencing a vocabulary with the specified Sentence Transformer model, reducing the dimensionality of the embeddings using PCA, weighting the embeddings using zipf weighting, and storing the embeddings in a static format. When a vocabulary is passed, a tokenizer is created on the fly based on the vocabulary. When output embeddings are used, the subword tokenizer from the Sentence Transformer is used.
 
 This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as GloVe, without need for a dataset.
 
