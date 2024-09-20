@@ -2,10 +2,15 @@
 
 **Model2Vec** is a method to distill a small, fast model from any Sentence Transformer model.
 
+| ![Description](assets/images/sentences_per_second_vs_average_score.png) |
+|:--:|
+|*Model2vec allows you to create really fast small models that still perform well.*|
+
+
 ## Table of Contents
-- [Main Features](#main-features)
 - [Quickstart](#quickstart)
 - [What is Model2Vec?](#what-is-model2vec)
+- [Main Features](#main-features)
 - [Who is this for?](#who-is-this-for)
 - [Usage](#usage)
     - [Distilling a Model2Vec model](#distilling-a-model2vec-model)
@@ -14,22 +19,6 @@
 - [Model List](#model-list)
 - [Results](#results)
 - [Citing](#citing)
-
-## Main Features
-- **Small**: Model2Vec can reduce the size of a Sentence Transformer model by a factor of 15 *.
-- **Fast distillation**: Model2Vec can distill a Sentence Transformer model in ~5 minutes on CPU *.
-- **Fast inference**: Model2Vec creates static embeddings that are up to 500 times * faster than the original model.
-- **State-of-the-art static embedding performance**: Model2Vec outperforms traditional static embeddings by a large margin on a number of benchmarks.
-- **No data needed**: Distillation happens directly on a token leven, so no dataset is needed.
-- **Simple to use**: Model2Vec provides an easy to use interface for distilling and inferencing Model2Vec models.
-- **Bring your own model**: Model2Vec can be applied to any Sentence Transformer model.
-- **Bring your own vocabulary**: Model2Vec can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary.
-- **Multi-lingual**: Model2Vec can easily be applied to any language.
-- **Tightly integrated with HuggingFace hub**: Model2Vec models can be easily shared and loaded from the HuggingFace hub. Our models can be found [here](https://huggingface.co/minishlab).
-- **Easy Evaluation**: Model2Vec comes with a set of evaluation tasks to measure the performance of the distilled model.
-
-\* Based on the [bge-base-en-v1.5 model](https://huggingface.co/BAAI/bge-base-en-v1.5).
-
 
 ## Quickstart
 
@@ -69,6 +58,20 @@ Model2Vec is a simple and effective method to distill any sentence transformer i
 
 This technique creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on a a number of relevent tasks, while being much faster to create than traditional static embedding models such as GloVe, without need for a dataset.
 
+## Main Features
+- **Small**: Model2Vec can reduce the size of a Sentence Transformer model by a factor of 15 *.
+- **Fast distillation**: Model2Vec can distill a Sentence Transformer model in ~5 minutes on CPU *.
+- **Fast inference**: Model2Vec creates static embeddings that are up to 500 times * faster than the original model.
+- **State-of-the-art static embedding performance**: Model2Vec outperforms traditional static embeddings by a large margin on a number of benchmarks.
+- **No data needed**: Distillation happens directly on a token leven, so no dataset is needed.
+- **Simple to use**: Model2Vec provides an easy to use interface for distilling and inferencing Model2Vec models.
+- **Bring your own model**: Model2Vec can be applied to any Sentence Transformer model.
+- **Bring your own vocabulary**: Model2Vec can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary.
+- **Multi-lingual**: Model2Vec can easily be applied to any language.
+- **Tightly integrated with HuggingFace hub**: Model2Vec models can be easily shared and loaded from the HuggingFace hub. Our models can be found [here](https://huggingface.co/minishlab).
+- **Easy Evaluation**: Model2Vec comes with a set of evaluation tasks to measure the performance of the distilled model.
+
+\* Based on the [bge-base-en-v1.5 model](https://huggingface.co/BAAI/bge-base-en-v1.5).
 
 ## Who is this for?
 Model2Vec allows anyone to create their own static embeddings from any Sentence Transformer model in minutes. It can easily be applied to other languages by using a language-specific Sentence Transformer model and vocab. Similarly, it can be applied to specific domains by using a domain specific model, vocab, or both. This makes it an ideal tool for fast prototyping, research, and production use cases where speed and size are more important than performance.
@@ -238,7 +241,9 @@ As can be seen, the Model2Vec models outperforms the GloVe and WL256 models on a
 
 The scatterplot below shows the relationship between the number of sentences per second and the average classification score. The bubble sizes correspond to the number of parameters in the models (larger = more parameters), and the colors correspond to the sentences per second (greener = more sentences per second). This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of classification performance with the all-MiniLM-L6-v2 model.
 
-![Description](assets/images/sentences_per_second_vs_average_score.png)
+| ![Description](assets/images/sentences_per_second_vs_average_score.png) |
+|:--:|
+|*Figure: The average accuracy over all classification datasets plotted against sentence per second. The circle size indicates model size.*|
 
 ## Citing
 
