@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 
 class StaticModel(nn.Module):
     def __init__(
-        self, vectors: np.ndarray, tokenizer: Tokenizer, config: dict[str, Any], normalize: bool = False
+        self, vectors: np.ndarray, tokenizer: Tokenizer, config: dict[str, Any], normalize: bool | None = None
     ) -> None:
         """
         Initialize the StaticModel.
@@ -49,7 +49,27 @@ class StaticModel(nn.Module):
             self.unk_token_id = None
 
         self.config = config
-        self.normalize = normalize
+        self.normalize = config.get("normalize", normalize if normalize is not None else False)
+
+    @property
+    def normalize(self) -> bool:
+        """
+        Get the normalize value.
+
+        :return: The normalize value.
+        """
+        return self._normalize
+
+    @normalize.setter
+    def normalize(self, value: bool) -> None:
+        """Update the config if the value of normalize changes."""
+        config_normalize = self.config.get("normalize", False)
+        self._normalize = value
+        if config_normalize is not None and value != config_normalize:
+            logger.warning(
+                f"Set normalization to `{value}`, which does not match config value `{config_normalize}`. Updating config."
+            )
+        self.config["normalize"] = value
 
     def save_pretrained(self, path: PathLike) -> None:
         """
