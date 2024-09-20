@@ -8,6 +8,7 @@ from typing import Any, Iterator
 import numpy as np
 import torch
 from tokenizers import Encoding, Tokenizer
+from torch import nn
 from torch.nn import EmbeddingBag
 from tqdm import tqdm
 
@@ -19,18 +20,21 @@ PathLike = Path | str
 logger = getLogger(__name__)
 
 
-class StaticModel:
-    def __init__(self, vectors: np.ndarray, tokenizer: Tokenizer, config: dict[str, Any]) -> None:
+class StaticModel(nn.Module):
+    def __init__(
+        self, vectors: np.ndarray, tokenizer: Tokenizer, config: dict[str, Any], normalize: bool = False
+    ) -> None:
         """
         Initialize the StaticModel.
 
         :param vectors: The vectors to use.
         :param tokenizer: The Transformers tokenizer to use.
         :param config: Any metadata config.
+        :param normalize: Whether to normalize.
         :raises: ValueError if the number of tokens does not match the number of vectors.
         """
+        super().__init__()
         tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
-        self.vectors = vectors
         self.tokens = tokens
         self.embedding = EmbeddingBag.from_pretrained(torch.from_numpy(vectors))
 
@@ -45,6 +49,7 @@ class StaticModel:
             self.unk_token_id = None
 
         self.config = config
+        self.normalize = normalize
 
     def save_pretrained(self, path: PathLike) -> None:
         """
@@ -52,7 +57,44 @@ class StaticModel:
 
         :param path: The path to save to.
         """
-        save_pretrained(Path(path), self.vectors, self.tokenizer, self.config)
+        save_pretrained(Path(path), self.embedding.weight.numpy(), self.tokenizer, self.config)
+
+    def forward(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the model.
+
+        :param ids: The input tensor.
+        :param offsets: The offsets tensor.
+        :return: The output tensor.
+        """
+        means = self.embedding(ids, offsets)
+        if self.normalize:
+            return torch.nn.functional.normalize(means)
+        return means
+
+    def tokenize(self, sentences: list[str], max_length: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Tokenize a sentence.
+
+        :param sentences: The sentence to tokenize.
+        :param max_length: The maximum length of the sentence.
+        :return: The tokens.
+        """
+        encodings: list[Encoding] = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
+        encodings_ids = [encoding.ids for encoding in encodings]
+
+        if self.unk_token_id is not None:
+            # NOTE: Remove the unknown token: necessary for word-level models.
+            encodings_ids = [
+                [token_id for token_id in token_ids if token_id != self.unk_token_id] for token_ids in encodings_ids
+            ]
+        if max_length is not None:
+            encodings_ids = [token_ids[:max_length] for token_ids in encodings_ids]
+
+        offsets = torch.from_numpy(np.cumsum([0] + [len(token_ids) for token_ids in encodings_ids[:-1]]))
+        ids = torch.tensor([token_id for token_ids in encodings_ids for token_id in token_ids], dtype=torch.long)
+
+        return ids, offsets
 
     @classmethod
     def from_pretrained(
@@ -80,20 +122,11 @@ class StaticModel:
         """
         return self.vectors.shape[1]
 
-    @staticmethod
-    def normalize(X: np.ndarray) -> np.ndarray:
-        """Normalize an array to unit length."""
-        norms = np.linalg.norm(X, axis=1, keepdims=True)
-        norms[norms == 0] = 1
-
-        return X / norms
-
     def encode(
         self,
         sentences: list[str] | str,
         show_progressbar: bool = False,
         max_length: int | None = 512,
-        norm: bool = False,
         batch_size: int = 1024,
         **kwargs: Any,
     ) -> np.ndarray:
@@ -107,7 +140,6 @@ class StaticModel:
         :param show_progressbar: Whether to show the progress bar.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
-        :param norm: Whether to normalize the embeddings to unit length.
         :param batch_size: The batch size to use.
         :param **kwargs: Any additional arguments. These are ignored.
         :return: The encoded sentences. If a single sentence was passed, a vector is returned.
@@ -125,31 +157,16 @@ class StaticModel:
 
         out_array = np.concatenate(out_arrays, axis=0)
 
-        if norm:
-            out_array = self.normalize(out_array)
-
         if was_single:
             return out_array[0]
 
         return out_array
 
+    @torch.no_grad()
     def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
-        encodings: list[Encoding] = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
-        encodings_ids = [encoding.ids for encoding in encodings]
-
-        if self.unk_token_id is not None:
-            # NOTE: Remove the unknown token: necessary for word-level models.
-            encodings_ids = [
-                [token_id for token_id in token_ids if token_id != self.unk_token_id] for token_ids in encodings_ids
-            ]
-        if max_length is not None:
-            encodings_ids = [token_ids[:max_length] for token_ids in encodings_ids]
-
-        offsets = np.cumsum([0] + [len(token_ids) for token_ids in encodings_ids[:-1]])
-        ids = torch.tensor([token_id for token_ids in encodings_ids for token_id in token_ids], dtype=torch.long)
-
-        return self.embedding(ids, torch.tensor(offsets, dtype=torch.long)).detach().numpy()
+        ids, offsets = self.tokenize(sentences, max_length)
+        return self.forward(ids, offsets).numpy()
 
     @staticmethod
     def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:
