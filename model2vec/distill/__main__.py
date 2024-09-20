@@ -104,15 +104,19 @@ def distill(
         tokenizer = create_tokenizer_from_vocab(tokens, unk_token="[UNK]", pad_token="[PAD]")
 
     if pca_dims is not None:
-        if pca_dims < embeddings.shape[1]:
+        if pca_dims >= embeddings.shape[1]:
+            raise ValueError(
+                f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]})"
+            )
+        if pca_dims >= len(tokens):
+            logger.warning(
+                f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({len(tokens)}). Not applying PCA."
+            )
+        elif pca_dims < embeddings.shape[1]:
             logger.info(f"Applying PCA with n_components {pca_dims}")
 
             p = PCA(n_components=pca_dims, whiten=False)
             embeddings = p.fit_transform(embeddings)
-        else:
-            raise ValueError(
-                f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]})"
-            )
 
     if apply_zipf:
         logger.info("Applying Zipf weighting")
