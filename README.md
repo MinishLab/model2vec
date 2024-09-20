@@ -2,7 +2,7 @@
 
 **Model2Vec** is a method to distill a small, fast model from any Sentence Transformer model.
 
-| ![Description](assets/images/sentences_per_second_vs_average_score.png) |
+| ![Description](assets/images/speed_vs_accuracy.png) |
 |:--:|
 |*Model2vec allows you to create really fast small models that still perform well.*|
 
@@ -241,7 +241,7 @@ As can be seen, the Model2Vec models outperforms the GloVe and WL256 models on a
 
 The scatterplot below shows the relationship between the number of sentences per second and the average classification score. The bubble sizes correspond to the number of parameters in the models (larger = more parameters), and the colors correspond to the sentences per second (greener = more sentences per second). This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of classification performance with the all-MiniLM-L6-v2 model.
 
-| ![Description](assets/images/sentences_per_second_vs_average_score.png) |
+| ![Description](assets/images/speed_vs_accuracy.png) |
 |:--:|
 |*Figure: The average accuracy over all classification datasets plotted against sentence per second. The circle size indicates model size.*|
 
