@@ -121,7 +121,7 @@ m2v_model.save_pretrained("m2v_model")
 m2v_model.push_to_hub("my_organization/my_model", token="<it's a secret to everybody>")
 ```
 
-Important note: we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
+**Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
 
 We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
 ```bash
