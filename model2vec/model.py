@@ -68,7 +68,7 @@ class StaticModel(nn.Module):
         """Update the config if the value of normalize changes."""
         config_normalize = self.config.get("normalize", False)
         self._normalize = value
-        if value != config_normalize:
+        if config_normalize is not None and value != config_normalize:
             logger.warning(
                 f"Set normalization to `{value}`, which does not match config value `{config_normalize}`. Updating config."
             )
@@ -123,16 +123,18 @@ class StaticModel(nn.Module):
     def from_pretrained(
         cls: type[StaticModel],
         path: PathLike,
-        huggingface_token: str | None = None,
+        token: str | None = None,
     ) -> StaticModel:
         """
-        Create a static embeddder by creating a word-level tokenizer.
+        Load a StaticModel from a local path or huggingface hub path.
+
+        NOTE: if you load a private model from the huggingface hub, you need to pass a token.
 
         :param path: The path to load your static model from.
-        :param huggingface_token: The huggingface token to use.
+        :param token: The huggingface token to use.
         :return: A StaticEmbedder
         """
-        embeddings, tokenizer, config = load_pretrained(path, huggingface_token=huggingface_token)
+        embeddings, tokenizer, config = load_pretrained(path, token=token)
 
         return cls(embeddings, tokenizer, config)
 
@@ -199,6 +201,8 @@ class StaticModel(nn.Module):
     def push_to_hub(self, repo_id: str, token: str | None) -> None:
         """
         Push the model to the huggingface hub.
+
+        NOTE: you need to pass a token if you are pushing a private model.
 
         :param repo_id: The repo id to push to.
         :param token: The huggingface token to use.

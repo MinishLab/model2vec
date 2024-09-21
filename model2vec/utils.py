@@ -51,7 +51,7 @@ def save_pretrained(folder_path: Path, embeddings: np.ndarray, tokenizer: Tokeni
 
 
 def load_pretrained(
-    folder_or_repo_path: str | Path, huggingface_token: str | None = None
+    folder_or_repo_path: str | Path, token: str | None = None
 ) -> tuple[np.ndarray, Tokenizer, dict[str, Any]]:
     """
     Loads a pretrained model from a folder.
@@ -59,7 +59,7 @@ def load_pretrained(
     :param folder_or_repo_path: The folder or repo path to load from.
         - If this is a local path, we will load from the local path.
         - If the local path is not found, we will attempt to load from the huggingface hub.
-    :param huggingface_token: The huggingface token to use.
+    :param token: The huggingface token to use.
     :raises: FileNotFoundError if the folder exists, but the file does not exist locally.
     :return: The embeddings, tokenizer, and config.
 
@@ -81,12 +81,10 @@ def load_pretrained(
     else:
         logger.info("Folder does not exist locally, attempting to use huggingface hub.")
         embeddings_path = huggingface_hub.hf_hub_download(
-            str(folder_or_repo_path), "embeddings.safetensors", token=huggingface_token
+            str(folder_or_repo_path), "embeddings.safetensors", token=token
         )
-        config_path = huggingface_hub.hf_hub_download(str(folder_or_repo_path), "config.json", token=huggingface_token)
-        tokenizer_path = huggingface_hub.hf_hub_download(
-            str(folder_or_repo_path), "tokenizer.json", token=huggingface_token
-        )
+        config_path = huggingface_hub.hf_hub_download(str(folder_or_repo_path), "config.json", token=token)
+        tokenizer_path = huggingface_hub.hf_hub_download(str(folder_or_repo_path), "tokenizer.json", token=token)
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     embeddings = opened_tensor_file.get_tensor("embeddings")
@@ -102,15 +100,15 @@ def load_pretrained(
     return embeddings, tokenizer, config
 
 
-def push_folder_to_hub(folder_path: Path, repo_id: str, huggingface_token: str | None) -> None:
+def push_folder_to_hub(folder_path: Path, repo_id: str, token: str | None) -> None:
     """
     Push a model folder to the huggingface hub.
 
     :param folder_path: The path to the folder.
     :param repo_id: The repo name.
-    :param huggingface_token: The huggingface token.
+    :param token: The huggingface token.
     """
-    if not huggingface_hub.repo_exists(repo_id=repo_id, token=huggingface_token):
-        huggingface_hub.create_repo(repo_id, token=huggingface_token)
-    huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=huggingface_token)
+    if not huggingface_hub.repo_exists(repo_id=repo_id, token=token):
+        huggingface_hub.create_repo(repo_id, token=token)
+    huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=token)
     logger.info(f"Pushed model to {repo_id}")
