@@ -185,6 +185,7 @@ print(make_leaderboard(task_scores))
 |------------------------|-------------|-----------------------------------------------------------------------|----------------|-----------------------|--------------|
 | [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)           | English     | Flagship embedding model based on GloVe vocab.           | GloVe        | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                   | 102M         |
 | [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)          | English     | Flagship embedding model based on bge-base-en-v1.5 vocab. Uses a subword tokenizer.                    | Output          | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                         | 7.5M         |
+| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output)          | Multilingual     | Flagship multilingual embedding model based on LaBSE vocab. Uses a subword tokenizer.                    | Output          | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)                         | 471M         |
 ## Results
 
 ### Main Results
