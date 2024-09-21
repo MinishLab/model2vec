@@ -112,7 +112,7 @@ vocabulary = ["word1", "word2", "word3"]
 model_name = "BAAI/bge-base-en-v1.5"
 
 # Distill the model with the custom vocabulary
-m2v_model = distill(model_name=model_name, vocabulary=vocabulary, pca_dims=None)
+m2v_model = distill(model_name=model_name, vocabulary=vocabulary, pca_dims=None, apply_zipf=True)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
@@ -120,6 +120,8 @@ m2v_model.save_pretrained("m2v_model")
 # Or push it to the hub
 m2v_model.push_to_hub("my_organization/my_model", token="<it's a secret to everybody>")
 ```
+
+Important note: we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
 
 We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
 ```bash
@@ -133,7 +135,8 @@ from model2vec import StaticModel
 
 # Load a model from the HuggingFace hub, or a local one.
 model_name = "minishlab/M2V_base_output"
-model = StaticModel.from_pretrained(model_name)
+# You can optionally pass a token if you're loading a private model
+model = StaticModel.from_pretrained(model_name, token=None)
 
 # Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
