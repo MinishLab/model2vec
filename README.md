@@ -15,7 +15,6 @@
     - [Distilling a Model2Vec model](#distilling-a-model2vec-model)
     - [Inferencing a Model2Vec model](#inference-with-a-model2vec-model)
     - [Evaluating a Model2Vec model](#evaluating-a-model2vec-model)
-    - [Finetuning a Model2Vec model](#finetuning-a-model2vec-model)
 - [Model List](#model-list)
 - [Results](#results)
 - [Related Work](#related-work)
@@ -178,28 +177,6 @@ task_scores = summarize_results(parsed_results)
 # Print the results in a leaderboard format
 print(make_leaderboard(task_scores))
 ```
-
-### Finetuning a Model2Vec model
-
-☢️☢️ *WARNING: EXPERIMENTAL* ☢️☢️ (it works, it's just experimental)
-
-Model2vec models are [pytorch](https://pytorch.org/) Modules. This means you can just use them in any gradient-based workflow, and update the weights for your own purpose. Train to you heart's content, but please don't overfit 🙇🦙.
-
-To do so, please unfreeze the embeddings, and use `forward` instead of `encode`. Note that `forward` takes as input the output of the `tokenize` function. See here for an example. We currently don't use this but it's an area we are exploring.
-
-```python
-# Enable gradients on the embeddings.
-m2v_model.embedding.weight.requires_grad_(True)
-
-sentences = ["keep yer feet on the ground!", "yes, this is not a Zelda quote", "fight me"]
-ids, offsets = m2v_model.tokenize(sentences)
-X = m2v_model(ids, offsets)
-# ✨✨✨✨✨✨✨✨
-print(X.requires_grad)
-# ✨✨✨✨✨✨✨✨
-
-```
-
 
 ## Model List
 
