@@ -36,7 +36,7 @@ model_name = "minishlab/M2V_base_output"
 model = StaticModel.from_pretrained(model_name)
 
 # Make embeddings
-embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everyone."])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
 And that's it. You can use the model to classify texts, to cluster, or to build a RAG system.
