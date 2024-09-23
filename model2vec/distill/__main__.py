@@ -80,6 +80,8 @@ def distill(
     embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
     logger.info("Removed unused tokens from the tokenizer and embeddings.")
 
+    w = np.log(np.arange(1, len(embeddings) + 1))
+
     if vocabulary is not None:
         preprocessed_vocabulary = preprocess_vocabulary(tokenizer, vocabulary)
         n_tokens_before = len(preprocessed_vocabulary)
@@ -88,17 +90,21 @@ def distill(
         logger.info(
             f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
         )
-        _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
-            model_name=model_name,
-            tokens=cleaned_vocabulary,
-            device=device,
-            output_value="token_embeddings",
-            include_eos_bos=False,
-        )
+        if cleaned_vocabulary:
+            _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
+                model_name=model_name,
+                tokens=cleaned_vocabulary,
+                device=device,
+                output_value="token_embeddings",
+                include_eos_bos=False,
+            )
 
-        tokenizer = add_tokens(tokenizer, cleaned_vocabulary)
-        embeddings = np.concatenate([embeddings, token_embeddings], axis=0)
-        tokens += cleaned_vocabulary
+            tokenizer = add_tokens(tokenizer, cleaned_vocabulary)
+            w = np.concatenate([w, np.log(np.arange(1, len(token_embeddings) + 1))])
+            embeddings = np.concatenate([embeddings, token_embeddings], axis=0)
+            tokens += cleaned_vocabulary
+        else:
+            logger.warning("Didn't create any token embeddings as all tokens were duplicates or empty.")
 
     if pca_dims is not None:
         if pca_dims >= embeddings.shape[1]:
@@ -117,7 +123,6 @@ def distill(
 
     if apply_zipf:
         logger.info("Applying Zipf weighting")
-        w = np.log(np.arange(1, len(embeddings) + 1))
         embeddings *= w[:, None]
 
     config = {"tokenizer_name": tokenizer_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
