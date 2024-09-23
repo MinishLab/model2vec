@@ -38,6 +38,22 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     return tokenizer
 
 
-def add_tokens(tokenizer: Tokenizer, new_tokens: list[str]) -> Tokenizer:
-    """Add tokens to a tokenizer."""
-    raise NotImplementedError()
+def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
+    """
+    Add tokens to a tokenizer.
+
+    :param tokenizer: The tokenizer to add tokens to.
+    :param tokens_to_add: The tokens to add.
+    :return: The modified tokenizer.
+    """
+    with NamedTemporaryFile(mode="w+") as temp_file:
+        tokenizer.save(temp_file.name)
+        data = json.load(open(temp_file.name))
+
+        vocab: dict[str, int] = data["model"]["vocab"]
+        for token in tokens_to_add:
+            vocab[token] = len(vocab)
+
+        tokenizer = Tokenizer.from_str(json.dumps(data))
+
+    return tokenizer
