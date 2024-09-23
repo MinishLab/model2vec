@@ -138,15 +138,6 @@ class StaticModel(nn.Module):
 
         return cls(embeddings, tokenizer, config)
 
-    @property
-    def dim(self) -> int:
-        """
-        Get the dimension of the vectors.
-
-        :return: The dimension of the vectors.
-        """
-        return self.vectors.shape[1]
-
     def encode(
         self,
         sentences: list[str] | str,
