@@ -81,7 +81,7 @@ def create_output_embeddings_from_model_name_and_tokens(
 
 def _get_embedder_output_dim(output_value: OutputValue, embedder: SentenceTransformer) -> int:
     """Get the embeddings dimension of a sentence transformer, given an output value."""
-    embedder_output_dim = embedder.encode(["a"], show_progress_bar=False, output_value=output_value)[0].shape[0]
+    embedder_output_dim = embedder.encode(["a"], show_progress_bar=False, output_value=output_value)[0].shape[1]
 
     return embedder_output_dim
 

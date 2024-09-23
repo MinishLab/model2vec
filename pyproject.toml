@@ -3,7 +3,7 @@ name = "model2vec"
 description = "Distill a Small Fast Model from any Sentence Transformer"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
-version = "0.1.1"
+version = "0.1.2"
 requires-python = ">=3.10"
 authors = [{ name = "Stéphan Tulkens", email = "stephantul@gmail.com"}, {name = "Thomas van Dongen", email = "thomas123@live.nl"}]
 
