@@ -12,7 +12,7 @@ from model2vec.distill.inference import (
     create_output_embeddings_from_model_name,
     create_output_embeddings_from_model_name_and_tokens,
 )
-from model2vec.distill.tokenizer import add_tokens, remove_tokens
+from model2vec.distill.tokenizer import add_tokens, preprocess_vocabulary, remove_tokens
 from model2vec.model import StaticModel
 from model2vec.utils import setup_logging
 
@@ -81,31 +81,24 @@ def distill(
     logger.info("Removed unused tokens from the tokenizer and embeddings.")
 
     if vocabulary is not None:
-        vocabulary_counts = Counter(vocabulary)
-        duplicates = [k for k, v in vocabulary_counts.items() if v > 1]
-        if duplicates:
-            duplicate_str = ", ".join(duplicates)
-            raise ValueError(f"Vocabulary contains duplicate tokens: {duplicate_str}")
-
-        subword_tokens_set = set(tokens)
-        # NOTE: we do a list comprehension to keep sort order.
-        n_tokens_before = len(vocabulary)
-        new_tokens = [token for token in vocabulary if token not in subword_tokens_set]
-        n_tokens_after = len(vocabulary)
+        preprocessed_vocabulary = preprocess_vocabulary(tokenizer, vocabulary)
+        n_tokens_before = len(preprocessed_vocabulary)
+        cleaned_vocabulary = _clean_vocabulary(preprocessed_vocabulary, tokens)
+        n_tokens_after = len(cleaned_vocabulary)
         logger.info(
-            f"Adding {len(new_tokens)} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens."
+            f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
         )
         _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
             model_name=model_name,
-            tokens=new_tokens,
+            tokens=cleaned_vocabulary,
             device=device,
             output_value="token_embeddings",
             include_eos_bos=False,
         )
 
-        tokenizer = add_tokens(tokenizer, new_tokens)
+        tokenizer = add_tokens(tokenizer, cleaned_vocabulary)
         embeddings = np.concatenate([embeddings, token_embeddings], axis=0)
-        tokens += new_tokens
+        tokens += cleaned_vocabulary
 
     if pca_dims is not None:
         if pca_dims >= embeddings.shape[1]:
@@ -130,6 +123,31 @@ def distill(
     config = {"tokenizer_name": tokenizer_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
 
     return StaticModel(embeddings, tokenizer, config)
+
+
+def _clean_vocabulary(preprocessed_vocabulary: list[str], added_tokens: list[str]) -> list[str]:
+    """Cleans a vocabulary by removing duplicates and tokens that were already in the vocabulary."""
+    added_tokens_set = set(added_tokens)
+    seen_tokens = set()
+    cleaned_vocabulary = []
+    n_empty = 0
+    n_duplicates = 0
+    for token in preprocessed_vocabulary:
+        if not token:
+            n_empty += 1
+            continue
+        if token in seen_tokens or token in added_tokens_set:
+            n_duplicates += 1
+            continue
+        seen_tokens.add(token)
+        cleaned_vocabulary.append(token)
+
+    if n_duplicates:
+        logger.warning(f"Removed {n_duplicates} duplicate tokens.")
+    if n_empty:
+        logger.warning(f"Removed {n_empty} empty tokens.")
+
+    return cleaned_vocabulary
 
 
 if __name__ == "__main__":

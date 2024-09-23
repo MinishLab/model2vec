@@ -9,6 +9,14 @@ from tokenizers import Tokenizer
 logger = logging.getLogger(__name__)
 
 
+def preprocess_vocabulary(tokenizer: Tokenizer, vocabulary: list[str]) -> list[str]:
+    """Preprocess a vocabulary with a tokenizer by doing a roundtrip encode/decode."""
+    encoded_ids: list[list[int]] = [
+        encoding.ids for encoding in tokenizer.encode_batch(vocabulary, add_special_tokens=False)
+    ]
+    return tokenizer.decode_batch(encoded_ids)
+
+
 def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenizer:
     """
     Remove tokens from a tokenizer.
