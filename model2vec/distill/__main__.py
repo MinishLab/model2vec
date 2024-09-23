@@ -12,7 +12,7 @@ from model2vec.distill.inference import (
     create_output_embeddings_from_model_name,
     create_output_embeddings_from_model_name_and_tokens,
 )
-from model2vec.distill.tokenizer import create_tokenizer_from_vocab, remove_tokens
+from model2vec.distill.tokenizer import add_tokens, remove_tokens
 from model2vec.model import StaticModel
 from model2vec.utils import setup_logging
 
@@ -69,39 +69,43 @@ def distill(
     :return: A StaticModdel
 
     """
-    if vocabulary is None:
-        tokenizer: Tokenizer = Tokenizer.from_pretrained(model_name)
-        tokens, embeddings = create_output_embeddings_from_model_name(model_name, device=device)
-        tokenizer_name = model_name
+    tokenizer: Tokenizer = Tokenizer.from_pretrained(model_name)
+    tokens, embeddings = create_output_embeddings_from_model_name(model_name, device=device)
+    tokenizer_name = model_name
 
-        wrong_tokens = [x for x in tokens if x.startswith("[unused")]
-        vocab = tokenizer.get_vocab()
-        wrong_token_ids = [vocab[token] for token in wrong_tokens]
-        tokenizer = remove_tokens(tokenizer, wrong_tokens)
-        embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
-        logger.info("Removed unused tokens from the tokenizer and embeddings.")
+    wrong_tokens = [x for x in tokens if x.startswith("[unused")]
+    vocab = tokenizer.get_vocab()
+    wrong_token_ids = [vocab[token] for token in wrong_tokens]
+    tokenizer = remove_tokens(tokenizer, wrong_tokens)
+    embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
+    logger.info("Removed unused tokens from the tokenizer and embeddings.")
 
-    else:
+    if vocabulary is not None:
         vocabulary_counts = Counter(vocabulary)
         duplicates = [k for k, v in vocabulary_counts.items() if v > 1]
         if duplicates:
             duplicate_str = ", ".join(duplicates)
             raise ValueError(f"Vocabulary contains duplicate tokens: {duplicate_str}")
 
-        if "[PAD]" not in vocabulary_counts:
-            vocabulary = ["[PAD]"] + vocabulary
-        if "[UNK]" not in vocabulary_counts:
-            vocabulary = ["[UNK]"] + vocabulary
-
-        tokens, embeddings = create_output_embeddings_from_model_name_and_tokens(
+        subword_tokens_set = set(tokens)
+        # NOTE: we do a list comprehension to keep sort order.
+        n_tokens_before = len(vocabulary)
+        new_tokens = [token for token in vocabulary if token not in subword_tokens_set]
+        n_tokens_after = len(vocabulary)
+        logger.info(
+            f"Adding {len(new_tokens)} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens."
+        )
+        token_embeddings = create_output_embeddings_from_model_name_and_tokens(
             model_name=model_name,
-            tokens=vocabulary,
+            tokens=new_tokens,
             device=device,
             output_value="token_embeddings",
             include_eos_bos=False,
         )
-        tokenizer_name = "word_level"
-        tokenizer = create_tokenizer_from_vocab(tokens, unk_token="[UNK]", pad_token="[PAD]")
+
+        tokenizer = add_tokens(tokenizer, new_tokens)
+        embeddings = np.concatenate([embeddings, token_embeddings], axis=0)
+        tokens += new_tokens
 
     if pca_dims is not None:
         if pca_dims >= embeddings.shape[1]:
