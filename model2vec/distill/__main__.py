@@ -95,7 +95,7 @@ def distill(
         logger.info(
             f"Adding {len(new_tokens)} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens."
         )
-        token_embeddings = create_output_embeddings_from_model_name_and_tokens(
+        _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
             model_name=model_name,
             tokens=new_tokens,
             device=device,
