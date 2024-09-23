@@ -43,7 +43,7 @@ class StaticModel(nn.Module):
 
         self.tokenizer = tokenizer
         self.unk_token_id: int | None
-        if getattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
+        if hasattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
             self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.model.unk_token]
         else:
             self.unk_token_id = None
@@ -137,15 +137,6 @@ class StaticModel(nn.Module):
         embeddings, tokenizer, config = load_pretrained(path, token=token)
 
         return cls(embeddings, tokenizer, config)
-
-    @property
-    def dim(self) -> int:
-        """
-        Get the dimension of the vectors.
-
-        :return: The dimension of the vectors.
-        """
-        return self.vectors.shape[1]
 
     def encode(
         self,
