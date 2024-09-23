@@ -43,7 +43,7 @@ class StaticModel(nn.Module):
 
         self.tokenizer = tokenizer
         self.unk_token_id: int | None
-        if getattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
+        if hasattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
             self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.model.unk_token]
         else:
             self.unk_token_id = None
