@@ -97,72 +97,73 @@ def _generate_model_card(model_name: str, **kwargs: Any) -> str:
     # Retrieve metadata from kwargs
     base_model = kwargs.get("base_model_name", "unknown")
     language = kwargs.get("language", "unknown")
-    license = kwargs.get("license", "MIT")
+    license = kwargs.get("license", "mit")
 
     # Define the content for the model card
     model_card_content = f"""
+---
+model_name: {model_name}
+base_model: {base_model}
+library_name: 'model2vec'
+license: {license}
+tags: [embeddings, sentence-transformers, static-embeddings]
+---
 
-    # {model_name} Model Card
+# {model_name} Model Card
 
-    Model2Vec distills a Sentence Transformer into a small, static model.
-    This model is ideal for applications requiring fast, lightweight embeddings.
+Model2Vec distills a Sentence Transformer into a small, static model.
+This model is ideal for applications requiring fast, lightweight embeddings.
 
-    ---
-    model_name: {model_name}
-    base_model: {base_model}
-    library: 'https://github.com/MinishLab/model2vec'
-    language: {language}
-    license: {license}
-    ---
 
-    ## Installation
 
-    Install model2vec using pip:
-    ```
-    pip install model2vec
-    ```
+## Installation
 
-    ## Usage
-    A StaticModel can be loaded using the `from_pretrained` method:
-    ```python
-    from model2vec import StaticModel
-    model = StaticModel.from_pretrained("minishlab/M2V_base_output")
-    embeddings = model.encode(["Example sentence"])
-    ```
+Install model2vec using pip:
+```
+pip install model2vec
+```
 
-    Alternatively, you can distill your own model using the `distill` method:
-    ```python
-    from model2vec.distill import distill
+## Usage
+A StaticModel can be loaded using the `from_pretrained` method:
+```python
+from model2vec import StaticModel
+model = StaticModel.from_pretrained("minishlab/M2V_base_output")
+embeddings = model.encode(["Example sentence"])
+```
 
-    # Choose a Sentence Transformer model
-    model_name = "BAAI/bge-base-en-v1.5"
+Alternatively, you can distill your own model using the `distill` method:
+```python
+from model2vec.distill import distill
 
-    # Distill the model
-    m2v_model = distill(model_name=model_name, pca_dims=256)
+# Choose a Sentence Transformer model
+model_name = "BAAI/bge-base-en-v1.5"
 
-    # Save the model
-    m2v_model.save_pretrained("m2v_model")
-    ```
+# Distill the model
+m2v_model = distill(model_name=model_name, pca_dims=256)
 
-    ## How it works
+# Save the model
+m2v_model.save_pretrained("m2v_model")
+```
 
-    Model2vec creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on all tasks we could find, while being much faster to create than traditional static embedding models such as GloVe. Best of all, you don't need any data to distill a model using Model2Vec.
+## How it works
 
-    It works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using zipf weighting. During inference, we simply take the mean of all token embeddings occurring in a sentence.
+Model2vec creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on all tasks we could find, while being much faster to create than traditional static embedding models such as GloVe. Best of all, you don't need any data to distill a model using Model2Vec.
 
-    ## Citation
+It works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using zipf weighting. During inference, we simply take the mean of all token embeddings occurring in a sentence.
 
-    Please cite the Model2Vec repository if you use this model in your work.
+## Citation
 
-    ## Additional Resources
+Please cite the Model2Vec repository if you use this model in your work.
 
-    - [Model2Vec Repo](https://github.com/MinishLab/model2vec)
-    - [Model2Vec Results](https://github.com/MinishLab/model2vec?tab=readme-ov-file#results)
-    - [Model2Vec Tutorials](https://github.com/MinishLab/model2vec/tree/main/tutorials)
+## Additional Resources
 
-    ## Model Authors
+- [Model2Vec Repo](https://github.com/MinishLab/model2vec)
+- [Model2Vec Results](https://github.com/MinishLab/model2vec?tab=readme-ov-file#results)
+- [Model2Vec Tutorials](https://github.com/MinishLab/model2vec/tree/main/tutorials)
 
-    Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team consisting of Stephan Tulkens and Thomas van Dongen.
+## Model Authors
+
+Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team consisting of Stephan Tulkens and Thomas van Dongen.
     """
 
     return model_card_content
@@ -220,7 +221,7 @@ def load_pretrained(
 
 def push_folder_to_hub(folder_path: Path, repo_id: str, token: str | None) -> None:
     """
-    Push a model folder to the huggingface hub.
+    Push a model folder to the huggingface hub, including model card.
 
     :param folder_path: The path to the folder.
     :param repo_id: The repo name.
@@ -228,5 +229,12 @@ def push_folder_to_hub(folder_path: Path, repo_id: str, token: str | None) -> No
     """
     if not huggingface_hub.repo_exists(repo_id=repo_id, token=token):
         huggingface_hub.create_repo(repo_id, token=token)
+
+    # Push model card and all model files to the Hugging Face hub
     huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=token)
-    logger.info(f"Pushed model to {repo_id}")
+
+    # Push model card
+    card = ModelCard.load(folder_path / "README.md")
+    card.push_to_hub(repo_id=repo_id, token=token)
+
+    logger.info(f"Pushed model and card to {repo_id}")
