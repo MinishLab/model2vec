@@ -69,12 +69,8 @@ def _create_model_card(folder_path: Path, **kwargs: Any) -> None:
     """
     Create a model card and store it in the specified path.
 
-    Args:
-    ----
-        folder_path (str): The path where the model card will be stored.
-        config (dict): A dictionary containing essential settings for running the model.
-        **kwargs: Additional metadata for the model card (e.g., model_name, base_model, etc.).
-
+    :param folder_path: The path where the model card will be stored.
+    :param **kwargs: Additional metadata for the model card (e.g., model_name, base_model, etc.).
     """
     folder_path = Path(folder_path)
     model_name = folder_path.name
