@@ -125,7 +125,7 @@ def distill(
 
     config = {"tokenizer_name": tokenizer_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
 
-    return StaticModel(embeddings, tokenizer, config)
+    return StaticModel(vectors=embeddings, tokenizer=tokenizer, config=config, base_model_name=model_name)
 
 
 if __name__ == "__main__":
