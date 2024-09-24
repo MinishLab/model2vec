@@ -172,8 +172,13 @@ def push_folder_to_hub(folder_path: Path, repo_id: str, token: str | None) -> No
     # Push model card and all model files to the Hugging Face hub
     huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=token)
 
-    # Push model card
-    card = ModelCard.load(folder_path / "README.md")
-    card.push_to_hub(repo_id=repo_id, token=token)
+    # Check if the model card exists, and push it if available
+    model_card_path = folder_path / "README.md"
+    if model_card_path.exists():
+        card = ModelCard.load(model_card_path)
+        card.push_to_hub(repo_id=repo_id, token=token)
+        logger.info(f"Pushed model card to {repo_id}")
+    else:
+        logger.warning(f"Model card README.md not found in {folder_path}. Skipping model card upload.")
 
-    logger.info(f"Pushed model and card to {repo_id}")
+    logger.info(f"Pushed model to {repo_id}")
