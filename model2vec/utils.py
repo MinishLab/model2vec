@@ -7,8 +7,9 @@ from typing import Any, Protocol, cast
 import click
 import huggingface_hub
 import numpy as np
+import pkg_resources
 import safetensors
-from huggingface_hub import ModelCard, ModelCardData
+from huggingface_hub import ModelCard
 from rich.logging import RichHandler
 from safetensors.numpy import save_file
 from tokenizers import Tokenizer
@@ -96,12 +97,16 @@ def _generate_model_card(model_name: str, template_path: str = "assets/model_car
     :return: The content of the model card in markdown format.
     """
     # Load the template
+    template_path = pkg_resources.resource_filename("model2vec", "model_card_template.md")
     with open(template_path, "r") as file:
         template_content = file.read()
 
     # # Fill in the placeholders in the template
     model_card_content = template_content.format(
-        model_name=model_name, base_model=kwargs.get("base_model_name", "unknown"), license=kwargs.get("license", "mit")
+        model_name=model_name,
+        base_model=kwargs.get("base_model_name", "unknown"),
+        language=kwargs.get("language", "unknown"),
+        license=kwargs.get("license", "mit"),
     )
 
     return model_card_content

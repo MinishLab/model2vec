@@ -28,6 +28,7 @@ class StaticModel(nn.Module):
         config: dict[str, Any],
         normalize: bool | None = None,
         base_model_name: str | None = None,
+        language: str | None = None,
     ) -> None:
         """
         Initialize the StaticModel.
@@ -37,6 +38,7 @@ class StaticModel(nn.Module):
         :param config: Any metadata config.
         :param normalize: Whether to normalize.
         :param base_model_name: The used base model name. Used for creating a model card.
+        :param language: The language of the model. Used for creating a model card.
         :raises: ValueError if the number of tokens does not match the number of vectors.
         """
         super().__init__()
@@ -56,6 +58,7 @@ class StaticModel(nn.Module):
 
         self.config = config
         self.base_model_name = base_model_name
+        self.language = language
 
         if normalize is not None:
             self.normalize = normalize
@@ -94,6 +97,7 @@ class StaticModel(nn.Module):
             tokenizer=self.tokenizer,
             config=self.config,
             base_model_name=self.base_model_name,
+            language=self.language,
         )
 
     def forward(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:

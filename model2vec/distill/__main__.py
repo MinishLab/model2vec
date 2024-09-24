@@ -5,6 +5,7 @@ from typing import Annotated, Optional
 
 import numpy as np
 import typer
+from huggingface_hub import model_info
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
 
@@ -124,8 +125,12 @@ def distill(
         embeddings *= w[:, None]
 
     config = {"tokenizer_name": tokenizer_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
-
-    return StaticModel(vectors=embeddings, tokenizer=tokenizer, config=config, base_model_name=model_name)
+    # Get the language from the model card
+    info = model_info(model_name)
+    language = info.cardData.get("language", "unknown")
+    return StaticModel(
+        vectors=embeddings, tokenizer=tokenizer, config=config, base_model_name=model_name, language=language
+    )
 
 
 if __name__ == "__main__":

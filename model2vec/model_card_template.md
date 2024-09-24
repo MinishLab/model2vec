@@ -1,6 +1,7 @@
 ---
 model_name: {model_name}
 base_model: {base_model}
+language: {language}
 library_name: 'model2vec'
 license: {license}
 tags: [embeddings, sentence-transformers, static-embeddings]
