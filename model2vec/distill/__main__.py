@@ -49,6 +49,7 @@ def distill(
     device: str = "cpu",
     pca_dims: int | None = 256,
     apply_zipf: bool = True,
+    use_subword: bool = True,
 ) -> StaticModel:
     """
     Distill down a sentencetransformer to a static model.
@@ -64,26 +65,34 @@ def distill(
     :param device: The device to use.
     :param pca_dims: The number of components to use for PCA. If this is None, we don't apply PCA.
     :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
+    :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary.
     :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
     :raises: ValueError if the vocabulary contains duplicate tokens.
     :return: A StaticModdel
 
     """
-    tokenizer: Tokenizer = Tokenizer.from_pretrained(model_name)
-    tokens, embeddings = create_output_embeddings_from_model_name(model_name, device=device)
-    tokenizer_name = model_name
+    if not use_subword and vocabulary is None:
+        raise ValueError("You must pass a vocabulary if you don't use subword tokens.")
 
-    wrong_tokens = [x for x in tokens if x.startswith("[unused")]
-    vocab = tokenizer.get_vocab()
-    wrong_token_ids = [vocab[token] for token in wrong_tokens]
-    tokenizer = remove_tokens(tokenizer, wrong_tokens)
-    embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
-    logger.info("Removed unused tokens from the tokenizer and embeddings.")
+    original_tokenizer: Tokenizer = Tokenizer.from_pretrained(model_name)
+    tokens: list[str] = []
+    if use_subword:
+        tokens, embeddings = create_output_embeddings_from_model_name(model_name, device=device)
 
-    w = np.log(np.arange(1, len(embeddings) + 1))
+        wrong_tokens = [x for x in tokens if x.startswith("[unused")]
+        vocab = original_tokenizer.get_vocab()
+        wrong_token_ids = [vocab[token] for token in wrong_tokens]
+        new_tokenizer = remove_tokens(original_tokenizer, wrong_tokens)
+        embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
+        logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
+    else:
+        unk_token = original_tokenizer.model.unk_token
+        new_tokenizer = remove_tokens(original_tokenizer, list(set(original_tokenizer.get_vocab()) - {unk_token}))
+        # We need to set embeddings to None because we don't know the dimensions of the embeddings yet.
+        embeddings = None
 
     if vocabulary is not None:
-        preprocessed_vocabulary = preprocess_vocabulary(tokenizer, vocabulary)
+        preprocessed_vocabulary = preprocess_vocabulary(original_tokenizer, vocabulary)
         n_tokens_before = len(preprocessed_vocabulary)
         cleaned_vocabulary = _clean_vocabulary(preprocessed_vocabulary, tokens)
         n_tokens_after = len(cleaned_vocabulary)
@@ -99,21 +108,30 @@ def distill(
                 include_eos_bos=False,
             )
 
-            tokenizer = add_tokens(tokenizer, cleaned_vocabulary)
-            w = np.concatenate([w, np.log(np.arange(1, len(token_embeddings) + 1))])
+            if embeddings is None:
+                embeddings = np.zeros((new_tokenizer.get_vocab_size(), token_embeddings.shape[1]))
             embeddings = np.concatenate([embeddings, token_embeddings], axis=0)
-            tokens += cleaned_vocabulary
+            new_tokenizer = add_tokens(new_tokenizer, cleaned_vocabulary)
         else:
             logger.warning("Didn't create any token embeddings as all tokens were duplicates or empty.")
 
+    embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, apply_zipf)
+
+    config = {"tokenizer_name": model_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
+
+    return StaticModel(embeddings, new_tokenizer, config)
+
+
+def _post_process_embeddings(embeddings: np.ndarray, pca_dims: int | None, apply_zipf: bool) -> np.ndarray:
+    """Post process embeddings by applying PCA and Zipf weighting."""
     if pca_dims is not None:
         if pca_dims >= embeddings.shape[1]:
             raise ValueError(
                 f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]})"
             )
-        if pca_dims >= len(tokens):
+        if pca_dims >= embeddings.shape[0]:
             logger.warning(
-                f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({len(tokens)}). Not applying PCA."
+                f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
             )
         elif pca_dims < embeddings.shape[1]:
             logger.info(f"Applying PCA with n_components {pca_dims}")
@@ -123,11 +141,9 @@ def distill(
 
     if apply_zipf:
         logger.info("Applying Zipf weighting")
-        embeddings *= w[:, None]
+        embeddings *= np.log(1 + np.arange(embeddings.shape[0]))[:, None]
 
-    config = {"tokenizer_name": tokenizer_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
-
-    return StaticModel(embeddings, tokenizer, config)
+    return embeddings
 
 
 def _clean_vocabulary(preprocessed_vocabulary: list[str], added_tokens: list[str]) -> list[str]:
