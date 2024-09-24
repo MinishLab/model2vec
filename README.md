@@ -10,9 +10,9 @@
 
 <div align="center">
   <h2>
-    <a href="https://huggingface.co/minishlab"><strong>Models</strong></a> |
-    <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>Tutorials</strong></a> |
-    <a href="https://github.com/MinishLab"><strong>Website</strong></a>
+    <a href="https://huggingface.co/minishlab"><strong>🤗 Models</strong></a> |
+    <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>📚 Tutorials</strong></a> |
+    <a href="https://github.com/MinishLab"><strong>📖 Website </strong></a>
   </h2>
 </div>
 
