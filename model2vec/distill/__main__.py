@@ -129,7 +129,7 @@ def distill(
     info = model_info(model_name)
     language = info.cardData.get("language")
     return StaticModel(
-        vectors=embeddings, tokenizer=tokenizer, config=config, base_model_name=model_name, language=None
+        vectors=embeddings, tokenizer=tokenizer, config=config, base_model_name=model_name, language=language
     )
 
 
