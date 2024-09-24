@@ -97,15 +97,22 @@ def _generate_model_card(model_name: str, template_path: str = "assets/model_car
     with open(template_path, "r") as file:
         template_content = file.read()
 
-    # # Fill in the placeholders in the template
-    model_card_content = template_content.format(
-        model_name=model_name,
-        base_model=kwargs.get("base_model_name", "unknown"),
-        language=kwargs.get("language", "unknown"),
-        license=kwargs.get("license", "mit"),
-    )
+    placeholders = {
+        "model_name": model_name,
+        "base_model": kwargs.get("base_model_name", "unknown"),
+        "license": kwargs.get("license", "mit"),
+    }
 
-    return model_card_content
+    # Only add language if it exists and is not None
+    language = kwargs.get("language")
+    if language:
+        placeholders["language"] = language
+    else:
+        # Remove the placeholder from the template if language is None
+        template_content = template_content.replace("language: {language}\n", "")
+
+    # Fill in the placeholders in the template and return the content
+    return template_content.format(**placeholders)
 
 
 def load_pretrained(

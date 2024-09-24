@@ -28,7 +28,7 @@ class StaticModel(nn.Module):
         config: dict[str, Any],
         normalize: bool | None = None,
         base_model_name: str | None = None,
-        language: str | None = None,
+        language: list[str] | None = None,
     ) -> None:
         """
         Initialize the StaticModel.

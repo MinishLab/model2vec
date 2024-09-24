@@ -127,9 +127,9 @@ def distill(
     config = {"tokenizer_name": tokenizer_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
     # Get the language from the model card
     info = model_info(model_name)
-    language = info.cardData.get("language", "unknown")
+    language = info.cardData.get("language")
     return StaticModel(
-        vectors=embeddings, tokenizer=tokenizer, config=config, base_model_name=model_name, language=language
+        vectors=embeddings, tokenizer=tokenizer, config=config, base_model_name=model_name, language=None
     )
 
 
