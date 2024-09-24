@@ -32,6 +32,13 @@ def main(
         ),
     ] = None,
     device: Annotated[str, typer.Option(help="The device to train the model on.")] = "cpu",
+    pca_dims: Annotated[
+        int | None, typer.Option(help="The PCA dimensionality to use. If this is None, no PCA is applied.")
+    ] = 256,
+    apply_zipf: Annotated[bool, typer.Option(help="Whether to apply Zipf weighting.")] = True,
+    use_subword: Annotated[
+        bool, typer.Option(help="Whether to use subword tokenization. If this is False, you must pass a vocabulary.")
+    ] = True,
 ) -> None:
     """Creates output embeddings for a sentencetransformer."""
     if vocabulary_path is not None:
@@ -39,7 +46,14 @@ def main(
     else:
         vocabulary = None
 
-    model = distill(model_name, vocabulary, device)
+    model = distill(
+        model_name=model_name,
+        vocabulary=vocabulary,
+        device=device,
+        pca_dims=pca_dims,
+        apply_zipf=apply_zipf,
+        use_subword=use_subword,
+    )
     model.save_pretrained(Path(save_path))
 
 
