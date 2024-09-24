@@ -4,7 +4,8 @@ base_model: {base_model}
 language: {language}
 library_name: 'model2vec'
 license: {license}
-tags: [embeddings, sentence-transformers, static-embeddings]
+tags: [embeddings, static-embeddings]
+pipeline_tag: 'feature-extraction'
 ---
 
 # {model_name} Model Card
