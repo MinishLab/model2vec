@@ -5,7 +5,6 @@ language: {language}
 library_name: 'model2vec'
 license: {license}
 tags: [embeddings, static-embeddings]
-pipeline_tag: 'feature-extraction'
 ---
 
 # {model_name} Model Card
