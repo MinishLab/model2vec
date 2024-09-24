@@ -22,7 +22,7 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     """
     with NamedTemporaryFile(mode="w+") as temp_file:
         tokenizer.save(temp_file.name)
-        data = json.load(open(temp_file.name))
+        data = json.load(temp_file)
         vocab: dict[str, int] = data["model"]["vocab"]
 
         n_tokens = len(vocab)
