@@ -1,6 +1,33 @@
-# Model2Vec: Distill a Small Fast Model from any Sentence Transformer
 
-**Model2Vec** is a method to distill a small, fast model from any Sentence Transformer model.
+
+
+
+
+
+<div align="center">
+  <h1>Model2Vec: Distill a Small Fast Model from any Sentence Transformer</h1>
+</div>
+
+<div align="center">
+  <h2>
+    <a href="https://huggingface.co/minishlab"><strong>🤗 Models</strong></a> |
+    <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>📚 Tutorials</strong></a> |
+    <a href="https://github.com/MinishLab"><strong>📖 Website </strong></a>
+  </h2>
+</div>
+
+<div align="center">
+  <h2>
+    <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/v/model2vec?color=%23007ec6&label=pypi%20package" alt="Package version"></a>
+    <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/pyversions/model2vec" alt="Supported Python versions"></a>
+    <a href="https://pepy.tech/project/model2vec">
+    <img src="https://static.pepy.tech/badge/model2vec" alt="Downloads">
+  </a>
+    <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
+  </h2>
+</div>
+
+
 
 | ![Description](assets/images/speed_vs_accuracy.png) |
 |:--:|
