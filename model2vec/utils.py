@@ -81,7 +81,6 @@ def _create_model_card(folder_path: Path, **kwargs: Any) -> None:
     # Generate the model card content
     model_card = _generate_model_card(model_name, **kwargs)
 
-    # Get the model name from the folder path ()
     # Save the model card as README.md
     with open(folder_path / "README.md", "w", encoding="utf8") as fOut:
         fOut.write(model_card)
