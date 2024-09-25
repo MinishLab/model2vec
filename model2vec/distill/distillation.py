@@ -37,10 +37,10 @@ def distill(
     :param device: The device to use.
     :param pca_dims: The number of components to use for PCA. If this is None, we don't apply PCA.
     :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
-    :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary.
+    :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
     :raises: ValueError if the vocabulary contains duplicate tokens.
-    :return: A StaticModdel
+    :return: A StaticModel
 
     """
     if not use_subword and vocabulary is None:
