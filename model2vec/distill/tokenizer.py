@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import json
 import logging
-from tempfile import NamedTemporaryFile
 
 from tokenizers import Tokenizer
-from tokenizers.models import WordLevel
-from tokenizers.normalizers import NFKC, Lowercase, Sequence
-from tokenizers.pre_tokenizers import Whitespace
 
 logger = logging.getLogger(__name__)
+
+
+def preprocess_vocabulary(tokenizer: Tokenizer, vocabulary: list[str]) -> list[str]:
+    """Preprocess a vocabulary with a tokenizer by doing a roundtrip encode/decode."""
+    encoded_ids: list[list[int]] = [
+        encoding.ids for encoding in tokenizer.encode_batch(vocabulary, add_special_tokens=False)
+    ]
+    return tokenizer.decode_batch(encoded_ids)
 
 
 def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenizer:
@@ -20,54 +24,57 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     :param tokens_to_remove: The tokens to remove.
     :return: The modified tokenizer.
     """
-    with NamedTemporaryFile(mode="w+", encoding="utf8") as temp_file:
-        tokenizer.save(temp_file.name)
-        data = json.load(temp_file)
-        vocab: dict[str, int] = data["model"]["vocab"]
+    tokenizer_data = json.loads(tokenizer.to_str())
 
-        n_tokens = len(vocab)
-        for token in tokens_to_remove:
-            if vocab.pop(token, None) is None:
-                logger.warning(f"Token {token} was not in the vocabulary.")
+    # Find all added tokens
+    added_tokens = tokenizer_data["added_tokens"]
+    added_tokens_str = {token["content"] for token in added_tokens}
 
-        n_removed = n_tokens - len(vocab)
-        logger.info(f"Removed {n_removed} tokens from the vocabulary.")
+    # Remove all added tokens from the list of tokens to remove.
+    # Things will go bad if we keep them.
+    tokens_to_remove = [token for token in tokens_to_remove if token not in added_tokens_str]
 
-        reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
-        data["model"]["vocab"] = reindexed
+    # Load the vocabulary.
+    vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
+    n_tokens = len(vocab)
 
-        tokenizer = Tokenizer.from_str(json.dumps(data))
+    # Remove the tokens.
+    for token in tokens_to_remove:
+        if vocab.pop(token, None) is None:
+            logger.warning(f"Token {token} was not in the vocabulary.")
+
+    n_removed = n_tokens - len(vocab)
+    logger.info(f"Removed {n_removed} tokens from the vocabulary.")
+
+    # Reindex the vocabulary so that it is contiguous.
+    reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
+    tokenizer_data["model"]["vocab"] = reindexed
+
+    # Reindex the special tokens (i.e., CLS and SEP for BertTokenizers.)
+    special_tokens_post_processor: dict[str, dict] = tokenizer_data["post_processor"]["special_tokens"]
+    for token, token_data in special_tokens_post_processor.items():
+        token_data["ids"] = [reindexed[token] for token in token_data["tokens"]]
+
+    # Reinitialize the tokenizer from the json.
+    tokenizer = Tokenizer.from_str(json.dumps(tokenizer_data))
 
     return tokenizer
 
 
-def create_tokenizer_from_vocab(vocabulary: list[str], unk_token: str, pad_token: str) -> Tokenizer:
+def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
     """
-    Create a word level tokenizer from a vocabulary.
+    Add tokens to a tokenizer.
 
-    :param vocabulary: The vocabulary mapping from strings to integers.
-    :param unk_token: The string representing the unk token.
-    :param pad_token: The string representing the pad token.
-    :return: A word level tokenizer.
-    :raises ValueError: If the unk_token or pad_token is not in the vocabulary.
+    :param tokenizer: The tokenizer to add tokens to.
+    :param tokens_to_add: The tokens to add.
+    :return: The modified tokenizer.
     """
-    vocabulary_indexed = {token: idx for idx, token in enumerate(vocabulary)}
+    data = json.loads(tokenizer.to_str())
 
-    if unk_token not in vocabulary_indexed:
-        raise ValueError(f"unk token: {unk_token} was not in your vocabulary.")
-    if pad_token not in vocabulary_indexed:
-        raise ValueError(f"pad token: {pad_token} was not in your vocabulary.")
+    vocab: dict[str, int] = data["model"]["vocab"]
+    for token in tokens_to_add:
+        vocab[token] = len(vocab)
 
-    model = WordLevel(vocab=vocabulary_indexed, unk_token=unk_token)
-    tokenizer = Tokenizer(model)
-    tokenizer.pre_tokenizer = Whitespace()
-
-    # NOTE: unk and pad token can be cased, doesn't matter.
-    is_cased = any(token != token.lower() for token in vocabulary if token not in {unk_token, pad_token})
-
-    normalization_steps = [NFKC()]
-    if not is_cased:
-        normalization_steps.append(Lowercase())
-    tokenizer.normalizer = Sequence(normalization_steps)
+    tokenizer = Tokenizer.from_str(json.dumps(data))
 
     return tokenizer

@@ -1,18 +1,19 @@
 import numpy as np
 import pytest
-from transformers import PreTrainedTokenizerFast
-
-from model2vec.distill.tokenizer import create_tokenizer_from_vocab
+from tokenizers import Tokenizer
+from tokenizers.models import WordLevel
+from tokenizers.pre_tokenizers import Whitespace
 
 
 @pytest.fixture
-def mock_tokenizer() -> PreTrainedTokenizerFast:
+def mock_tokenizer() -> Tokenizer:
     """Create a mock tokenizer."""
     vocab = ["word1", "word2", "word3", "[UNK]", "[PAD]"]
     unk_token = "[UNK]"
-    pad_token = "[PAD]"
 
-    tokenizer = create_tokenizer_from_vocab(vocab, unk_token, pad_token)
+    model = WordLevel(vocab={word: idx for idx, word in enumerate(vocab)}, unk_token=unk_token)
+    tokenizer = Tokenizer(model)
+    tokenizer.pre_tokenizer = Whitespace()
 
     return tokenizer
 
