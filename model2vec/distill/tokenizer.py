@@ -25,9 +25,9 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     :param tokens_to_remove: The tokens to remove.
     :return: The modified tokenizer.
     """
-    with NamedTemporaryFile(mode="w+") as temp_file:
+    with NamedTemporaryFile(mode="w+", encoding="utf8") as temp_file:
         tokenizer.save(temp_file.name)
-        data = json.load(open(temp_file.name))
+        data = json.load(temp_file)
         vocab: dict[str, int] = data["model"]["vocab"]
 
         n_tokens = len(vocab)

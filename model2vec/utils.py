@@ -81,10 +81,10 @@ def load_pretrained(
     else:
         logger.info("Folder does not exist locally, attempting to use huggingface hub.")
         embeddings_path = huggingface_hub.hf_hub_download(
-            str(folder_or_repo_path), "embeddings.safetensors", token=token
+            folder_or_repo_path.as_posix(), "embeddings.safetensors", token=token
         )
-        config_path = huggingface_hub.hf_hub_download(str(folder_or_repo_path), "config.json", token=token)
-        tokenizer_path = huggingface_hub.hf_hub_download(str(folder_or_repo_path), "tokenizer.json", token=token)
+        config_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), "config.json", token=token)
+        tokenizer_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), "tokenizer.json", token=token)
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     embeddings = opened_tensor_file.get_tensor("embeddings")
