@@ -29,7 +29,7 @@
 
 
 <p align="center">
-  <img src="assets/images/model2vec_ezlo.png" alt="Model2Vec">
+  <img src="assets/images/model2vec_diagram.png" alt="Model2Vec">
 </p>
 
 ## Table of Contents
