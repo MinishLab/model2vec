@@ -41,6 +41,9 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
         reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
         data["model"]["vocab"] = reindexed
 
+        added_tokens = data["added_tokens"]
+        added_tokens_to_keep = [token for token in added_tokens if token["content"] not in tokens_to_remove]
+        data["added_tokens"] = added_tokens_to_keep
         tokenizer = Tokenizer.from_str(json.dumps(data))
 
     return tokenizer
