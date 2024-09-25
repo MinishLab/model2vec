@@ -28,8 +28,9 @@
 </div>
 
 
-
-![Model2Vec](assets/images/model2vec_ezlo.png)
+<p align="center">
+  <img src="assets/images/model2vec_ezlo.png" alt="Model2Vec">
+</p>
 
 ## Table of Contents
 - [Quickstart](#quickstart)
