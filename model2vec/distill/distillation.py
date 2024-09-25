@@ -43,34 +43,49 @@ def distill(
 
     """
     if not use_subword and vocabulary is None:
-        raise ValueError("You must pass a vocabulary if you don't use subword tokens.")
+        raise ValueError(
+            "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
+        )
 
+    # Load original tokenizer. We need to keep this to tokenize any tokens in the vocabulary.
     original_tokenizer: Tokenizer = Tokenizer.from_pretrained(model_name)
+    # Make a base list of tokens.
     tokens: list[str] = []
     if use_subword:
+        # Create the subword embeddings.
         tokens, embeddings = create_output_embeddings_from_model_name(model_name, device=device)
 
+        # Remove any unused tokens from the tokenizer and embeddings.
         wrong_tokens = [x for x in tokens if x.startswith("[unused")]
         vocab = original_tokenizer.get_vocab()
+        # Get the ids of the unused token.
         wrong_token_ids = [vocab[token] for token in wrong_tokens]
+        # Remove the unused tokens from the tokenizer.
         new_tokenizer = remove_tokens(original_tokenizer, wrong_tokens)
+        # Remove the embeddings of the unused tokens.
         embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
         logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
     else:
+        # We need to keep the unk token in the tokenizer.
         unk_token = original_tokenizer.model.unk_token
+        # Remove all tokens except the UNK token.
         new_tokenizer = remove_tokens(original_tokenizer, list(set(original_tokenizer.get_vocab()) - {unk_token}))
         # We need to set embeddings to None because we don't know the dimensions of the embeddings yet.
         embeddings = None
 
     if vocabulary is not None:
+        # Preprocess the vocabulary with the original tokenizer.
         preprocessed_vocabulary = preprocess_vocabulary(original_tokenizer, vocabulary)
         n_tokens_before = len(preprocessed_vocabulary)
+        # Clean the vocabulary by removing duplicate tokens and tokens that are in the subword vocabulary.
         cleaned_vocabulary = _clean_vocabulary(preprocessed_vocabulary, tokens)
         n_tokens_after = len(cleaned_vocabulary)
         logger.info(
             f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
         )
+        # Only create embeddings if we have tokens to add.
         if cleaned_vocabulary:
+            # Create the embeddings.
             _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
                 model_name=model_name,
                 tokens=cleaned_vocabulary,
@@ -79,13 +94,17 @@ def distill(
                 include_eos_bos=False,
             )
 
+            # If we don't have subword tokens, we still need to create
+            #  some embeddings for [UNK] and some other special tokens.
             if embeddings is None:
                 embeddings = np.zeros((new_tokenizer.get_vocab_size(), token_embeddings.shape[1]))
             embeddings = np.concatenate([embeddings, token_embeddings], axis=0)
+            # Add the cleaned vocabulary to the tokenizer.
             new_tokenizer = add_tokens(new_tokenizer, cleaned_vocabulary)
         else:
             logger.warning("Didn't create any token embeddings as all tokens were duplicates or empty.")
 
+    # Post process the embeddings by applying PCA and Zipf weighting.
     embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, apply_zipf)
 
     config = {"tokenizer_name": model_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
