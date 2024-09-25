@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from tempfile import NamedTemporaryFile
 
 from tokenizers import Tokenizer
 
@@ -25,31 +24,39 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     :param tokens_to_remove: The tokens to remove.
     :return: The modified tokenizer.
     """
-    with NamedTemporaryFile(mode="w+", encoding="utf8") as temp_file:
-        tokenizer.save(temp_file.name)
-        tokenizer_data = json.load(temp_file)
-        vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
+    tokenizer_data = json.loads(tokenizer.to_str())
 
-        added_tokens = tokenizer_data["added_tokens"]
-        added_tokens_str = {token["content"] for token in added_tokens}
-        tokens_to_remove = [token for token in tokens_to_remove if token not in added_tokens_str]
+    # Find all added tokens
+    added_tokens = tokenizer_data["added_tokens"]
+    added_tokens_str = {token["content"] for token in added_tokens}
 
-        n_tokens = len(vocab)
-        for token in tokens_to_remove:
-            if vocab.pop(token, None) is None:
-                logger.warning(f"Token {token} was not in the vocabulary.")
+    # Remove all added tokens from the list of tokens to remove.
+    # Things will go bad if we keep them.
+    tokens_to_remove = [token for token in tokens_to_remove if token not in added_tokens_str]
 
-        n_removed = n_tokens - len(vocab)
-        logger.info(f"Removed {n_removed} tokens from the vocabulary.")
+    # Load the vocabulary.
+    vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
+    n_tokens = len(vocab)
 
-        reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
-        tokenizer_data["model"]["vocab"] = reindexed
+    # Remove the tokens.
+    for token in tokens_to_remove:
+        if vocab.pop(token, None) is None:
+            logger.warning(f"Token {token} was not in the vocabulary.")
 
-        special_tokens_post_processor = tokenizer_data["post_processor"]["special_tokens"]
-        for token, token_data in special_tokens_post_processor.items():
-            token_data["ids"] = [reindexed[token] for token in token_data["tokens"]]
+    n_removed = n_tokens - len(vocab)
+    logger.info(f"Removed {n_removed} tokens from the vocabulary.")
 
-        tokenizer = Tokenizer.from_str(json.dumps(tokenizer_data))
+    # Reindex the vocabulary so that it is contiguous.
+    reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
+    tokenizer_data["model"]["vocab"] = reindexed
+
+    # Reindex the special tokens (i.e., CLS and SEP for BertTokenizers.)
+    special_tokens_post_processor: dict[str, dict] = tokenizer_data["post_processor"]["special_tokens"]
+    for token, token_data in special_tokens_post_processor.items():
+        token_data["ids"] = [reindexed[token] for token in token_data["tokens"]]
+
+    # Reinitialize the tokenizer from the json.
+    tokenizer = Tokenizer.from_str(json.dumps(tokenizer_data))
 
     return tokenizer
 
@@ -62,14 +69,12 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
     :param tokens_to_add: The tokens to add.
     :return: The modified tokenizer.
     """
-    with NamedTemporaryFile(mode="w+") as temp_file:
-        tokenizer.save(temp_file.name)
-        data = json.load(open(temp_file.name))
+    data = json.loads(tokenizer.to_str())
 
-        vocab: dict[str, int] = data["model"]["vocab"]
-        for token in tokens_to_add:
-            vocab[token] = len(vocab)
+    vocab: dict[str, int] = data["model"]["vocab"]
+    for token in tokens_to_add:
+        vocab[token] = len(vocab)
 
-        tokenizer = Tokenizer.from_str(json.dumps(data))
+    tokenizer = Tokenizer.from_str(json.dumps(data))
 
     return tokenizer
