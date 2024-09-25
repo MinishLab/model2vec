@@ -27,8 +27,12 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     """
     with NamedTemporaryFile(mode="w+", encoding="utf8") as temp_file:
         tokenizer.save(temp_file.name)
-        data = json.load(temp_file)
-        vocab: dict[str, int] = data["model"]["vocab"]
+        tokenizer_data = json.load(temp_file)
+        vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
+
+        added_tokens = tokenizer_data["added_tokens"]
+        added_tokens_str = {token["content"] for token in added_tokens}
+        tokens_to_remove = [token for token in tokens_to_remove if token not in added_tokens_str]
 
         n_tokens = len(vocab)
         for token in tokens_to_remove:
@@ -39,12 +43,13 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
         logger.info(f"Removed {n_removed} tokens from the vocabulary.")
 
         reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
-        data["model"]["vocab"] = reindexed
+        tokenizer_data["model"]["vocab"] = reindexed
 
-        added_tokens = data["added_tokens"]
-        added_tokens_to_keep = [token for token in added_tokens if token["content"] not in tokens_to_remove]
-        data["added_tokens"] = added_tokens_to_keep
-        tokenizer = Tokenizer.from_str(json.dumps(data))
+        special_tokens_post_processor = tokenizer_data["post_processor"]["special_tokens"]
+        for token, token_data in special_tokens_post_processor.items():
+            token_data["ids"] = [reindexed[token] for token in token_data["tokens"]]
+
+        tokenizer = Tokenizer.from_str(json.dumps(tokenizer_data))
 
     return tokenizer
 
