@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+from huggingface_hub import model_info
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
 
@@ -108,8 +109,13 @@ def distill(
     embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, apply_zipf)
 
     config = {"tokenizer_name": model_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
+    # Get the language from the model card
+    info = model_info(model_name)
+    language = info.cardData.get("language")
 
-    return StaticModel(embeddings, new_tokenizer, config)
+    return StaticModel(
+        vectors=embeddings, tokenizer=new_tokenizer, config=config, base_model_name=model_name, language=language
+    )
 
 
 def _post_process_embeddings(embeddings: np.ndarray, pca_dims: int | None, apply_zipf: bool) -> np.ndarray:

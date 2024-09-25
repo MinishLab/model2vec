@@ -7,7 +7,9 @@ from typing import Any, Protocol, cast
 import click
 import huggingface_hub
 import numpy as np
+import pkg_resources
 import safetensors
+from huggingface_hub import ModelCard
 from rich.logging import RichHandler
 from safetensors.numpy import save_file
 from tokenizers import Tokenizer
@@ -33,14 +35,23 @@ def setup_logging() -> None:
     )
 
 
-def save_pretrained(folder_path: Path, embeddings: np.ndarray, tokenizer: Tokenizer, config: dict[str, Any]) -> None:
+def save_pretrained(
+    folder_path: Path,
+    embeddings: np.ndarray,
+    tokenizer: Tokenizer,
+    config: dict[str, Any],
+    create_model_card: bool = True,
+    **kwargs: Any,
+) -> None:
     """
     Save a model to a folder.
 
     :param folder_path: The path to the folder.
-    :param embeddings: The embeddings
-    :param tokenizer: The tokenizer
-    :param config: A metadata config
+    :param embeddings: The embeddings.
+    :param tokenizer: The tokenizer.
+    :param config: A metadata config.
+    :param create_model_card: Whether to create a model card.
+    :param **kwargs: Any additional arguments.
     """
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "embeddings.safetensors")
@@ -48,6 +59,54 @@ def save_pretrained(folder_path: Path, embeddings: np.ndarray, tokenizer: Tokeni
     json.dump(config, open(folder_path / "config.json", "w"))
 
     logger.info(f"Saved model to {folder_path}")
+
+    # Optionally create the model card
+    if create_model_card:
+        _create_model_card(folder_path, **kwargs)
+
+
+def _create_model_card(
+    folder_path: Path,
+    base_model_name: str = "unknown",
+    license: str = "mit",
+    language: list[str] | None = None,
+    **kwargs: Any,
+) -> None:
+    """
+    Create a model card and store it in the specified path.
+
+    :param folder_path: The path where the model card will be stored.
+    :param base_model_name: The name of the base model.
+    :param license: The license to use.
+    :param language: The language of the model.
+    :param **kwargs: Additional metadata for the model card (e.g., model_name, base_model, etc.).
+    """
+    folder_path = Path(folder_path)
+    model_name = folder_path.name
+
+    template_path = pkg_resources.resource_filename("model2vec", "model_card_template.md")
+    with open(template_path, "r") as file:
+        template_content = file.read()
+
+    placeholders = {
+        "model_name": model_name,
+        "base_model": base_model_name,
+        "license": license,
+    }
+
+    # Only add language if it exists and is not None
+    if language:
+        placeholders["language"] = f"[{', '.join(repr(lang) for lang in language)}]"
+    else:
+        # Remove the placeholder from the template if language is None
+        template_content = template_content.replace("language: {language}\n", "")
+
+    # Fill in the placeholders in the template and create the model card
+    model_card = template_content.format(**placeholders)
+
+    # Save the model card as README.md
+    with open(folder_path / "README.md", "w", encoding="utf8") as out:
+        out.write(model_card)
 
 
 def load_pretrained(
@@ -102,7 +161,7 @@ def load_pretrained(
 
 def push_folder_to_hub(folder_path: Path, repo_id: str, token: str | None) -> None:
     """
-    Push a model folder to the huggingface hub.
+    Push a model folder to the huggingface hub, including model card.
 
     :param folder_path: The path to the folder.
     :param repo_id: The repo name.
@@ -110,5 +169,17 @@ def push_folder_to_hub(folder_path: Path, repo_id: str, token: str | None) -> No
     """
     if not huggingface_hub.repo_exists(repo_id=repo_id, token=token):
         huggingface_hub.create_repo(repo_id, token=token)
+
+    # Push model card and all model files to the Hugging Face hub
     huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=token)
+
+    # Check if the model card exists, and push it if available
+    model_card_path = folder_path / "README.md"
+    if model_card_path.exists():
+        card = ModelCard.load(model_card_path)
+        card.push_to_hub(repo_id=repo_id, token=token)
+        logger.info(f"Pushed model card to {repo_id}")
+    else:
+        logger.warning(f"Model card README.md not found in {folder_path}. Skipping model card upload.")
+
     logger.info(f"Pushed model to {repo_id}")

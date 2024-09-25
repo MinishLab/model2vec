@@ -441,6 +441,7 @@ dependencies = [
     { name = "rich" },
     { name = "scikit-learn" },
     { name = "sentence-transformers" },
+    { name = "setuptools" },
     { name = "tokenizers" },
     { name = "torch" },
     { name = "tqdm" },
@@ -473,6 +474,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "scikit-learn" },
     { name = "sentence-transformers" },
+    { name = "setuptools" },
     { name = "tokenizers" },
     { name = "torch" },
     { name = "tqdm" },
@@ -1212,6 +1214,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/41/fb/2368f84127920d86330b533792e66b26264e92b729b5c1998aaa33d2e22f/sentence_transformers-3.0.1.tar.gz", hash = "sha256:8a3d2c537cc4d1014ccc20ac92be3d6135420a3bc60ae29a3a8a9b4bb35fbff6", size = 177258 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/58/4b/922436953394e1bfda05e4bf1fe0e80f609770f256c59a9df7a9254f3e0d/sentence_transformers-3.0.1-py3-none-any.whl", hash = "sha256:01050cc4053c49b9f5b78f6980b5a72db3fd3a0abb9169b1792ac83875505ee6", size = 227071 },
+]
+
+[[package]]
+name = "setuptools"
+version = "75.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/27/b8/f21073fde99492b33ca357876430822e4800cdf522011f18041351dfa74b/setuptools-75.1.0.tar.gz", hash = "sha256:d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538", size = 1348057 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl", hash = "sha256:35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2", size = 1248506 },
 ]
 
 [[package]]
