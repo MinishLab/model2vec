@@ -29,10 +29,7 @@
 
 
 
-| ![Description](assets/images/speed_vs_accuracy.png) |
-|:--:|
-|*Model2vec allows you to create really fast small models that still perform well.*|
-
+![Model2Vec](assets/images/model2vec_ezlo.png)
 
 ## Table of Contents
 - [Quickstart](#quickstart)
