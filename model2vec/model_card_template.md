@@ -1,13 +1,8 @@
 ---
-model_name: {model_name}
-base_model: {base_model}
-language: {language}
-library_name: 'model2vec'
-license: {license}
-tags: [embeddings, static-embeddings]
+{{ card_data }}
 ---
 
-# {model_name} Model Card
+# {{ model_name }} Model Card
 
 Model2Vec distills a Sentence Transformer into a small, static model.
 This model is ideal for applications requiring fast, lightweight embeddings.
@@ -25,7 +20,11 @@ pip install model2vec
 A StaticModel can be loaded using the `from_pretrained` method:
 ```python
 from model2vec import StaticModel
-model = StaticModel.from_pretrained("minishlab/M2V_base_output")
+
+# Load a pretrained Model2Vec model
+model = StaticModel.from_pretrained("{{ model_name }}")
+
+# Compute text embeddings
 embeddings = model.encode(["Example sentence"])
 ```
 
@@ -49,10 +48,6 @@ Model2vec creates a small, fast, and powerful model that outperforms other stati
 
 It works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using zipf weighting. During inference, we simply take the mean of all token embeddings occurring in a sentence.
 
-## Citation
-
-Please cite the [Model2Vec repository](https://github.com/MinishLab/model2vec) if you use this model in your work.
-
 ## Additional Resources
 
 - [Model2Vec Repo](https://github.com/MinishLab/model2vec)
@@ -61,4 +56,16 @@ Please cite the [Model2Vec repository](https://github.com/MinishLab/model2vec) i
 
 ## Model Authors
 
-Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team consisting of Stephan Tulkens and Thomas van Dongen.
+Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team consisting of [Stephan Tulkens](https://github.com/stephantul) and [Thomas van Dongen](https://github.com/Pringled).
+
+## Citation
+
+Please cite the [Model2Vec repository](https://github.com/MinishLab/model2vec) if you use this model in your work.
+```
+@software{minishlab2024word2vec,
+  authors = {Stephan Tulkens, Thomas van Dongen},
+  title = {Model2Vec: Turn any Sentence Transformer into a Small Fast Model},
+  year = {2024},
+  url = {https://github.com/MinishLab/model2vec},
+}
+```

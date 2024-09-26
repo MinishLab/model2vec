@@ -7,9 +7,8 @@ from typing import Any, Protocol, cast
 import click
 import huggingface_hub
 import numpy as np
-import pkg_resources
 import safetensors
-from huggingface_hub import ModelCard
+from huggingface_hub import ModelCard, ModelCardData
 from rich.logging import RichHandler
 from safetensors.numpy import save_file
 from tokenizers import Tokenizer
@@ -70,6 +69,7 @@ def _create_model_card(
     base_model_name: str = "unknown",
     license: str = "mit",
     language: list[str] | None = None,
+    model_name: str | None = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -79,34 +79,24 @@ def _create_model_card(
     :param base_model_name: The name of the base model.
     :param license: The license to use.
     :param language: The language of the model.
+    :param model_name: The name of the model to use in the Model Card.
     :param **kwargs: Additional metadata for the model card (e.g., model_name, base_model, etc.).
     """
     folder_path = Path(folder_path)
-    model_name = folder_path.name
+    model_name = model_name or folder_path.name
+    template_path = Path(__file__).parent / "model_card_template.md"
 
-    template_path = pkg_resources.resource_filename("model2vec", "model_card_template.md")
-    with open(template_path, "r") as file:
-        template_content = file.read()
-
-    placeholders = {
-        "model_name": model_name,
-        "base_model": base_model_name,
-        "license": license,
-    }
-
-    # Only add language if it exists and is not None
-    if language:
-        placeholders["language"] = f"[{', '.join(repr(lang) for lang in language)}]"
-    else:
-        # Remove the placeholder from the template if language is None
-        template_content = template_content.replace("language: {language}\n", "")
-
-    # Fill in the placeholders in the template and create the model card
-    model_card = template_content.format(**placeholders)
-
-    # Save the model card as README.md
-    with open(folder_path / "README.md", "w", encoding="utf8") as out:
-        out.write(model_card)
+    model_card_data = ModelCardData(
+        model_name=model_name,
+        base_model=base_model_name,
+        license=license,
+        language=language,
+        tags=["embeddings", "static-embeddings"],
+        library_name="model2vec",
+        **kwargs,
+    )
+    model_card = ModelCard.from_template(model_card_data, template_path=template_path)
+    model_card.save(folder_path / "README.md")
 
 
 def load_pretrained(
