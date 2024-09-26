@@ -85,11 +85,12 @@ class StaticModel(nn.Module):
             )
         self.config["normalize"] = value
 
-    def save_pretrained(self, path: PathLike) -> None:
+    def save_pretrained(self, path: PathLike, model_name: str | None = None) -> None:
         """
         Save the pretrained model.
 
         :param path: The path to save to.
+        :param model_name: The model name to use in the Model Card.
         """
         save_pretrained(
             folder_path=Path(path),
@@ -98,6 +99,7 @@ class StaticModel(nn.Module):
             config=self.config,
             base_model_name=self.base_model_name,
             language=self.language,
+            model_name=model_name,
         )
 
     def forward(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
@@ -217,5 +219,5 @@ class StaticModel(nn.Module):
         :param token: The huggingface token to use.
         """
         with TemporaryDirectory() as temp_dir:
-            self.save_pretrained(temp_dir)
+            self.save_pretrained(temp_dir, model_name=repo_id)
             push_folder_to_hub(Path(temp_dir), repo_id, token)

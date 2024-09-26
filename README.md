@@ -28,11 +28,9 @@
 </div>
 
 
-
-| ![Description](assets/images/speed_vs_accuracy.png) |
-|:--:|
-|*Model2vec allows you to create really fast small models that still perform well.*|
-
+<p align="center">
+  <img src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
+</p>
 
 ## Table of Contents
 - [Quickstart](#quickstart)

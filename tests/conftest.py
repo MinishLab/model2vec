@@ -2,30 +2,22 @@ import numpy as np
 import pytest
 from sentence_transformers import SentenceTransformer
 from sentence_transformers import models as SentenceTransformerModels
-from tokenizers import Tokenizer, decoders, models, normalizers, pre_tokenizers
-from transformers import BertConfig, BertModel, PreTrainedTokenizerFast
+from tokenizers import Tokenizer
+from tokenizers.models import WordLevel
+from tokenizers.pre_tokenizers import Whitespace
+from transformers import BertConfig, BertModel
 
 
 @pytest.fixture
-def mock_tokenizer() -> PreTrainedTokenizerFast:
+def mock_tokenizer() -> Tokenizer:
     """Create a mock tokenizer."""
-    # Define the vocabulary and special tokens
     vocab = ["word1", "word2", "word3", "[UNK]", "[PAD]"]
-    vocab_dict = {word: idx for idx, word in enumerate(vocab)}
     unk_token = "[UNK]"
 
-    # Create a WordLevel model with the vocab and set the unk_token
-    tokenizer_model = models.WordLevel(vocab=vocab_dict, unk_token=unk_token)
+    model = WordLevel(vocab={word: idx for idx, word in enumerate(vocab)}, unk_token=unk_token)
+    tokenizer = Tokenizer(model)
+    tokenizer.pre_tokenizer = Whitespace()
 
-    # Initialize the tokenizer with the WordLevel model
-    tokenizer = Tokenizer(tokenizer_model)
-
-    # Add basic components to handle text preprocessing
-    tokenizer.normalizer = normalizers.Sequence([normalizers.Lowercase()])
-    tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()
-
-    # Add a simple decoder
-    tokenizer.decoder = decoders.WordPiece()
     return tokenizer
 
 
