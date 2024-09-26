@@ -36,7 +36,7 @@ def create_output_embeddings_from_model_name_and_tokens(
     :param tokenizer: The tokenizer to use.
     :param tokens: The tokens to use.
     :param device: The torch device to use.
-    :return: The tokens and output emnbeddings.
+    :return: The tokens and output embeddings.
     """
     model = model.to(device)
 
