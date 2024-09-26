@@ -65,7 +65,7 @@ def distill(
         # Get the ids of the unused token.
         wrong_token_ids = [vocab[token] for token in wrong_tokens]
         # Remove the unused tokens from the tokenizer.
-        new_tokenizer = remove_tokens(original_tokenizer, wrong_tokens)
+        new_tokenizer = remove_tokens(original_tokenizer.backend_tokenizer, wrong_tokens)
         # Remove the embeddings of the unused tokens.
         embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
         logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
