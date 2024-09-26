@@ -209,15 +209,17 @@ class StaticModel(nn.Module):
         """Batch the sentences into equal-sized."""
         return (sentences[i : i + batch_size] for i in range(0, len(sentences), batch_size))
 
-    def push_to_hub(self, repo_id: str, token: str | None) -> None:
+    def push_to_hub(self, repo_id: str, private: bool = False, token: str | None = None) -> None:
         """
         Push the model to the huggingface hub.
 
         NOTE: you need to pass a token if you are pushing a private model.
 
         :param repo_id: The repo id to push to.
+        :param private: Whether the repo, if created is set to private.
+            If the repo already exists, this doesn't change the visibility.
         :param token: The huggingface token to use.
         """
         with TemporaryDirectory() as temp_dir:
             self.save_pretrained(temp_dir, model_name=repo_id)
-            push_folder_to_hub(Path(temp_dir), repo_id, token)
+            push_folder_to_hub(Path(temp_dir), repo_id, private, token)

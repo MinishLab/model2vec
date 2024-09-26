@@ -149,16 +149,17 @@ def load_pretrained(
     return embeddings, tokenizer, config
 
 
-def push_folder_to_hub(folder_path: Path, repo_id: str, token: str | None) -> None:
+def push_folder_to_hub(folder_path: Path, repo_id: str, private: bool, token: str | None) -> None:
     """
     Push a model folder to the huggingface hub, including model card.
 
     :param folder_path: The path to the folder.
     :param repo_id: The repo name.
+    :param private: Whether the repo is private.
     :param token: The huggingface token.
     """
     if not huggingface_hub.repo_exists(repo_id=repo_id, token=token):
-        huggingface_hub.create_repo(repo_id, token=token)
+        huggingface_hub.create_repo(repo_id, token=token, private=private)
 
     # Push model card and all model files to the Hugging Face hub
     huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=token)
