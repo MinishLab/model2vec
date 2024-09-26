@@ -49,7 +49,7 @@ Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team c
 
 Please cite the [Model2Vec repository](https://github.com/MinishLab/model2vec) if you use this model in your work.
 ```
-@software{minishlab2024word2vec,
+@software{minishlab2024model2vec,
   authors = {Stephan Tulkens, Thomas van Dongen},
   title = {Model2Vec: Turn any Sentence Transformer into a Small Fast Model},
   year = {2024},
