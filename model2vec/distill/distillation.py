@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from huggingface_hub import model_info
 from sklearn.decomposition import PCA
-from tokenizers import Tokenizer
+from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import (
     create_output_embeddings_from_model_name,
@@ -49,12 +49,15 @@ def distill(
         )
 
     # Load original tokenizer. We need to keep this to tokenize any tokens in the vocabulary.
-    original_tokenizer: Tokenizer = Tokenizer.from_pretrained(model_name)
+    original_tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_name)
+    original_model: PreTrainedModel = AutoModel.from_pretrained(model_name)
     # Make a base list of tokens.
     tokens: list[str] = []
     if use_subword:
         # Create the subword embeddings.
-        tokens, embeddings = create_output_embeddings_from_model_name(model_name, device=device)
+        tokens, embeddings = create_output_embeddings_from_model_name(
+            model=original_model, tokenizer=original_tokenizer, device=device
+        )
 
         # Remove any unused tokens from the tokenizer and embeddings.
         wrong_tokens = [x for x in tokens if x.startswith("[unused")]
@@ -68,15 +71,17 @@ def distill(
         logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
     else:
         # We need to keep the unk token in the tokenizer.
-        unk_token = original_tokenizer.model.unk_token
+        unk_token = original_tokenizer.backend_tokenizer.model.unk_token
         # Remove all tokens except the UNK token.
-        new_tokenizer = remove_tokens(original_tokenizer, list(set(original_tokenizer.get_vocab()) - {unk_token}))
+        new_tokenizer = remove_tokens(
+            original_tokenizer.backend_tokenizer, list(set(original_tokenizer.get_vocab()) - {unk_token})
+        )
         # We need to set embeddings to None because we don't know the dimensions of the embeddings yet.
         embeddings = None
 
     if vocabulary is not None:
         # Preprocess the vocabulary with the original tokenizer.
-        preprocessed_vocabulary = preprocess_vocabulary(original_tokenizer, vocabulary)
+        preprocessed_vocabulary = preprocess_vocabulary(original_tokenizer.backend_tokenizer, vocabulary)
         n_tokens_before = len(preprocessed_vocabulary)
         # Clean the vocabulary by removing duplicate tokens and tokens that are in the subword vocabulary.
         cleaned_vocabulary = _clean_vocabulary(preprocessed_vocabulary, tokens)
@@ -88,11 +93,10 @@ def distill(
         if cleaned_vocabulary:
             # Create the embeddings.
             _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
-                model_name=model_name,
+                model=original_model,
+                tokenizer=original_tokenizer,
                 tokens=cleaned_vocabulary,
                 device=device,
-                output_value="token_embeddings",
-                include_eos_bos=False,
             )
 
             # If we don't have subword tokens, we still need to create

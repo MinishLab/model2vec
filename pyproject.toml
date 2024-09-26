@@ -29,7 +29,6 @@ dependencies = [
     "typer",
     "transformers",
     "torch",
-    "sentence_transformers",
     "tokenizers",
     "scikit-learn",
     "setuptools",
