@@ -4,9 +4,7 @@
 
 # {{ model_name }} Model Card
 
-Model2Vec distills a Sentence Transformer into a small, static model.
-This model is ideal for applications requiring fast, lightweight embeddings.
-
+This [Model2Vec](https://github.com/MinishLab/model2vec) model is a distilled version of {% if base_model %}the [{{ base_model }}](https://huggingface.co/{{ base_model }}){% else %}a{% endif %} Sentence Transformer. It uses static embeddings, allowing text embeddings to be computed orders of magnitude faster on both GPU and CPU. It is designed for applications where computational resources are limited or where real-time performance is critical.
 
 
 ## Installation
@@ -26,6 +24,20 @@ model = StaticModel.from_pretrained("{{ model_name }}")
 
 # Compute text embeddings
 embeddings = model.encode(["Example sentence"])
+```
+
+Alternatively, you can distill your own model using the `distill` method:
+```python
+from model2vec.distill import distill
+
+# Choose a Sentence Transformer model
+model_name = "BAAI/bge-base-en-v1.5"
+
+# Distill the model
+m2v_model = distill(model_name=model_name, pca_dims=256)
+
+# Save the model
+m2v_model.save_pretrained("m2v_model")
 ```
 
 ## How it works
