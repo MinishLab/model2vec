@@ -104,7 +104,7 @@ def create_output_embeddings_from_model_name(
     :param model: The model name to use.
     :param tokenizer: The tokenizer to use.
     :param device: The torch device to use.
-    :return: The tokens and output emnbeddings.
+    :return: The tokens and output embeddings.
     """
     model = model.to(device)
     ids = torch.arange(tokenizer.vocab_size)
