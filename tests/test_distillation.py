@@ -97,6 +97,11 @@ def test__post_process_embeddings(
     """Test the _post_process_embeddings function."""
     original_embeddings = embeddings.copy()  # Copy embeddings to compare later
 
+    # Test that the function raises an error if the PCA dims are larger than the number of dimensions
+    if pca_dims and pca_dims > embeddings.shape[1]:
+        with pytest.raises(ValueError):
+            _post_process_embeddings(embeddings, pca_dims, False)
+
     processed_embeddings = _post_process_embeddings(embeddings, pca_dims, apply_zipf)
 
     # Assert the shape is correct
@@ -110,16 +115,6 @@ def test__post_process_embeddings(
         assert np.allclose(
             processed_embeddings, expected_zipf_embeddings, rtol=1e-5
         ), "Zipf weighting not applied correctly"
-
-
-@pytest.mark.parametrize(
-    "embeddings, pca_dims",
-    [(rng.random((10, 768)), 1024)],  # Use np.random.Generator's random() with shape as a tuple
-)
-def test__post_process_embeddings_pca_warning(embeddings: np.ndarray, pca_dims: int) -> None:
-    """Test the _post_process_embeddings function raises a warning when PCA dims are larger than the embedding dimension."""
-    with pytest.raises(ValueError):
-        _post_process_embeddings(embeddings, pca_dims, False)
 
 
 @pytest.mark.parametrize(
