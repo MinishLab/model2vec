@@ -20,7 +20,10 @@ jobs:
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Install dependencies
-        run: make install-base
+        run: make install
+
+      - name: Install testing dependencies
+        run: uv pip install pytest pytest-cov
 
       - name: Run tests
         run: pytest --cov --cov-report=xml
