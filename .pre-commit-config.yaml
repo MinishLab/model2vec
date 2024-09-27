@@ -15,6 +15,8 @@ repos:
         description: Prevent giant files from being committed.
       - id: check-case-conflict
         description: Check for files with names that would conflict on case-insensitive filesystems like MacOS/Windows.
+      - id: check-yaml
+        description: Check yaml files for syntax errors.
   - repo: https://github.com/jsh9/pydoclint
     rev: 0.5.3
     hooks:
