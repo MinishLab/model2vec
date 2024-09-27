@@ -17,7 +17,7 @@ jobs:
         uses: actions/setup-python@v4
 
       - name: Install uv
-        run: sudo apt-get update && sudo apt-get install -y uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Install dependencies
         run: make install
