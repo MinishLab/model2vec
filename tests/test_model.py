@@ -75,7 +75,8 @@ def test_save_pretrained(
 
     # Check that the save_path directory contains the saved files
     assert save_path.exists()
-    assert (save_path / "embeddings.safetensors").exists()
+
+    assert (save_path / "model.safetensors").exists()
     assert (save_path / "tokenizer.json").exists()
     assert (save_path / "config.json").exists()
 

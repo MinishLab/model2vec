@@ -1,0 +1,58 @@
+name: Run tests and upload coverage
+
+on:
+  push
+
+jobs:
+  test:
+    name: Run tests with pytest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        python-version: ["3.10"]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
+      # Step for Windows: Create and activate a virtual environment
+      - name: Create and activate a virtual environment (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          irm https://astral.sh/uv/install.ps1 | iex
+          uv venv .venv
+          "VIRTUAL_ENV=.venv" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$PWD/.venv/Scripts" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      # Step for Unix: Create and activate a virtual environment
+      - name: Create and activate a virtual environment (Unix)
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv venv .venv
+          echo "VIRTUAL_ENV=.venv" >> $GITHUB_ENV
+          echo "$PWD/.venv/bin" >> $GITHUB_PATH
+
+      # Install dependencies using uv pip
+      - name: Install dependencies
+        run: make install
+       # run: uv pip install -e ".[pytest]"
+
+      # Run tests with coverage
+      - name: Run tests under coverage
+        run: |
+          coverage run -m pytest
+          coverage report
+
+      # Upload results to Codecov
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

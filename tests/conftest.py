@@ -1,8 +1,15 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
 import numpy as np
 import pytest
+import torch
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
+from transformers import AutoModel, BertTokenizerFast
 
 
 @pytest.fixture
@@ -16,6 +23,40 @@ def mock_tokenizer() -> Tokenizer:
     tokenizer.pre_tokenizer = Whitespace()
 
     return tokenizer
+
+
+@pytest.fixture
+def mock_berttokenizer() -> BertTokenizerFast:
+    """Load the real BertTokenizerFast from the provided tokenizer.json file."""
+    tokenizer_path = Path("tests/data/test_tokenizer/tokenizer.json")
+    return BertTokenizerFast(tokenizer_file=str(tokenizer_path))
+
+
+@pytest.fixture
+def mock_transformer() -> AutoModel:
+    """Create a mock transformer model."""
+
+    class MockPreTrainedModel:
+        def __init__(self) -> None:
+            self.device = "cpu"
+
+        def to(self, device: str) -> MockPreTrainedModel:
+            self.device = device
+            return self
+
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
+            # Simulate a last_hidden_state output for a transformer model
+            batch_size, seq_length = kwargs["input_ids"].shape
+            # Return a tensor of shape (batch_size, seq_length, 768)
+            return type(
+                "BaseModelOutputWithPoolingAndCrossAttentions",
+                (object,),
+                {
+                    "last_hidden_state": torch.rand(batch_size, seq_length, 768)  # Simulate 768 hidden units
+                },
+            )
+
+    return MockPreTrainedModel()
 
 
 @pytest.fixture
