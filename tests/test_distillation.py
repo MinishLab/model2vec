@@ -26,6 +26,7 @@ rng = np.random.default_rng()
         (["wordA", "wordB"], True, 4, False, (29530, 4)),  # Custom vocab with subword, PCA applied
         (None, True, None, True, (29528, 768)),  # No PCA applied
         (["wordA", "wordB"], False, 4, True, (7, 4)),  # Custom vocab without subwords PCA and Zipf applied
+        (None, False, 256, True, None),  # use_subword = False without passing a vocabulary should raise an error
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -53,21 +54,32 @@ def test_distill(
 
     model_name = "mock-model"
 
-    # Call the distill function with the parametrized inputs
-    static_model = distill(
-        model_name=model_name,
-        vocabulary=vocabulary,
-        device="cpu",
-        pca_dims=pca_dims,
-        apply_zipf=apply_zipf,
-        use_subword=use_subword,
-    )
+    if vocabulary is None and use_subword == False:
+        with pytest.raises(ValueError):
+            static_model = distill(
+                model_name=model_name,
+                vocabulary=vocabulary,
+                device="cpu",
+                pca_dims=pca_dims,
+                apply_zipf=apply_zipf,
+                use_subword=use_subword,
+            )
+    else:
+        # Call the distill function with the parametrized inputs
+        static_model = distill(
+            model_name=model_name,
+            vocabulary=vocabulary,
+            device="cpu",
+            pca_dims=pca_dims,
+            apply_zipf=apply_zipf,
+            use_subword=use_subword,
+        )
 
-    # Assert the model is correctly generated
-    assert isinstance(static_model, StaticModel)
-    assert static_model.embedding.weight.shape == expected_shape
-    assert "mock-model" in static_model.config["tokenizer_name"]
-    assert static_model.tokenizer is not None
+        # Assert the model is correctly generated
+        assert isinstance(static_model, StaticModel)
+        assert static_model.embedding.weight.shape == expected_shape
+        assert "mock-model" in static_model.config["tokenizer_name"]
+        assert static_model.tokenizer is not None
 
 
 @pytest.mark.parametrize(
