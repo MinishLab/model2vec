@@ -4,9 +4,7 @@
 
 # {{ model_name }} Model Card
 
-Model2Vec distills a Sentence Transformer into a small, static model.
-This model is ideal for applications requiring fast, lightweight embeddings.
-
+This [Model2Vec](https://github.com/MinishLab/model2vec) model is a distilled version of {% if base_model %}the [{{ base_model }}](https://huggingface.co/{{ base_model }}){% else %}a{% endif %} Sentence Transformer. It uses static embeddings, allowing text embeddings to be computed orders of magnitude faster on both GPU and CPU. It is designed for applications where computational resources are limited or where real-time performance is critical.
 
 
 ## Installation
@@ -17,7 +15,7 @@ pip install model2vec
 ```
 
 ## Usage
-A StaticModel can be loaded using the `from_pretrained` method:
+Load this model using the `from_pretrained` method:
 ```python
 from model2vec import StaticModel
 
@@ -50,11 +48,12 @@ It works by passing a vocabulary through a sentence transformer model, then redu
 
 ## Additional Resources
 
+- [All Model2Vec models on the hub](https://huggingface.co/models?library=model2vec)
 - [Model2Vec Repo](https://github.com/MinishLab/model2vec)
 - [Model2Vec Results](https://github.com/MinishLab/model2vec?tab=readme-ov-file#results)
 - [Model2Vec Tutorials](https://github.com/MinishLab/model2vec/tree/main/tutorials)
 
-## Model Authors
+## Library Authors
 
 Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team consisting of [Stephan Tulkens](https://github.com/stephantul) and [Thomas van Dongen](https://github.com/Pringled).
 
@@ -62,7 +61,7 @@ Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team c
 
 Please cite the [Model2Vec repository](https://github.com/MinishLab/model2vec) if you use this model in your work.
 ```
-@software{minishlab2024word2vec,
+@software{minishlab2024model2vec,
   authors = {Stephan Tulkens, Thomas van Dongen},
   title = {Model2Vec: Turn any Sentence Transformer into a Small Fast Model},
   year = {2024},
