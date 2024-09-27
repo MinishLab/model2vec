@@ -1,9 +1,3 @@
-
-
-
-
-
-
 <div align="center">
   <h1>Model2Vec: Distill a Small Fast Model from any Sentence Transformer</h1>
 </div>

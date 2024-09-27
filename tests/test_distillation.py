@@ -54,7 +54,7 @@ def test_distill(
 
     model_name = "mock-model"
 
-    if vocabulary is None and use_subword == False:
+    if vocabulary is None and not use_subword:
         with pytest.raises(ValueError):
             static_model = distill(
                 model_name=model_name,
