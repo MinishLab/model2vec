@@ -6,13 +6,10 @@ from typing import Any
 import numpy as np
 import pytest
 import torch
-import torch.nn as nn
-from sentence_transformers import SentenceTransformer
-from sentence_transformers import models as SentenceTransformerModels
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
-from transformers import AutoModel, BertConfig, BertModel, BertTokenizerFast
+from transformers import AutoModel, BertTokenizerFast
 
 
 @pytest.fixture

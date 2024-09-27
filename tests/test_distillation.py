@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 from pytest import LogCaptureFixture
-from transformers import AutoModel, BertConfig, BertModel, BertTokenizerFast
+from transformers import AutoModel, BertTokenizerFast
 
 from model2vec.distill.distillation import _clean_vocabulary, _post_process_embeddings, distill
 from model2vec.model import StaticModel
