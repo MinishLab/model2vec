@@ -1,11 +1,18 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
 import numpy as np
 import pytest
+import torch
+import torch.nn as nn
 from sentence_transformers import SentenceTransformer
 from sentence_transformers import models as SentenceTransformerModels
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
-from transformers import BertConfig, BertModel
+from transformers import AutoModel, BertConfig, BertModel, BertTokenizerFast
 
 
 @pytest.fixture
@@ -22,32 +29,37 @@ def mock_tokenizer() -> Tokenizer:
 
 
 @pytest.fixture
-def mock_transformer() -> BertModel:
-    """Create a mock transformer."""
-    # Define the configuration
-    config = BertConfig(
-        hidden_size=2,
-        num_hidden_layers=1,
-        num_attention_heads=1,
-        intermediate_size=2,
-    )
+def mock_berttokenizer() -> BertTokenizerFast:
+    """Load the real BertTokenizerFast from the provided tokenizer.json file."""
+    tokenizer_path = Path("tests/data/test_tokenizer/tokenizer.json")
+    return BertTokenizerFast(tokenizer_file=str(tokenizer_path))
 
-    # Initialize a BertModel with random weights
-    random_bert = BertModel(config)
 
-    # Create a custom transformer class to bypass model loading behavior
-    class MockTransformer(SentenceTransformerModels.Transformer):
-        def __init__(self, model: BertModel) -> None:
-            # Skip loading from a name or path, use the pre-loaded model
-            self.auto_model = model
+@pytest.fixture
+def mock_transformer() -> AutoModel:
+    """Create a mock transformer model."""
 
-    # Create a transformer model and a pooling model
-    word_embedding_model = MockTransformer(random_bert)
-    pooling_model = SentenceTransformerModels.Pooling(word_embedding_model.get_word_embedding_dimension())
+    class MockPreTrainedModel:
+        def __init__(self) -> None:
+            self.device = "cpu"
 
-    # Initialize the SentenceTransformer
-    model = SentenceTransformer(modules=[word_embedding_model, pooling_model])
-    return model
+        def to(self, device: str) -> MockPreTrainedModel:
+            self.device = device
+            return self
+
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
+            # Simulate a last_hidden_state output for a transformer model
+            batch_size, seq_length = kwargs["input_ids"].shape
+            # Return a tensor of shape (batch_size, seq_length, 768)
+            return type(
+                "BaseModelOutputWithPoolingAndCrossAttentions",
+                (object,),
+                {
+                    "last_hidden_state": torch.rand(batch_size, seq_length, 768)  # Simulate 768 hidden units
+                },
+            )
+
+    return MockPreTrainedModel()
 
 
 @pytest.fixture

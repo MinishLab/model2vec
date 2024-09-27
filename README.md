@@ -66,7 +66,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 And that's it. You can use the model to classify texts, to cluster, or to build a RAG system.
 
-Instead of using on of our models, you can distill your own Model2Vec model from a Sentence Transformer model. The following code snippet shows how to distill a model:
+Instead of using one of our models, you can distill your own Model2Vec model from a Sentence Transformer model. The following code snippet shows how to distill a model:
 ```python
 from model2vec.distill import distill
 
