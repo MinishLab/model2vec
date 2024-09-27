@@ -22,11 +22,10 @@
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/pyversions/model2vec" alt="Supported Python versions"></a>
     <a href="https://pepy.tech/project/model2vec">
     <img src="https://static.pepy.tech/badge/model2vec" alt="Downloads">
-  </a>
+    </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
   </h2>
 </div>
-
 
 <p align="center">
   <img src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
