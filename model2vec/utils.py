@@ -6,6 +6,7 @@ from typing import Any, Protocol, cast
 
 import click
 import huggingface_hub
+import huggingface_hub.errors
 import numpy as np
 import safetensors
 from huggingface_hub import ModelCard, ModelCardData
@@ -53,7 +54,7 @@ def save_pretrained(
     :param **kwargs: Any additional arguments.
     """
     folder_path.mkdir(exist_ok=True, parents=True)
-    save_file({"embeddings": embeddings}, folder_path / "embeddings.safetensors")
+    save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"))
     json.dump(config, open(folder_path / "config.json", "w"))
 
@@ -115,9 +116,14 @@ def load_pretrained(
     """
     folder_or_repo_path = Path(folder_or_repo_path)
     if folder_or_repo_path.exists():
-        embeddings_path = folder_or_repo_path / "embeddings.safetensors"
+        embeddings_path = folder_or_repo_path / "model.safetensors"
         if not embeddings_path.exists():
-            raise FileNotFoundError(f"Embeddings file does not exist in {folder_or_repo_path}")
+            old_embeddings_path = folder_or_repo_path / "embeddings.safetensors"
+            if old_embeddings_path.exists():
+                logger.warning("Old embeddings file found. Please rename to `model.safetensors` and re-save.")
+                embeddings_path = old_embeddings_path
+            else:
+                raise FileNotFoundError(f"Embeddings file does not exist in {folder_or_repo_path}")
 
         config_path = folder_or_repo_path / "config.json"
         if not config_path.exists():
@@ -129,9 +135,19 @@ def load_pretrained(
 
     else:
         logger.info("Folder does not exist locally, attempting to use huggingface hub.")
-        embeddings_path = huggingface_hub.hf_hub_download(
-            folder_or_repo_path.as_posix(), "embeddings.safetensors", token=token
-        )
+        try:
+            embeddings_path = huggingface_hub.hf_hub_download(
+                folder_or_repo_path.as_posix(), "model.safetensors", token=token
+            )
+        except huggingface_hub.utils.EntryNotFoundError as e:
+            try:
+                embeddings_path = huggingface_hub.hf_hub_download(
+                    folder_or_repo_path.as_posix(), "embeddings.safetensors", token=token
+                )
+            except huggingface_hub.utils.EntryNotFoundError:
+                # Raise original exception.
+                raise e
+
         config_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), "config.json", token=token)
         tokenizer_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), "tokenizer.json", token=token)
 
