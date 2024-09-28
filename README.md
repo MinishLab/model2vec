@@ -288,7 +288,7 @@ MIT
 
 If you use Model2Vec in your research, please cite the following:
 ```bibtex
-@software{minishlab2024word2vec,
+@software{minishlab2024model2vec,
   authors = {Stephan Tulkens, Thomas van Dongen},
   title = {Model2Vec: Turn any Sentence Transformer into a Small Fast Model},
   year = {2024},
