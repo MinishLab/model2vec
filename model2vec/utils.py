@@ -182,7 +182,7 @@ def _get_metadata_from_readme(readme_path: Path) -> dict[str, Any]:
         logger.info(f"README file not found in {readme_path}. No model card loaded.")
         return {}
     model_card = ModelCard.load(readme_path)
-    data: dict[str, Any] = model_card.data
+    data: dict[str, Any] = model_card.data.to_dict()
     if not data:
         logger.info("File README.md exists, but was empty. No model card loaded.")
     return data
