@@ -1,5 +1,13 @@
+
 <div align="center">
-  <h1>Model2Vec: Distill a Small Fast Model from any Sentence Transformer</h1>
+    <picture>
+      <img alt="Model2Vec logo" src="assets/images/logo.png">
+    </picture>
+  </a>
+</div>
+
+<div align="center">
+  <h1>Distill a Small Fast Model from any Sentence Transformer</h1>
 </div>
 
 <div align="center">
@@ -16,13 +24,11 @@
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/pyversions/model2vec" alt="Supported Python versions"></a>
     <a href="https://pepy.tech/project/model2vec">
     <img src="https://static.pepy.tech/badge/model2vec" alt="Downloads">
-    </a>
-    <a href="https://app.codecov.io/gh/MinishLab/model2vec">
-    <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Downloads">
-    </a>
+  </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
   </h2>
 </div>
+
 
 <p align="center">
   <img src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
