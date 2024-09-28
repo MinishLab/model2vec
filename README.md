@@ -1,5 +1,13 @@
+
 <div align="center">
-  <h1>Model2Vec: Distill a Small Fast Model from any Sentence Transformer</h1>
+    <picture>
+      <img width="50%" alt="Model2Vec logo" src="assets/images/logo.png">
+    </picture>
+  </a>
+</div>
+
+<div align="center">
+  <h2>Distill a Small Fast Model from any Sentence Transformer</h2>
 </div>
 
 <div align="center">
@@ -16,17 +24,17 @@
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/pyversions/model2vec" alt="Supported Python versions"></a>
     <a href="https://pepy.tech/project/model2vec">
     <img src="https://static.pepy.tech/badge/model2vec" alt="Downloads">
-    </a>
-    <a href="https://app.codecov.io/gh/MinishLab/model2vec">
-    <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Downloads">
-    </a>
+  </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
   </h2>
 </div>
 
+
 <p align="center">
-  <img src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
+  <img width="75%", src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
 </p>
+
+Model2Vec is a technique to turn any sentence transformer into a really small fast model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](#classification-and-speed-benchmarks), or dive in to see how it works.
 
 ## Table of Contents
 - [Quickstart](#quickstart)
@@ -282,7 +290,7 @@ MIT
 
 If you use Model2Vec in your research, please cite the following:
 ```bibtex
-@software{minishlab2024word2vec,
+@software{minishlab2024model2vec,
   authors = {Stephan Tulkens, Thomas van Dongen},
   title = {Model2Vec: Turn any Sentence Transformer into a Small Fast Model},
   year = {2024},
