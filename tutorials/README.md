@@ -1,6 +1,6 @@
 <div align="center">
     <picture>
-      <img width="50%", alt="Tutorials" src="../assets/images/tutorial_ezlo.png">
+      <img width="75%", alt="Tutorials" src="../assets/images/tutorial_ezlo.png">
     </picture>
   </a>
 </div>

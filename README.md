@@ -31,7 +31,7 @@
 
 
 <p align="center">
-  <img width="50%", src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
+  <img width="75%", src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
 </p>
 
 ## Table of Contents
