@@ -154,9 +154,11 @@ class StaticModel(nn.Module):
         :param token: The huggingface token to use.
         :return: A StaticEmbedder
         """
-        embeddings, tokenizer, config = load_pretrained(path, token=token)
+        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token)
 
-        return cls(embeddings, tokenizer, config)
+        return cls(
+            embeddings, tokenizer, config, base_model_name=metadata.get("base_model"), language=metadata.get("language")
+        )
 
     def encode(
         self,
