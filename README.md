@@ -7,7 +7,7 @@
 </div>
 
 <div align="center">
-  <h1>Distill a Small Fast Model from any Sentence Transformer</h1>
+  <h2>Distill a Small Fast Model from any Sentence Transformer</h2>
 </div>
 
 <div align="center">
