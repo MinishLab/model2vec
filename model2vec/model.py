@@ -56,6 +56,7 @@ class StaticModel(nn.Module):
         else:
             self.unk_token_id = None
 
+        self.median_token_length = int(np.median([len(token) for token in self.tokens]))
         self.config = config
         self.base_model_name = base_model_name
         self.language = language
@@ -123,6 +124,10 @@ class StaticModel(nn.Module):
         :param max_length: The maximum length of the sentence.
         :return: The tokens.
         """
+        if max_length is not None:
+            m = max_length * self.median_token_length
+            sentences = [sentence[:m] for sentence in sentences]
+
         encodings: list[Encoding] = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
         encodings_ids = [encoding.ids for encoding in encodings]
 
