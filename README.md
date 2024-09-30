@@ -26,7 +26,7 @@
     <img src="https://static.pepy.tech/badge/model2vec" alt="Downloads">
     </a>
     <a href="https://app.codecov.io/gh/MinishLab/model2vec">
-    <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Downloads">
+    <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Codecov">
     </a>
   </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
