@@ -24,14 +24,11 @@
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/pyversions/model2vec" alt="Supported Python versions"></a>
     <a href="https://pepy.tech/project/model2vec">
     <img src="https://static.pepy.tech/badge/model2vec" alt="Downloads">
-<<<<<<< HEAD
     </a>
     <a href="https://app.codecov.io/gh/MinishLab/model2vec">
     <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Downloads">
     </a>
-=======
   </a>
->>>>>>> 9a887a3a464ae987213db59e2e65c5dccd5df246
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
   </h2>
 </div>
