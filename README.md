@@ -96,9 +96,10 @@ Model2vec creates a small, fast, and powerful model that outperforms other stati
 
 It works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using zipf weighting. During inference, we simply take the mean of all token embeddings occurring in a sentence.
 
-Model2vec has 2 modes:
-- **Output**: behaves much a like a real sentence transformer, i.e., it uses a subword tokenizer and encodes all wordpieces. This is really quick to create, very small (30 MB), but might be less performant on some tasks.
-- **Vocab**: behaves much like GloVe or regular word2vec vectors, albeit with much better performance. These models are a bit bigger, depending on your vocabulary size, but still very fast, and are useful in situations in which you have a bit more RAM, but still need to go fast.
+Model2vec has 3 modes:
+- **Output**: behaves much like a real sentence transformer, i.e., it uses a subword tokenizer and simply encodes all wordpieces in its vocab. This is really quick to create (30 seconds on a CPU), very small (30 MB in float32), but might be less performant on some tasks.
+- **Vocab (word level)**: creates a word-level tokenizer and only encodes words that are in the vocabulary. This is a bit slower to create and creates a larger model, but might be more performant on some tasks. Note that this model can go out-of-vocabulary, which might be beneficial if your domain is very noisy
+- **Vocab (subword)**: a combination of the two methods above. In this mode, you can pass your own vocabulary, but it also uses the subword vocabulary to create representations for words not in the passed vocabulary.
 
 ## Main Features
 
