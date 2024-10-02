@@ -278,7 +278,7 @@ As can be seen, Model2Vec models outperform the GloVe and WL256 models on all cl
 The figure below shows the relationship between the number of sentences per second and the average classification score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
 This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of classification performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
 
-| ![Description](assets/images/speed_vs_accuracy.png) |
+| ![Description](assets/images/speed_vs_accuracy_v2.png) |
 |:--:|
 |*Figure: The average accuracy over all classification datasets plotted against sentence per second. The circle size indicates model size.*|
 

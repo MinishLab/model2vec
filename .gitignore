@@ -171,4 +171,5 @@ model2vec_models
 results/*
 counts/*
 results_old/*
+local/*
 lightning_logs/*
