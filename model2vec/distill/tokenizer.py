@@ -31,7 +31,7 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     if not set(tokens_to_remove).intersection(model_vocab):
         # NOTE: return a copy.
         if tokens_to_remove:
-            logger.info("No tokens to remove, all tokens were not in the vocabulary.")
+            logger.info("No tokens to remove, none of the tokens were in the vocabulary.")
         else:
             logger.info("No tokens to remove.")
         return Tokenizer.from_str(tokenizer.to_str())
