@@ -91,13 +91,16 @@ m2v_model.save_pretrained("m2v_model")
 If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
 
 ```python
+from transformers import AutoModel, AutoTokenizer
+
 from model2vec.distill import distill_from_model
 
 # Assuming a loaded model and tokenizer
-model = load_my_model()
-tokenizer = load_my_tokenizer()
+model_name = "baai/bge-base-en-v1.5"
+model = AutoModel.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-m2v_model = distill(model=model, tokenizer=tokenizer, pca_dims=256)
+m2v_model = distill_from_model(model=model, tokenizer=tokenizer, pca_dims=256)
 
 m2v_model.save_pretrained("m2v_model")
 
