@@ -12,6 +12,7 @@ from model2vec.distill.inference import (
     create_output_embeddings_from_model_name_and_tokens,
 )
 from model2vec.distill.tokenizer import add_tokens, preprocess_vocabulary, remove_tokens
+from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ def distill_from_model(
     model: PreTrainedModel,
     tokenizer: PreTrainedTokenizerFast,
     vocabulary: list[str] | None = None,
-    device: str = "cpu",
+    device: str | None = None,
     pca_dims: PCADimType = 256,
     apply_zipf: bool = True,
     use_subword: bool = True,
@@ -52,7 +53,7 @@ def distill_from_model(
     :return: A StaticModel
 
     """
-    """"""
+    device = select_optimal_device(device)
     if not use_subword and vocabulary is None:
         raise ValueError(
             "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
@@ -137,7 +138,7 @@ def distill_from_model(
 def distill(
     model_name: str,
     vocabulary: list[str] | None = None,
-    device: str = "cpu",
+    device: str | None = None,
     pca_dims: PCADimType = 256,
     apply_zipf: bool = True,
     use_subword: bool = True,
