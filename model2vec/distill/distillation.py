@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 
 import numpy as np
 from huggingface_hub import model_info
@@ -16,12 +17,15 @@ from model2vec.model import StaticModel
 logger = logging.getLogger(__name__)
 
 
+PCAType = int | None | Literal["auto"]
+
+
 def distill_from_model(
     model: PreTrainedModel,
     tokenizer: PreTrainedTokenizerFast,
     vocabulary: list[str] | None = None,
     device: str = "cpu",
-    pca_dims: int | None = 256,
+    pca_dims: PCAType = 256,
     apply_zipf: bool = True,
     use_subword: bool = True,
 ) -> StaticModel:
@@ -132,7 +136,7 @@ def distill(
     model_name: str,
     vocabulary: list[str] | None = None,
     device: str = "cpu",
-    pca_dims: int | None = 256,
+    pca_dims: PCAType = 256,
     apply_zipf: bool = True,
     use_subword: bool = True,
 ) -> StaticModel:
@@ -168,18 +172,23 @@ def distill(
     )
 
 
-def _post_process_embeddings(embeddings: np.ndarray, pca_dims: int | None, apply_zipf: bool) -> np.ndarray:
+def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCAType, apply_zipf: bool) -> np.ndarray:
     """Post process embeddings by applying PCA and Zipf weighting."""
     if pca_dims is not None:
-        if pca_dims >= embeddings.shape[1]:
-            raise ValueError(
-                f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]})"
+        if pca_dims == "auto":
+            pca_dims = embeddings.shape[1]
+        if pca_dims > embeddings.shape[1]:
+            logger.warning(
+                f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]}). "
+                "Applying PCA, but not reducing dimensionality. Is this is not desired, please set `pca_dims` to None. "
+                "Applying PCA will probably improve performance, so consider just leaving it."
             )
+            pca_dims = embeddings.shape[1]
         if pca_dims >= embeddings.shape[0]:
             logger.warning(
                 f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
             )
-        elif pca_dims < embeddings.shape[1]:
+        elif pca_dims <= embeddings.shape[1]:
             logger.info(f"Applying PCA with n_components {pca_dims}")
 
             p = PCA(n_components=pca_dims, whiten=False)
