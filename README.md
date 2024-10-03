@@ -88,7 +88,22 @@ m2v_model = distill(model_name=model_name, pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 ```
 
-Distillation is really fast, and only takes about 30 seconds on a 2024 macbook using the MPS backend. Best of all, distillation requires no training data.
+If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory./
+
+```python
+from model2vec.distill import distill_from_model
+
+# Assuming a loaded model and tokenizer
+model = load_my_model()
+tokenizer = load_my_tokenizer()
+
+m2v_model = distill(model=model, tokenizer=tokenizer, pca_dims=256)
+
+m2v_model.save_pretrained("m2v_model")
+
+```
+
+Distillation is really fast, and only takes about 5 seconds on a 2024 macbook using the MPS backend, 30 seconds on CPU. Best of all, distillation requires no training data.
 
 ## What is Model2Vec?
 
