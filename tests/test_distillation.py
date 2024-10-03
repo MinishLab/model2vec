@@ -31,7 +31,7 @@ rng = np.random.default_rng()
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
 @patch("transformers.AutoModel.from_pretrained")
-def test_distill_from_moddel(
+def test_distill_from_model(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
     mock_berttokenizer: BertTokenizerFast,
