@@ -124,6 +124,11 @@ def create_output_embeddings_from_model_name(
         with torch.no_grad():
             encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(input_ids=batch.to(device))
             out: torch.Tensor = encoded.last_hidden_state
+            # NOTE: If the dtype is bfloat 16, we convert to float32,
+            # because numpy does not suport bfloat16
+            # See here: https://github.com/numpy/numpy/issues/19808
+            if out.dtype == torch.bfloat16:
+                out = out.float()
         intermediate_weights.append(out[:, 1].cpu().numpy())
     out_weights = np.concatenate(intermediate_weights)
 
