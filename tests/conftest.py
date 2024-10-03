@@ -39,6 +39,7 @@ def mock_transformer() -> AutoModel:
     class MockPreTrainedModel:
         def __init__(self) -> None:
             self.device = "cpu"
+            self.name_or_path = "mock-model"
 
         def to(self, device: str) -> MockPreTrainedModel:
             self.device = device
