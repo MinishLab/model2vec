@@ -3,6 +3,7 @@ import logging
 import numpy as np
 from huggingface_hub import model_info
 from sklearn.decomposition import PCA
+from tokenizers.models import BPE, Unigram, WordPiece
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import (
@@ -50,6 +51,14 @@ def distill(
 
     # Load original tokenizer. We need to keep this to tokenize any tokens in the vocabulary.
     original_tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_name)
+
+    if vocabulary and isinstance(original_tokenizer.backend_tokenizer.model, (BPE, Unigram)):
+        raise ValueError(
+            "You passed a vocabulary, but the model you are using does not use a WordPiece tokenizer. "
+            "This is not supported yet."
+            "Feel free to open an issue if this is a blocker: https://github.com/MinishLab/model2vec/issues"
+        )
+
     original_model: PreTrainedModel = AutoModel.from_pretrained(model_name)
     # Make a base list of tokens.
     tokens: list[str] = []
@@ -79,7 +88,7 @@ def distill(
         # We need to set embeddings to None because we don't know the dimensions of the embeddings yet.
         embeddings = None
 
-    if vocabulary is not None:
+    if vocabulary:
         # Preprocess the vocabulary with the original tokenizer.
         preprocessed_vocabulary = preprocess_vocabulary(original_tokenizer.backend_tokenizer, vocabulary)
         n_tokens_before = len(preprocessed_vocabulary)

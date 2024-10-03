@@ -23,7 +23,19 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     :param tokenizer: The tokenizer to remove tokens from.
     :param tokens_to_remove: The tokens to remove.
     :return: The modified tokenizer.
+    :raises ValueError: If the tokenizer model type is not supported.
     """
+    model_vocab = set(tokenizer.get_vocab())
+    # This triggers when tokens_to_remove is empty or when there is no overlap
+    # between the tokens to remove and the model vocabulary.
+    if not set(tokens_to_remove).intersection(model_vocab):
+        # NOTE: return a copy.
+        if tokens_to_remove:
+            logger.info("No tokens to remove, none of the tokens were in the vocabulary.")
+        else:
+            logger.info("No tokens to remove.")
+        return Tokenizer.from_str(tokenizer.to_str())
+
     tokenizer_data = json.loads(tokenizer.to_str())
 
     # Find all added tokens
@@ -35,20 +47,31 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     tokens_to_remove = [token for token in tokens_to_remove if token not in added_tokens_str]
 
     # Load the vocabulary.
-    vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
-    n_tokens = len(vocab)
+    model_type = tokenizer_data["model"]["type"]
 
-    # Remove the tokens.
-    for token in tokens_to_remove:
-        if vocab.pop(token, None) is None:
-            logger.warning(f"Token {token} was not in the vocabulary.")
+    match model_type:
+        case "WordPiece":
+            # Vocab is a dictionary.
+            vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
+            n_tokens = len(vocab)
 
-    n_removed = n_tokens - len(vocab)
-    logger.info(f"Removed {n_removed} tokens from the vocabulary.")
+            # Remove the tokens.
+            for token in tokens_to_remove:
+                if vocab.pop(token, None) is None:
+                    logger.warning(f"Token {token} was not in the vocabulary.")
 
-    # Reindex the vocabulary so that it is contiguous.
-    reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
-    tokenizer_data["model"]["vocab"] = reindexed
+            n_removed = n_tokens - len(vocab)
+            logger.info(f"Removed {n_removed} tokens from the vocabulary.")
+
+            # Reindex the vocabulary so that it is contiguous.
+            reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
+            tokenizer_data["model"]["vocab"] = reindexed
+        case "Unigram":
+            raise ValueError("Removing tokens from a unigram tokenizer is not supported.")
+        case "BPE":
+            raise ValueError("Removing tokens from a bpe tokenizer is not supported.")
+        case _:
+            raise ValueError(f"Unknown model type {model_type}")
 
     # Reindex the special tokens (i.e., CLS and SEP for BertTokenizers.)
     special_tokens_post_processor: dict[str, dict] = tokenizer_data["post_processor"]["special_tokens"]
@@ -68,12 +91,24 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
     :param tokenizer: The tokenizer to add tokens to.
     :param tokens_to_add: The tokens to add.
     :return: The modified tokenizer.
+    :raises ValueError: If the tokenizer model type is not supported.
     """
     data = json.loads(tokenizer.to_str())
 
-    vocab: dict[str, int] = data["model"]["vocab"]
-    for token in tokens_to_add:
-        vocab[token] = len(vocab)
+    model = data["model"]["type"]
+
+    match model:
+        case "WordPiece":
+            wordpiece_vocab: dict[str, int] = data["model"]["vocab"]
+            for token in tokens_to_add:
+                if token not in wordpiece_vocab:
+                    wordpiece_vocab[token] = len(wordpiece_vocab)
+        case "Unigram":
+            raise ValueError("Adding tokens to a unigram tokenizer is not supported.")
+        case "BPE":
+            raise ValueError("Adding tokens to a bpe tokenizer is not supported.")
+        case _:
+            raise ValueError(f"Unknown model type {model}")
 
     tokenizer = Tokenizer.from_str(json.dumps(data))
 
