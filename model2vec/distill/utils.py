@@ -17,7 +17,7 @@ def select_optimal_device(device: str | None) -> str:
     if device is None:
         if torch.cuda.is_available():
             device = "cuda"
-        if torch.backends.mps.is_available():
+        elif torch.backends.mps.is_available():
             device = "mps"
         else:
             device = "cpu"

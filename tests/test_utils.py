@@ -46,7 +46,7 @@ def test__get_metadata_from_readme_mocked_file_keys() -> None:
 def test_select_optimal_device(device: str | None, expected: str, cuda: bool, mps: bool) -> None:
     """Test whether the optimal device is selected."""
     with (
-        patch("torch.cuda.is_available", return_value=cuda),
-        patch("torch.backends.mps.is_available", return_value=mps),
+        patch("model2vec.distill.utils.torch.cuda.is_available", return_value=cuda),
+        patch("model2vec.distill.utils.torch.torch.backends.mps.is_available", return_value=mps),
     ):
         assert select_optimal_device(device) == expected
