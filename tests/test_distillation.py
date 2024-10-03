@@ -24,6 +24,8 @@ rng = np.random.default_rng()
             False,
         ),  # Custom vocab without subword , PCA applied
         (["wordA", "wordB"], True, 4, False),  # Custom vocab with subword, PCA applied
+        (None, True, "auto", False),  # Subword, PCA set to 'auto'
+        (None, True, 1024, False),  # Subword, PCA set to high number.
         (None, True, None, True),  # No PCA applied
         (["wordA", "wordB"], False, 4, True),  # Custom vocab without subwords PCA and Zipf applied
         (None, False, 256, True),  # use_subword = False without passing a vocabulary should raise an error
@@ -98,6 +100,8 @@ def test_distill_from_model(
             False,
             (7, 4),
         ),  # Custom vocab without subword , PCA applied
+        (None, True, "auto", False, (29528, 768)),  # Subword, PCA set to 'auto'
+        (None, True, 1024, False, (29528, 768)),  # Subword, PCA set to high number.
         (["wordA", "wordB"], True, 4, False, (29530, 4)),  # Custom vocab with subword, PCA applied
         (None, True, None, True, (29528, 768)),  # No PCA applied
         (["wordA", "wordB"], False, 4, True, (7, 4)),  # Custom vocab without subwords PCA and Zipf applied
