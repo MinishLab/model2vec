@@ -88,7 +88,7 @@ m2v_model = distill(model_name=model_name, pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 ```
 
-If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory./
+If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
 
 ```python
 from model2vec.distill import distill_from_model
