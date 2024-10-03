@@ -88,7 +88,7 @@ def distill(
         # We need to set embeddings to None because we don't know the dimensions of the embeddings yet.
         embeddings = None
 
-    if vocabulary is not None:
+    if vocabulary:
         # Preprocess the vocabulary with the original tokenizer.
         preprocessed_vocabulary = preprocess_vocabulary(original_tokenizer.backend_tokenizer, vocabulary)
         n_tokens_before = len(preprocessed_vocabulary)
