@@ -433,7 +433,7 @@ wheels = [
 
 [[package]]
 name = "model2vec"
-version = "0.1.2"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

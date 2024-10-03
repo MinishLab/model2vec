@@ -9,7 +9,7 @@ import torch
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
-from transformers import AutoModel, BertTokenizerFast
+from transformers import AutoModel, AutoTokenizer
 
 
 @pytest.fixture
@@ -26,10 +26,9 @@ def mock_tokenizer() -> Tokenizer:
 
 
 @pytest.fixture
-def mock_berttokenizer() -> BertTokenizerFast:
+def mock_berttokenizer() -> AutoTokenizer:
     """Load the real BertTokenizerFast from the provided tokenizer.json file."""
-    tokenizer_path = Path("tests/data/test_tokenizer/tokenizer.json")
-    return BertTokenizerFast(tokenizer_file=str(tokenizer_path))
+    return AutoTokenizer.from_pretrained("tests/data/test_tokenizer")
 
 
 @pytest.fixture
@@ -39,6 +38,7 @@ def mock_transformer() -> AutoModel:
     class MockPreTrainedModel:
         def __init__(self) -> None:
             self.device = "cpu"
+            self.name_or_path = "mock-model"
 
         def to(self, device: str) -> MockPreTrainedModel:
             self.device = device
