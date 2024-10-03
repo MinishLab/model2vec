@@ -67,7 +67,12 @@ def _encode_mean_using_model(model: PreTrainedModel, tokenizer: PreTrainedTokeni
     """
     encodings = tokenizer(tokens, return_tensors="pt", padding=True, truncation=True).to(model.device)
     encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(**encodings)
-    out = encoded.last_hidden_state.cpu()
+    out: torch.Tensor = encoded.last_hidden_state.cpu()
+    # NOTE: If the dtype is bfloat 16, we convert to float32,
+    # because numpy does not suport bfloat16
+    # See here: https://github.com/numpy/numpy/issues/19808
+    if out.dtype == torch.bfloat16:
+        out = out.float()
 
     mask = encodings["attention_mask"].cpu()
     # NOTE: evil hack. For any batch, there will be a mask vector
@@ -124,6 +129,11 @@ def create_output_embeddings_from_model_name(
         with torch.no_grad():
             encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(input_ids=batch.to(device))
             out: torch.Tensor = encoded.last_hidden_state
+            # NOTE: If the dtype is bfloat 16, we convert to float32,
+            # because numpy does not suport bfloat16
+            # See here: https://github.com/numpy/numpy/issues/19808
+            if out.dtype == torch.bfloat16:
+                out = out.float()
         intermediate_weights.append(out[:, 1].cpu().numpy())
     out_weights = np.concatenate(intermediate_weights)
 
