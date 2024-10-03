@@ -55,6 +55,7 @@ def distill(
     if vocabulary and isinstance(original_tokenizer.backend_tokenizer.model, (BPE, Unigram)):
         raise ValueError(
             "You passed a vocabulary, but the model you are using does not use a WordPiece tokenizer. "
+            "This is not supported yet."
             "Feel free to open an issue if this is a blocker: https://github.com/MinishLab/model2vec/issues"
         )
 
