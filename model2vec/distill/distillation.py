@@ -125,7 +125,13 @@ def distill_from_model(
 
     model_name = getattr(model, "name_or_path", "")
 
-    config = {"tokenizer_name": model_name, "apply_pca": pca_dims, "apply_zipf": apply_zipf}
+    config = {
+        "tokenizer_name": model_name,
+        "apply_pca": pca_dims,
+        "apply_zipf": apply_zipf,
+        "hidden_dim": embeddings.shape[1],
+        "seq_length": 1000000,  # Set this to a high value since we don't have a sequence length limit.
+    }
     # Get the language from the model card
     info = model_info(model_name)
     language = info.cardData.get("language")
