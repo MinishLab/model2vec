@@ -110,7 +110,7 @@ Distillation is really fast, and only takes about 5 seconds on a 2024 macbook us
 
 ## What is Model2Vec?
 
-Model2vec creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on all tasks we could find, while being much faster to create than traditional static embedding models such as GloVe. Best of all, you don't need _any_ data to distill a model using Model2Vec.
+Model2vec creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on all tasks we could find, while being much faster to create than traditional static embedding models such as GloVe. Like BPEmb, it can create subword embeddings, but with much better performance. Best of all, you don't need _any_ data to distill a model using Model2Vec.
 
 It works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using zipf weighting. During inference, we simply take the mean of all token embeddings occurring in a sentence.
 
@@ -252,13 +252,15 @@ print(make_leaderboard(task_scores))
 Model2Vec is evaluated on MTEB, as well as two additional tasks: [PEARL](https://github.com/tigerchen52/PEARL) (a phrase representation task) and WordSim (a collection of _word_ similarity tasks). The results are shown in the table below.
 
 
+
 | Model                  | Avg (All) | Avg (MTEB) | Class  | Clust  | PairClass | Rank   | Ret    | STS    | Sum    | Pearl  | WordSim |
-|------------------------|-----------|------------|--------|--------|-----------|--------|--------|--------|--------|--------|---------|
+|:-----------------------|:---------:|:----------:|:------:|:------:|:---------:|:------:|:------:|:------:|:------:|:------:|:-------:|
 | all-MiniLM-L6-v2        | 56.08     | 56.09      | 62.62  | 41.94  | 82.37     | 58.04  | 41.95  | 78.90  | 30.81  | 60.83  | 49.91   |
 | M2V_base_glove_subword  | 49.06     | 46.69      | 61.27  | 30.03  | 74.71     | 49.15  | 27.16  | 69.09  | 30.08  | 56.82  | 57.99   |
-| M2V_base_glove          | 48.58     | 47.6       | 61.35  | 30.52  | 75.34     | 48.5   | 29.26  | 70.31  | 31.5   | 50.28  | 54.29   |
-| M2V_base_output         | 46.79     | 45.34      | 61.25  | 25.58  | 74.9      | 47.63  | 26.14  | 68.58  | 29.2   | 54.02  | 49.18   |
-| GloVe_300d              | 42.84     | 42.36      | 57.31  | 27.66  | 72.48     | 43.3   | 22.78  | 61.9   | 28.81  | 45.65  | 43.05   |
+| M2V_base_glove          | 48.58     | 47.60      | 61.35  | 30.52  | 75.34     | 48.50  | 29.26  | 70.31  | 31.50  | 50.28  | 54.29   |
+| M2V_base_output         | 46.79     | 45.34      | 61.25  | 25.58  | 74.90     | 47.63  | 26.14  | 68.58  | 29.20  | 54.02  | 49.18   |
+| GloVe_300d              | 42.84     | 42.36      | 57.31  | 27.66  | 72.48     | 43.30  | 22.78  | 61.90  | 28.81  | 45.65  | 43.05   |
+| BPEmb_50k_300d          | 39.34     | 37.78      | 55.76  | 23.35  | 57.86     | 43.21  | 17.50  | 55.10  | 29.74  | 47.56  | 41.28   |
 | WL256*                  | 48.88     | 49.36      | 58.98  | 33.34  | 74.00     | 52.03  | 33.12  | 73.34  | 29.05  | 48.81  | 45.16   |
 
 
@@ -282,22 +284,25 @@ For readability, the MTEB task names are abbreviated as follows:
 
 In addition to the MTEB evaluation, we evaluate Model2Vec on a number of classification datasets. These are used as additional evidence to avoid overfitting to the MTEB dataset and to benchmark the speed of the model. The results are shown in the table below.
 
+
 | Model                  | Average | SST2   | IMDB  | TREC   | AG News |
 |:-----------------------|:-------:|:------:|:-----:|:------:|:-------:|
 | bge-base-en-v1.5        | 90.00   | 91.54  | 91.88 | 85.16  | 91.45   |
 | all-MiniLM-L6-v2        | 84.10   | 83.95  | 81.36 | 81.31  | 89.77   |
 | M2V_base_output         | 82.23   | 80.92  | 84.56 | 75.27  | 88.17   |
 | M2V_base_glove_subword  | 81.95   | 82.84  | 85.96 | 70.51  | 88.49   |
+| BPEmb_50k_300d          | 81.15   | 80.42  | 84.04 | 71.25  | 88.92   |
 | M2V_base_glove          | 80.76   | 83.07  | 85.24 | 66.12  | 88.61   |
 | WL256                   | 78.48   | 76.88  | 80.12 | 69.23  | 87.68   |
 | GloVe_300d              | 77.77   | 81.68  | 84.00 | 55.67  | 89.71   |
 
-As can be seen, Model2Vec models outperform the GloVe and WL256 models on all classification tasks, and are competitive with the all-MiniLM-L6-v2 model, while being much faster.
+
+As can be seen, Model2Vec models outperform the GloVe, BPEmb, and WL256 models on all classification tasks, and are competitive with the all-MiniLM-L6-v2 model, while being much faster.
 
 The figure below shows the relationship between the number of sentences per second and the average classification score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
 This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of classification performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
 
-| ![Description](assets/images/speed_vs_accuracy_v2.png) |
+| ![Description](assets/images/speed_vs_accuracy_v3.png) |
 |:--:|
 |*Figure: The average accuracy over all classification datasets plotted against sentence per second. The circle size indicates model size.*|
 
