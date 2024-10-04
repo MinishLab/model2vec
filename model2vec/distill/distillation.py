@@ -129,7 +129,7 @@ def distill_from_model(
         "tokenizer_name": model_name,
         "apply_pca": pca_dims,
         "apply_zipf": apply_zipf,
-        "hidden_dim": pca_dims,
+        "hidden_dim": embeddings.shape[1],
         "seq_length": 1000000,  # Set this to a high value since we don't have a sequence length limit.
     }
     # Get the language from the model card
