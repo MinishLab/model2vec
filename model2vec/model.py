@@ -109,7 +109,24 @@ class StaticModel(nn.Module):
             model_name=model_name,
         )
 
-    def forward(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
+    def forward(self, X: tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+        """
+        Helper method to facilitate training.
+
+        :param X: a tuple of ids and offsets.
+        :return: A padded output tensor.
+        """
+        ids, offsets = X
+        tensors: list[torch.Tensor] = self._sub_encode_as_sequence(ids, offsets)
+
+        # Create big 3D tensor.
+        out = torch.zeros(len(tensors), max(len(x) for x in tensors), self.embedding.weight.shape[1])
+        for i, tensor in enumerate(tensors):
+            out[i, : len(tensor)] = tensor
+
+        return out
+
+    def forward_mean(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the model.
 
@@ -195,14 +212,20 @@ class StaticModel(nn.Module):
             sentences = [sentences]
 
         ids, offsets = self.tokenize(sentences=sentences, max_length=max_length)
-        out = []
-        for x in range(len(offsets) - 1):
-            start, end = offsets[x], offsets[x + 1]
-            out.append(self.embedding(ids[start:end]).numpy())
-        out.append(self.embedding(ids[offsets[-1] :]).numpy())
+        out = [tensor.numpy() for tensor in self._sub_encode_as_sequence(ids, offsets)]
 
         if was_single:
             return out[0]
+
+        return out
+
+    def _sub_encode_as_sequence(self, ids: torch.Tensor, offsets: torch.Tensor) -> list[torch.Tensor]:
+        """Helper function to reduce deduplication."""
+        out = []
+        for x in range(len(offsets) - 1):
+            start, end = offsets[x], offsets[x + 1]
+            out.append(self.embedding(ids[start:end]))
+        out.append(self.embedding(ids[offsets[-1] :]))
 
         return out
 
@@ -250,7 +273,7 @@ class StaticModel(nn.Module):
     def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
         ids, offsets = self.tokenize(sentences, max_length)
-        return self.forward(ids, offsets).numpy()
+        return self.forward_mean(ids, offsets).numpy()
 
     @staticmethod
     def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:

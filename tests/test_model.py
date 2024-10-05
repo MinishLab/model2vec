@@ -48,6 +48,8 @@ def test_encode_as_tokens(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, m
     encoded_sequence = model.encode_as_sequence(sentences)
     encoded = model.encode(sentences)
 
+    assert len(encoded_sequence) == 2
+
     means = [np.mean(sequence, axis=0) for sequence in encoded_sequence]
     assert np.allclose(means, encoded)
 
@@ -63,6 +65,17 @@ def test_encode_as_tokens_empty(
     encoded = model.encode_as_sequence(["", ""])
     out = [np.zeros(shape=(0, 2), dtype=model.embedding.weight.numpy().dtype) for _ in range(2)]
     assert np.array_equal(encoded, out)
+
+
+def test_forward(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
+    """Test forward pass of the model."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    encoded = model.forward(model.tokenize(["word1 word2"]))
+    assert encoded.shape == (1, 2, model.embedding.weight.shape[1])
+
+    encoded = model.forward(model.tokenize(["word1", "word1 word2 word1"]))
+    assert encoded.shape == (2, 3, model.embedding.weight.shape[1])
+    assert (encoded[0, 1:] == 0).all()
 
 
 def test_encode_empty_sentence(
