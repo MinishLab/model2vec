@@ -73,6 +73,11 @@ class StaticModel(nn.Module):
             self.normalize = self.config.get("normalize", False)
 
     @property
+    def dim(self) -> int:
+        """Get the dimension of the model."""
+        return self.embedding.weight.shape[1]
+
+    @property
     def device(self) -> torch.device:
         """Get the device of the model."""
         return next(self.parameters()).device
