@@ -25,7 +25,7 @@ class StaticModel(nn.Module):
         self,
         vectors: np.ndarray,
         tokenizer: Tokenizer,
-        config: dict[str, Any],
+        config: dict[str, Any] | None = None,
         normalize: bool | None = None,
         base_model_name: str | None = None,
         language: list[str] | None = None,
@@ -63,14 +63,14 @@ class StaticModel(nn.Module):
             self.unk_token_id = None
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
-        self.config = config
+        self.config = config or {}
         self.base_model_name = base_model_name
         self.language = language
 
         if normalize is not None:
             self.normalize = normalize
         else:
-            self.normalize = config.get("normalize", False)
+            self.normalize = self.config.get("normalize", False)
 
     @property
     def device(self) -> torch.device:
