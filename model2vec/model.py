@@ -73,6 +73,11 @@ class StaticModel(nn.Module):
             self.normalize = config.get("normalize", False)
 
     @property
+    def device(self) -> torch.device:
+        """Get the device of the model."""
+        return next(self.parameters()).device
+
+    @property
     def normalize(self) -> bool:
         """
         Get the normalize value.
@@ -117,14 +122,7 @@ class StaticModel(nn.Module):
         :return: A padded output tensor.
         """
         ids, offsets = X
-        tensors: list[torch.Tensor] = self._sub_encode_as_sequence(ids, offsets)
-
-        # Create big 3D tensor.
-        out = torch.zeros(len(tensors), max(len(x) for x in tensors), self.embedding.weight.shape[1])
-        for i, tensor in enumerate(tensors):
-            out[i, : len(tensor)] = tensor
-
-        return out
+        return self.embedding_bag(ids, offsets)
 
     def forward_mean(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
         """
@@ -212,7 +210,10 @@ class StaticModel(nn.Module):
             sentences = [sentences]
 
         ids, offsets = self.tokenize(sentences=sentences, max_length=max_length)
-        out = [tensor.numpy() for tensor in self._sub_encode_as_sequence(ids, offsets)]
+        ids = ids.to(self.device)
+        offsets = offsets.to(self.device)
+
+        out = [tensor.cpu().numpy() for tensor in self._sub_encode_as_sequence(ids, offsets)]
 
         if was_single:
             return out[0]
@@ -273,7 +274,9 @@ class StaticModel(nn.Module):
     def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
         ids, offsets = self.tokenize(sentences, max_length)
-        return self.forward_mean(ids, offsets).numpy()
+        ids = ids.to(self.device)
+        offsets = offsets.to(self.device)
+        return self.forward_mean(ids, offsets).cpu().numpy()
 
     @staticmethod
     def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:

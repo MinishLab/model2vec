@@ -71,11 +71,10 @@ def test_forward(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_confi
     """Test forward pass of the model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     encoded = model.forward(model.tokenize(["word1 word2"]))
-    assert encoded.shape == (1, 2, model.embedding.weight.shape[1])
+    assert encoded.shape == (1, model.embedding.weight.shape[1])
 
     encoded = model.forward(model.tokenize(["word1", "word1 word2 word1"]))
-    assert encoded.shape == (2, 3, model.embedding.weight.shape[1])
-    assert (encoded[0, 1:] == 0).all()
+    assert encoded.shape == (2, model.embedding.weight.shape[1])
 
 
 def test_encode_empty_sentence(
