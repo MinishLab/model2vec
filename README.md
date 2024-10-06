@@ -70,6 +70,9 @@ model = StaticModel.from_pretrained(model_name)
 
 # Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+
+# Make sequences of token embeddings
+token_embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
 And that's it. You can use the model to classify texts, to cluster, or to build a RAG system.
@@ -195,6 +198,9 @@ model = StaticModel.from_pretrained(model_name, token=None)
 
 # Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+
+# Make sequences of token embeddings
+token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
 ### Evaluating a Model2Vec model
