@@ -160,3 +160,10 @@ def test_set_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> N
     assert model.config == {"normalize": False}
     model.normalize = True
     assert model.config == {"normalize": True}
+
+
+def test_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
+    """Tests the dimensionality of the model."""
+    model = StaticModel(mock_vectors, mock_tokenizer, mock_config)
+    assert model.dim == 2
+    assert model.dim == model.embedding.weight.shape[1]
