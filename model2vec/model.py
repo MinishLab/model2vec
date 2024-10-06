@@ -122,14 +122,7 @@ class StaticModel(nn.Module):
         :return: A padded output tensor.
         """
         ids, offsets = X
-        tensors: list[torch.Tensor] = self._sub_encode_as_sequence(ids, offsets)
-
-        # Create big 3D tensor.
-        out = torch.zeros(len(tensors), max(len(x) for x in tensors), self.embedding.weight.shape[1])
-        for i, tensor in enumerate(tensors):
-            out[i, : len(tensor)] = tensor
-
-        return out
+        return self.embedding_bag(ids, offsets)
 
     def forward_mean(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
         """
