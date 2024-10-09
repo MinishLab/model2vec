@@ -3,6 +3,7 @@ from typing import Literal
 
 import numpy as np
 from huggingface_hub import model_info
+from huggingface_hub.utils._errors import RepositoryNotFoundError
 from sklearn.decomposition import PCA
 from tokenizers.models import BPE, Unigram
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
@@ -133,8 +134,12 @@ def distill_from_model(
         "seq_length": 1000000,  # Set this to a high value since we don't have a sequence length limit.
     }
     # Get the language from the model card
-    info = model_info(model_name)
-    language = info.cardData.get("language")
+    try:
+        info = model_info(model_name)
+        language = info.cardData.get("language")
+    except RepositoryNotFoundError:
+        logger.info("No model info found for model. Setting `language` to None.")
+        language = None
 
     return StaticModel(
         vectors=embeddings, tokenizer=new_tokenizer, config=config, base_model_name=model_name, language=language
