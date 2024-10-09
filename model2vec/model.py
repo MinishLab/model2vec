@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from tokenizers import Encoding, Tokenizer
 from torch import nn
-from torch.nn import EmbeddingBag
+from torch.nn import Embedding, EmbeddingBag
 from tqdm import tqdm
 
 from model2vec.utils import load_pretrained, push_folder_to_hub, save_pretrained
@@ -25,7 +25,7 @@ class StaticModel(nn.Module):
         self,
         vectors: np.ndarray,
         tokenizer: Tokenizer,
-        config: dict[str, Any],
+        config: dict[str, Any] | None = None,
         normalize: bool | None = None,
         base_model_name: str | None = None,
         language: list[str] | None = None,
@@ -44,7 +44,13 @@ class StaticModel(nn.Module):
         super().__init__()
         tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
         self.tokens = tokens
-        self.embedding = EmbeddingBag.from_pretrained(torch.from_numpy(vectors))
+        tensor = torch.from_numpy(vectors)
+
+        # NOTE: We make two embedding modules, but since they share the same memory,
+        # there's no overhead.
+        # Gradients are also integrated into both.
+        self.embedding_bag = EmbeddingBag.from_pretrained(tensor, mode="mean")
+        self.embedding = Embedding.from_pretrained(tensor)
 
         if len(tokens) != vectors.shape[0]:
             raise ValueError(f"Number of tokens ({len(tokens)}) does not match number of vectors ({vectors.shape[0]})")
@@ -57,14 +63,24 @@ class StaticModel(nn.Module):
             self.unk_token_id = None
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
-        self.config = config
+        self.config = config or {}
         self.base_model_name = base_model_name
         self.language = language
 
         if normalize is not None:
             self.normalize = normalize
         else:
-            self.normalize = config.get("normalize", False)
+            self.normalize = self.config.get("normalize", False)
+
+    @property
+    def dim(self) -> int:
+        """Get the dimension of the model."""
+        return self.embedding.weight.shape[1]
+
+    @property
+    def device(self) -> torch.device:
+        """Get the device of the model."""
+        return next(self.parameters()).device
 
     @property
     def normalize(self) -> bool:
@@ -103,7 +119,17 @@ class StaticModel(nn.Module):
             model_name=model_name,
         )
 
-    def forward(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
+    def forward(self, X: tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+        """
+        Helper method to facilitate training.
+
+        :param X: a tuple of ids and offsets.
+        :return: A padded output tensor.
+        """
+        ids, offsets = X
+        return self.embedding_bag(ids, offsets)
+
+    def forward_mean(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the model.
 
@@ -111,7 +137,8 @@ class StaticModel(nn.Module):
         :param offsets: The offsets tensor.
         :return: The output tensor.
         """
-        means = self.embedding(ids, offsets)
+        means = self.embedding_bag(ids, offsets)
+
         if self.normalize:
             return torch.nn.functional.normalize(means)
         return means
@@ -165,6 +192,49 @@ class StaticModel(nn.Module):
             embeddings, tokenizer, config, base_model_name=metadata.get("base_model"), language=metadata.get("language")
         )
 
+    def encode_as_sequence(
+        self, sentences: list[str] | str, max_length: int | None = None
+    ) -> list[np.ndarray] | np.ndarray:
+        """
+        Encode a list of sentences as a list of numpy arrays of tokens.
+
+        This is useful if you want to use the tokens for further processing, or if you want to do sequence
+        modeling.
+        Note that if you just want the mean, you should use the `encode` method.
+        This is about twice as slow.
+        Sentences that do not contain any tokens will be turned into an empty array.
+
+        :param sentences: The list of sentences to encode.
+        :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
+            If this is None, no truncation is done.
+        :return: The encoded sentences with an embedding per token.
+        """
+        was_single = False
+        if isinstance(sentences, str):
+            was_single = True
+            sentences = [sentences]
+
+        ids, offsets = self.tokenize(sentences=sentences, max_length=max_length)
+        ids = ids.to(self.device)
+        offsets = offsets.to(self.device)
+
+        out = [tensor.cpu().numpy() for tensor in self._sub_encode_as_sequence(ids, offsets)]
+
+        if was_single:
+            return out[0]
+
+        return out
+
+    def _sub_encode_as_sequence(self, ids: torch.Tensor, offsets: torch.Tensor) -> list[torch.Tensor]:
+        """Helper function to reduce deduplication."""
+        out = []
+        for x in range(len(offsets) - 1):
+            start, end = offsets[x], offsets[x + 1]
+            out.append(self.embedding(ids[start:end]))
+        out.append(self.embedding(ids[offsets[-1] :]))
+
+        return out
+
     def encode(
         self,
         sentences: list[str] | str,
@@ -209,7 +279,9 @@ class StaticModel(nn.Module):
     def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
         ids, offsets = self.tokenize(sentences, max_length)
-        return self.forward(ids, offsets).numpy()
+        ids = ids.to(self.device)
+        offsets = offsets.to(self.device)
+        return self.forward_mean(ids, offsets).cpu().numpy()
 
     @staticmethod
     def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:

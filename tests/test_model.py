@@ -28,7 +28,7 @@ def test_encode_single_sentence(
 ) -> None:
     """Test encoding of a single sentence."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    encoded = model.encode("test sentence")
+    encoded = model.encode("word1 word2")
     assert encoded.shape == (2,)
 
 
@@ -37,8 +37,44 @@ def test_encode_multiple_sentences(
 ) -> None:
     """Test encoding of multiple sentences."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    encoded = model.encode(["sentence 1", "sentence 2"])
+    encoded = model.encode(["word1 word2", "word1 word3"])
     assert encoded.shape == (2, 2)
+
+
+def test_encode_as_tokens(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
+    """Test encoding of sentences as tokens."""
+    sentences = ["word1 word2", "word1 word3"]
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    encoded_sequence = model.encode_as_sequence(sentences)
+    encoded = model.encode(sentences)
+
+    assert len(encoded_sequence) == 2
+
+    means = [np.mean(sequence, axis=0) for sequence in encoded_sequence]
+    assert np.allclose(means, encoded)
+
+
+def test_encode_as_tokens_empty(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test encoding of an empty list of sentences."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    encoded = model.encode_as_sequence("")
+    assert np.array_equal(encoded, np.zeros(shape=(0, 2), dtype=model.embedding.weight.numpy().dtype))
+
+    encoded = model.encode_as_sequence(["", ""])
+    out = [np.zeros(shape=(0, 2), dtype=model.embedding.weight.numpy().dtype) for _ in range(2)]
+    assert np.array_equal(encoded, out)
+
+
+def test_forward(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
+    """Test forward pass of the model."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    encoded = model.forward(model.tokenize(["word1 word2"]))
+    assert encoded.shape == (1, model.embedding.weight.shape[1])
+
+    encoded = model.forward(model.tokenize(["word1", "word1 word2 word1"]))
+    assert encoded.shape == (2, model.embedding.weight.shape[1])
 
 
 def test_encode_empty_sentence(
@@ -124,3 +160,10 @@ def test_set_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> N
     assert model.config == {"normalize": False}
     model.normalize = True
     assert model.config == {"normalize": True}
+
+
+def test_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
+    """Tests the dimensionality of the model."""
+    model = StaticModel(mock_vectors, mock_tokenizer, mock_config)
+    assert model.dim == 2
+    assert model.dim == model.embedding.weight.shape[1]
