@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+from huggingface_hub.utils._errors import RepositoryNotFoundError
 from pytest import LogCaptureFixture
 from transformers import AutoModel, BertTokenizerFast
 
@@ -155,6 +156,18 @@ def test_distill(
         assert static_model.embedding.weight.shape == expected_shape
         assert "mock-model" in static_model.config["tokenizer_name"]
         assert static_model.tokenizer is not None
+
+
+@patch.object(import_module("model2vec.distill.distillation"), "model_info")
+def test_missing_modelinfo(
+    mock_model_info: MagicMock,
+    mock_transformer: AutoModel,
+    mock_berttokenizer: BertTokenizerFast,
+) -> None:
+    """Test that a ValueError is raised when the model info is missing."""
+    mock_model_info.side_effect = RepositoryNotFoundError("Model not found")
+    static_model = distill_from_model(model=mock_transformer, tokenizer=mock_berttokenizer, device="cpu")
+    assert static_model.language is None
 
 
 @pytest.mark.parametrize(
