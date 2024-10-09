@@ -164,7 +164,7 @@ def test_missing_modelinfo(
     mock_transformer: AutoModel,
     mock_berttokenizer: BertTokenizerFast,
 ) -> None:
-    """Test that a ValueError is raised when the model info is missing."""
+    """Test that missing model info does not crash."""
     mock_model_info.side_effect = RepositoryNotFoundError("Model not found")
     static_model = distill_from_model(model=mock_transformer, tokenizer=mock_berttokenizer, device="cpu")
     assert static_model.language is None
