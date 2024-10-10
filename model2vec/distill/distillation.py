@@ -3,7 +3,6 @@ from typing import Literal
 
 import numpy as np
 from huggingface_hub import model_info
-from huggingface_hub.utils._errors import RepositoryNotFoundError
 from sklearn.decomposition import PCA
 from tokenizers.models import BPE, Unigram
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
@@ -15,6 +14,14 @@ from model2vec.distill.inference import (
 from model2vec.distill.tokenizer import add_tokens, preprocess_vocabulary, remove_tokens
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
+
+try:
+    # For huggingface_hub>=0.25.0
+    from huggingface_hub.errors import RepositoryNotFoundError
+except ImportError:
+    # For huggingface_hub<0.25.0
+    from huggingface_hub.utils._errors import RepositoryNotFoundError
+
 
 logger = logging.getLogger(__name__)
 
