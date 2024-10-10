@@ -4,12 +4,18 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from huggingface_hub.utils._errors import RepositoryNotFoundError
 from pytest import LogCaptureFixture
 from transformers import AutoModel, BertTokenizerFast
 
 from model2vec.distill.distillation import _clean_vocabulary, _post_process_embeddings, distill, distill_from_model
 from model2vec.model import StaticModel
+
+try:
+    # For huggingface_hub>=0.25.0
+    from huggingface_hub.errors import RepositoryNotFoundError
+except ImportError:
+    # For huggingface_hub<0.25.0
+    from huggingface_hub.utils._errors import RepositoryNotFoundError
 
 rng = np.random.default_rng()
 
