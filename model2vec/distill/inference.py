@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import inspect
 import logging
 from pathlib import Path
 from typing import Protocol
@@ -127,20 +128,27 @@ def create_output_embeddings_from_model_name(
     for batch_idx in tqdm(range(0, len(stacked), _DEFAULT_BATCH_SIZE)):
         batch = stacked[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE].to(model.device)
         with torch.no_grad():
-            # NOTE: we create these masks because nomic embed requires them.
-            # Normally, we could set them to None
-            token_type_ids = torch.zeros_like(batch)
             attention_mask = torch.ones_like(batch)
-            encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(
-                input_ids=batch.to(device), attention_mask=attention_mask, token_type_ids=token_type_ids
-            )
-            out: torch.Tensor = encoded.last_hidden_state
+            # Prepare model inputs
+            model_inputs = {"input_ids": batch.to(device), "attention_mask": attention_mask}
+
+            # Add token_type_ids only if the model supports it
+            if "token_type_ids" in inspect.getfullargspec(model.forward).args:
+                model_inputs["token_type_ids"] = torch.zeros_like(batch)
+
+            # Perform the forward pass
+            encoded_output: BaseModelOutputWithPoolingAndCrossAttentions = model(**model_inputs)
+            out: torch.Tensor = encoded_output.last_hidden_state
             # NOTE: If the dtype is bfloat 16, we convert to float32,
             # because numpy does not suport bfloat16
             # See here: https://github.com/numpy/numpy/issues/19808
             if out.dtype == torch.bfloat16:
                 out = out.float()
-        intermediate_weights.append(out[:, 1].cpu().numpy())
+
+        # Add the output to the intermediate weights
+        intermediate_weights.append(out[:, 1].detach().cpu().numpy())
+
+    # Concatenate the intermediate weights
     out_weights = np.concatenate(intermediate_weights)
 
     return tokenizer.convert_ids_to_tokens(ids), out_weights
