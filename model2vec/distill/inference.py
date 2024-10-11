@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import inspect
 import logging
 from pathlib import Path
 from typing import Protocol
@@ -132,7 +133,7 @@ def create_output_embeddings_from_model_name(
             model_inputs = {"input_ids": batch.to(device), "attention_mask": attention_mask}
 
             # Add token_type_ids only if the model supports it
-            if "token_type_ids" in model.forward.__code__.co_varnames:
+            if "token_type_ids" in inspect.getfullargspec(model.forward).args:
                 model_inputs["token_type_ids"] = torch.zeros_like(batch)
 
             # Perform the forward pass
