@@ -144,9 +144,10 @@ def create_output_embeddings_from_model_name(
             if out.dtype == torch.bfloat16:
                 out = out.float()
 
-            # Detach the tensor from the computation graph before converting to NumPy
+        # Add the output to the intermediate weights
         intermediate_weights.append(out[:, 1].detach().cpu().numpy())
 
+    # Concatenate the intermediate weights
     out_weights = np.concatenate(intermediate_weights)
 
     return tokenizer.convert_ids_to_tokens(ids), out_weights
