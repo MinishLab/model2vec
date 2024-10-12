@@ -56,12 +56,10 @@ dev = [
     "ruff",
 ]
 
-
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"
 "Bug Reports" = "https://github.com/MinishLab/model2vec/issues"
 "Source" = "https://github.com/MinishLab/model2vec"
-
 
 [tool.ruff]
 exclude = [".venv/"]
