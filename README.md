@@ -91,25 +91,29 @@ m2v_model = distill(model_name=model_name, pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 ```
 
-If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
+Distillation is really fast, and only takes about 5 seconds on a 2024 macbook using the MPS backend, 30 seconds on CPU. Best of all, distillation requires no training data.
 
+You can also directly use Model2Vec in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) using the [StaticEmbedding](https://github.com/UKPLab/sentence-transformers/blob/master/sentence_transformers/models/StaticEmbedding.py) module. You can either load a Model2Vec model into a Sentence Transformer with the following code snippet:
 ```python
-from transformers import AutoModel, AutoTokenizer
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
 
-from model2vec.distill import distill_from_model
-
-# Assuming a loaded model and tokenizer
-model_name = "baai/bge-base-en-v1.5"
-model = AutoModel.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-m2v_model = distill_from_model(model=model, tokenizer=tokenizer, pca_dims=256)
-
-m2v_model.save_pretrained("m2v_model")
-
+# Initialize a StaticEmbedding module
+static_embedding = StaticEmbedding.from_model2vec("minishlab/M2V_base_output")
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
-Distillation is really fast, and only takes about 5 seconds on a 2024 macbook using the MPS backend, 30 seconds on CPU. Best of all, distillation requires no training data.
+Or you can distill a model directly into a Sentence Transformer model:
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+static_embedding = StaticEmbedding.from_distillation("BAAI/bge-base-en-v1.5", device="cpu", pca_dims=256)
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+For more documentation, please refer to the [Sentence Transformers documentation](https://sbert.net/docs/package_reference/sentence_transformer/models.html#sentence_transformers.models.StaticEmbedding).
 
 ## What is Model2Vec?
 
@@ -132,6 +136,7 @@ Model2Vec is:
 - **Fast inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **No data needed**: Distillation happens directly on the token level, so no dataset is needed.
 - **Simple to use**: An easy to use interface for distilling and inferencing.
+- **Integrated into Sentence Transformers**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers).
 - **Bring your own model**: Can be applied to any Sentence Transformer model.
 - **Bring your own vocabulary**: Can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary. Need biomedical? Just get a medical dictionary, a biomedical model, and inference it.
 - **Multi-lingual**: Use any language. Need a French model? [Pick one](https://huggingface.co/models?library=sentence-transformers&language=fr&sort=trending). Need multilingual? [Here you go](https://huggingface.co/sentence-transformers/LaBSE).
@@ -153,6 +158,25 @@ model_name = "BAAI/bge-base-en-v1.5"
 m2v_model = distill(model_name=model_name, pca_dims=256)
 
 # Save the model
+m2v_model.save_pretrained("m2v_model")
+
+```
+
+
+If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
+
+```python
+from transformers import AutoModel, AutoTokenizer
+
+from model2vec.distill import distill_from_model
+
+# Assuming a loaded model and tokenizer
+model_name = "baai/bge-base-en-v1.5"
+model = AutoModel.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+m2v_model = distill_from_model(model=model, tokenizer=tokenizer, pca_dims=256)
+
 m2v_model.save_pretrained("m2v_model")
 
 ```
@@ -204,13 +228,21 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 ```
 
 ### Evaluating a Model2Vec model
+Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation).
+<details>
+<summary>  Installation </summary>
+Install the evaluation package with:
 
-Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). To run this, first install the optional evaluation package:
 ```bash
-pip install evaluation@git+https://github.com/MinishLab/evaluation@main
+pip install evaluation@git+https://github.com MinishLab/evaluation@main
 ```
+</details>
 
-Then, the following code snippet shows how to evaluate a Model2Vec model:
+<details>
+  <summary>  Evaluation Code </summary>
+
+
+The following code snippet shows how to evaluate a Model2Vec model:
 ```python
 from model2vec import StaticModel
 
@@ -241,6 +273,7 @@ task_scores = summarize_results(parsed_results)
 # Print the results in a leaderboard format
 print(make_leaderboard(task_scores))
 ```
+</details>
 
 ## Model List
 
