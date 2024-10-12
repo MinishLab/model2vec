@@ -117,10 +117,10 @@ def create_output_embeddings_from_model_name(
 
     # Work-around to get the eos and bos token ids without having to go into tokenizer internals.
     dummy_encoding = tokenizer.encode("A")
-    eos_token_id, bos_token_id = dummy_encoding[0], dummy_encoding[-1]
+    bos_token_id, eos_token_id = dummy_encoding[0], dummy_encoding[-1]
 
-    eos = torch.full([len(ids)], fill_value=eos_token_id)
     bos = torch.full([len(ids)], fill_value=bos_token_id)
+    eos = torch.full([len(ids)], fill_value=eos_token_id)
 
     stacked = torch.stack([bos, ids, eos], dim=1)
 
