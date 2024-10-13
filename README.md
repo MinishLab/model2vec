@@ -150,8 +150,7 @@ Model2Vec is:
 
 <details>
 <summary>  Distilling from a Sentence Transformer </summary>
-
-#### Distilling from a Sentence Transformer
+<br>
 
 The following code can be used to distill a model from a Sentence Transformer. As mentioned above, this leads to really small model that might be less performant.
 ```python
@@ -171,8 +170,7 @@ m2v_model.save_pretrained("m2v_model")
 
 <details>
 <summary>  Distilling from a loaded model </summary>
-
-#### Distilling from a loaded model
+<br>
 
 If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
 
@@ -195,7 +193,7 @@ m2v_model.save_pretrained("m2v_model")
 </details>
 
 <details>
-<summary>  Distilling with the Sentence Transformerslibrary </summary>
+<summary>  Distilling with the Sentence Transformers library </summary>
 <br>
 
 The following code snippet shows how to distill a model using the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
@@ -214,6 +212,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 <details>
 <summary>  Distilling with a custom vocabulary </summary>
+<br>
 
 If you pass a vocabulary, you get a set of static word embeddings, together with a custom tokenizer for exactly that vocabulary. This is comparable to how you would use GLoVe or traditional word2vec, but doesn't actually require a corpus or data.
 ```python
@@ -243,6 +242,7 @@ m2v_model.push_to_hub("my_organization/my_model", token="<it's a secret to every
 
 <details>
 <summary>  Distilling via CLI </summary>
+<br>
 
 We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
 ```bash
@@ -255,6 +255,7 @@ python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-pat
 
 <details>
 <summary>  Inference a pretrained model </summary>
+<br>
 
 Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
 ```python
@@ -276,6 +277,7 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 
 <details>
 <summary>  Inference with the Sentence Transformers library </summary>
+<br>
 
 The following code snippet shows how to use a Model2Vec model in the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
@@ -294,10 +296,12 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 ### Evaluating a Model2Vec model
 
-Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation).
+
 <details>
 <summary>  Installation </summary>
-Install the evaluation package with:
+<br>
+
+Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). Install the evaluation package with:
 
 ```bash
 pip install evaluation@git+https://github.com MinishLab/evaluation@main
@@ -306,7 +310,7 @@ pip install evaluation@git+https://github.com MinishLab/evaluation@main
 
 <details>
   <summary>  Evaluation Code </summary>
-
+<br>
 
 The following code snippet shows how to evaluate a Model2Vec model:
 ```python
