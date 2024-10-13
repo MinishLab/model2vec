@@ -350,7 +350,7 @@ print(make_leaderboard(task_scores))
 
 ## Model List
 
-We provide a number of models that can be used out of the box. These models are available on the HuggingFace hub and can be loaded using the `from_pretrained` method. The models are listed below.
+We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e) and can be loaded using the `from_pretrained` method. The models are listed below.
 
 | Model                  | Language    | Vocab            | Sentence Transformer | Tokenizer Type | Params       |
 |------------------------|-------------|------------------|----------------------|----------------|--------------|
