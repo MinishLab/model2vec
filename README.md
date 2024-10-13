@@ -38,7 +38,7 @@
   <img width="75%", src="assets/images/model2vec_model_diagram_v2.png" alt="Model2Vec">
 </p> -->
 
-<div style="text-align: center;">
+<div align="center">
     <img src="assets/images/model2vec_model_diagram_transparant_dark.png#gh-dark-mode-only" width="75%">
     <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="75%">
 </div>
