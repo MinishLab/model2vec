@@ -151,7 +151,7 @@ Model2Vec is:
 <details>
 <summary>  Distilling from a Sentence Transformer </summary>
 
-Distilling a model from the output embeddings of a Sentence Transformer model. As mentioned above, this leads to really small model that might be less performant.
+The following code can be used to distill a model from a Sentence Transformer. As mentioned above, this leads to really small model that might be less performant.
 ```python
 from model2vec.distill import distill
 
@@ -189,6 +189,23 @@ m2v_model.save_pretrained("m2v_model")
 ```
 
 </details>
+
+<details>
+<summary>  Distilling with the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library </summary>
+
+The following code snippet shows how to distill a model using the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
+
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+static_embedding = StaticEmbedding.from_distillation("BAAI/bge-base-en-v1.5", device="cpu", pca_dims=256)
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+</details>
+
 
 <details>
 <summary>  Distilling with a custom vocabulary </summary>
@@ -229,7 +246,7 @@ python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-pat
 
 </details>
 
-### Inference with a Model2Vec model
+### Inference with Model2Vec
 
 <details>
 <summary>  Inference a pretrained model </summary>
@@ -250,6 +267,25 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 </details>
+
+
+<details>
+<summary>  Inference with the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library </summary>
+
+The following code snippet shows how to use a Model2Vec model in the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
+
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+# Initialize a StaticEmbedding module
+static_embedding = StaticEmbedding.from_model2vec("minishlab/M2V_base_output")
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+</details>
+
 
 ### Evaluating a Model2Vec model
 
