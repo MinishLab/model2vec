@@ -1,7 +1,7 @@
 
 <div align="center">
     <picture>
-      <img width="30%" alt="Model2Vec logo" src="assets/images/logo_v2.png">
+      <img width="35%" alt="Model2Vec logo" src="assets/images/logo_v2.png">
     </picture>
   </a>
 </div>
