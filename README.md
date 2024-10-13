@@ -196,6 +196,7 @@ m2v_model.save_pretrained("m2v_model")
 
 <details>
 <summary>  Distilling with the Sentence Transformerslibrary </summary>
+<br>
 
 The following code snippet shows how to distill a model using the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
