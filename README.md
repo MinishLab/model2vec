@@ -1,7 +1,7 @@
 
 <div align="center">
     <picture>
-      <img width="50%" alt="Model2Vec logo" src="assets/images/logo.png">
+      <img width="35%" alt="Model2Vec logo" src="assets/images/logo_v2.png">
     </picture>
   </a>
 </div>
@@ -33,10 +33,10 @@
   </h2>
 </div>
 
-
-<p align="center">
-  <img width="75%", src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
-</p>
+<div align="center">
+    <img src="assets/images/model2vec_model_diagram_transparant_dark.png#gh-dark-mode-only" width="90%">
+    <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="90%">
+</div>
 
 Model2Vec is a technique to turn any sentence transformer into a really small fast model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](#classification-and-speed-benchmarks), or dive in to see how it works.
 
@@ -145,9 +145,14 @@ Model2Vec is:
 
 ## Usage
 
+
 ### Distilling a Model2Vec model
 
-Distilling a model from the output embeddings of a Sentence Transformer model. As mentioned above, this leads to really small model that might be less performant.
+<details>
+<summary>  Distilling from a Sentence Transformer </summary>
+<br>
+
+The following code can be used to distill a model from a Sentence Transformer. As mentioned above, this leads to really small model that might be less performant.
 ```python
 from model2vec.distill import distill
 
@@ -161,7 +166,11 @@ m2v_model = distill(model_name=model_name, pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 
 ```
+</details>
 
+<details>
+<summary>  Distilling from a loaded model </summary>
+<br>
 
 If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
 
@@ -181,6 +190,30 @@ m2v_model.save_pretrained("m2v_model")
 
 ```
 
+</details>
+
+<details>
+<summary>  Distilling with the Sentence Transformers library </summary>
+<br>
+
+The following code snippet shows how to distill a model using the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
+
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+static_embedding = StaticEmbedding.from_distillation("BAAI/bge-base-en-v1.5", device="cpu", pca_dims=256)
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+</details>
+
+
+<details>
+<summary>  Distilling with a custom vocabulary </summary>
+<br>
+
 If you pass a vocabulary, you get a set of static word embeddings, together with a custom tokenizer for exactly that vocabulary. This is comparable to how you would use GLoVe or traditional word2vec, but doesn't actually require a corpus or data.
 ```python
 from model2vec.distill import distill
@@ -191,10 +224,7 @@ vocabulary = ["word1", "word2", "word3"]
 model_name = "BAAI/bge-base-en-v1.5"
 
 # Distill the model with the custom vocabulary
-m2v_model = distill(model_name=model_name,
-                    vocabulary=vocabulary,
-                    pca_dims=None,
-                    apply_zipf=True)
+m2v_model = distill(model_name=model_name, vocabulary=vocabulary)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
@@ -203,14 +233,33 @@ m2v_model.save_pretrained("m2v_model")
 m2v_model.push_to_hub("my_organization/my_model", token="<it's a secret to everybody>")
 ```
 
+By default, this will distill a model with a subword tokenizer, combining the models (subword) vocab with the new vocabulary. If you want to get a word-level tokenizer instead (with only the passed vocabulary), the `use_subword` parameter can be set to `False`, e.g.:
+
+```python
+m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=False)
+```
+
 **Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
+
+</details>
+
+<details>
+<summary>  Distilling via CLI </summary>
+<br>
 
 We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
 ```bash
 python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-path vocab.txt --device mps --save-path model2vec_model
 ```
 
-### Inference with a Model2Vec model
+</details>
+
+### Inference with Model2Vec
+
+<details>
+<summary>  Inference a pretrained model </summary>
+<br>
+
 Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
 ```python
 from model2vec import StaticModel
@@ -226,12 +275,36 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 # Make sequences of token embeddings
 token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
+</details>
+
+
+<details>
+<summary>  Inference with the Sentence Transformers library </summary>
+<br>
+
+The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
+
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+# Initialize a StaticEmbedding module
+static_embedding = StaticEmbedding.from_model2vec("minishlab/M2V_base_output")
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+</details>
+
 
 ### Evaluating a Model2Vec model
-Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation).
+
+
 <details>
 <summary>  Installation </summary>
-Install the evaluation package with:
+<br>
+
+Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). Install the evaluation package with:
 
 ```bash
 pip install evaluation@git+https://github.com MinishLab/evaluation@main
@@ -240,7 +313,7 @@ pip install evaluation@git+https://github.com MinishLab/evaluation@main
 
 <details>
   <summary>  Evaluation Code </summary>
-
+<br>
 
 The following code snippet shows how to evaluate a Model2Vec model:
 ```python
@@ -277,13 +350,16 @@ print(make_leaderboard(task_scores))
 
 ## Model List
 
+We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e) and can be loaded using the `from_pretrained` method. The models are listed below.
 
-| Model                  | Language    | Description                                                           | Vocab | Sentence Transformer | Params       |
-|------------------------|-------------|-----------------------------------------------------------------------|----------------|-----------------------|--------------|
-| [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)           | English     | Flagship embedding model based on GloVe vocab.           | GloVe        | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                   | 102M         |
-| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)          | English     | Flagship embedding model based on bge-base-en-v1.5 vocab. Uses a subword tokenizer.                    | Output          | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                         | 7.5M         |
-| [M2V_base_glove_subword](https://huggingface.co/minishlab/M2V_base_glove_subword)          | English     | Flagship embedding model based on bge-base-en-v1.5 + glove vocab. Uses a subword tokenizer.                    | Output  + GloVe       | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)                         | 103M         |
-| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output)          | Multilingual     | Flagship multilingual embedding model based on LaBSE vocab. Uses a subword tokenizer.                    | Output          | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)                         | 471M         |
+| Model                  | Language    | Vocab            | Sentence Transformer | Tokenizer Type | Params       |
+|------------------------|-------------|------------------|----------------------|----------------|--------------|
+| [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)           | English     | GloVe            | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Word-level     | 102M         |
+| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)          | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Subword        | 7.5M         |
+| [M2V_base_glove_subword](https://huggingface.co/minishlab/M2V_base_glove_subword)          | English     | Output + GloVe   | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Subword        | 103M         |
+| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output)          | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)        | Subword        | 471M         |
+
+
 ## Results
 
 ### Main Results
