@@ -34,8 +34,8 @@
 </div>
 
 <div align="center">
-    <img src="assets/images/model2vec_model_diagram_transparant_dark.png#gh-dark-mode-only" width="75%">
-    <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="75%">
+    <img src="assets/images/model2vec_model_diagram_transparant_dark.png#gh-dark-mode-only" width="90%">
+    <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="90%">
 </div>
 
 Model2Vec is a technique to turn any sentence transformer into a really small fast model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](#classification-and-speed-benchmarks), or dive in to see how it works.
