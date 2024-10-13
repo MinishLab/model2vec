@@ -145,7 +145,11 @@ Model2Vec is:
 
 ## Usage
 
+
 ### Distilling a Model2Vec model
+
+<details>
+<summary>  Distilling from a Sentence Transformer </summary>
 
 Distilling a model from the output embeddings of a Sentence Transformer model. As mentioned above, this leads to really small model that might be less performant.
 ```python
@@ -161,7 +165,10 @@ m2v_model = distill(model_name=model_name, pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 
 ```
+</details>
 
+<details>
+<summary>  Distilling from a loaded model </summary>
 
 If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
 
@@ -180,6 +187,11 @@ m2v_model = distill_from_model(model=model, tokenizer=tokenizer, pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 
 ```
+
+</details>
+
+<details>
+<summary>  Distilling with a custom vocabulary </summary>
 
 If you pass a vocabulary, you get a set of static word embeddings, together with a custom tokenizer for exactly that vocabulary. This is comparable to how you would use GLoVe or traditional word2vec, but doesn't actually require a corpus or data.
 ```python
@@ -205,12 +217,23 @@ m2v_model.push_to_hub("my_organization/my_model", token="<it's a secret to every
 
 **Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
 
+</details>
+
+<details>
+<summary>  Distilling via CLI </summary>
+
 We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
 ```bash
 python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-path vocab.txt --device mps --save-path model2vec_model
 ```
 
+</details>
+
 ### Inference with a Model2Vec model
+
+<details>
+<summary>  Inference a pretrained model </summary>
+
 Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
 ```python
 from model2vec import StaticModel
@@ -226,8 +249,10 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 # Make sequences of token embeddings
 token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
+</details>
 
 ### Evaluating a Model2Vec model
+
 Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation).
 <details>
 <summary>  Installation </summary>
