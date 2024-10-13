@@ -35,7 +35,7 @@
 
 
 <p align="center">
-  <img width="75%", src="assets/images/model2vec_model_diagram.png" alt="Model2Vec">
+  <img width="75%", src="assets/images/model2vec_model_diagram_v2.png" alt="Model2Vec">
 </p>
 
 Model2Vec is a technique to turn any sentence transformer into a really small fast model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](#classification-and-speed-benchmarks), or dive in to see how it works.
