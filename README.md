@@ -196,7 +196,7 @@ m2v_model.save_pretrained("m2v_model")
 <summary>  Distilling with the Sentence Transformers library </summary>
 <br>
 
-The following code snippet shows how to distill a model using the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
+The following code snippet shows how to distill a model using the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
 ```python
 from sentence_transformers import SentenceTransformer
@@ -224,16 +224,19 @@ vocabulary = ["word1", "word2", "word3"]
 model_name = "BAAI/bge-base-en-v1.5"
 
 # Distill the model with the custom vocabulary
-m2v_model = distill(model_name=model_name,
-                    vocabulary=vocabulary,
-                    pca_dims=None,
-                    apply_zipf=True)
+m2v_model = distill(model_name=model_name, vocabulary=vocabulary)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
 
 # Or push it to the hub
 m2v_model.push_to_hub("my_organization/my_model", token="<it's a secret to everybody>")
+```
+
+By default, this will distill a model with a subword tokenizer, combining the models (subword) vocab with the new vocabulary. If you want to get a word-level tokenizer instead (with only the passed vocabulary), the `use_subword` parameter can be set to `False`, e.g.:
+
+```python
+m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=False)
 ```
 
 **Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
@@ -279,7 +282,7 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 <summary>  Inference with the Sentence Transformers library </summary>
 <br>
 
-The following code snippet shows how to use a Model2Vec model in the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
+The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
 ```python
 from sentence_transformers import SentenceTransformer
