@@ -151,6 +151,8 @@ Model2Vec is:
 <details>
 <summary>  Distilling from a Sentence Transformer </summary>
 
+#### Distilling from a Sentence Transformer
+
 The following code can be used to distill a model from a Sentence Transformer. As mentioned above, this leads to really small model that might be less performant.
 ```python
 from model2vec.distill import distill
@@ -169,6 +171,8 @@ m2v_model.save_pretrained("m2v_model")
 
 <details>
 <summary>  Distilling from a loaded model </summary>
+
+#### Distilling from a loaded model
 
 If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
 
@@ -191,7 +195,7 @@ m2v_model.save_pretrained("m2v_model")
 </details>
 
 <details>
-<summary>  Distilling with the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library </summary>
+<summary>  Distilling with the Sentence Transformerslibrary </summary>
 
 The following code snippet shows how to distill a model using the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
@@ -270,7 +274,7 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 
 
 <details>
-<summary>  Inference with the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library </summary>
+<summary>  Inference with the Sentence Transformers library </summary>
 
 The following code snippet shows how to use a Model2Vec model in the Sentence Transformers library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
