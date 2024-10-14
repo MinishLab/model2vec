@@ -151,7 +151,7 @@ For a technical deepdive into Model2Vec, please refer to our [blog post](https:/
 ## Usage
 
 
-### Distilling a Model2Vec model
+### Distillation
 
 <details>
 <summary>  Distilling from a Sentence Transformer </summary>
@@ -259,7 +259,7 @@ python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-pat
 
 </details>
 
-### Inference with Model2Vec
+### Inference
 
 <details>
 <summary>  Inference a pretrained model </summary>
@@ -302,7 +302,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 </details>
 
 
-### Evaluating a Model2Vec model
+### Evaluation
 
 
 <details>
