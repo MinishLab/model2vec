@@ -120,8 +120,8 @@ For more documentation, please refer to the [Sentence Transformers documentation
 
 Model2Vec is:
 
-- **Small**: reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk!).
-- **Static, but better**: smaller than GLoVe, but much more performant, even with the same vocabulary.
+- **Small**: reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk, making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
+- **Static, but better**: smaller than GLoVe and BPEmb, but [much more performant](results/README.md), even with the same vocabulary.
 - **Fast distillation**: make your own model in 30 seconds.
 - **Fast inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **No data needed**: Distillation happens directly on the token level, so no dataset is needed.
