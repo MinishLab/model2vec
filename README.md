@@ -262,7 +262,7 @@ python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-pat
 ### Inference
 
 <details>
-<summary>  Inference a pretrained model </summary>
+<summary>  Inference using pretrained model </summary>
 <br>
 
 Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
@@ -284,7 +284,7 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 
 
 <details>
-<summary>  Inference with the Sentence Transformers library </summary>
+<summary>  Inference using the Sentence Transformers library </summary>
 <br>
 
 The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
