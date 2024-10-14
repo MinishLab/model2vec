@@ -14,7 +14,8 @@
   <h2>
     <a href="https://huggingface.co/minishlab"><strong>🤗 Models</strong></a> |
     <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>📚 Tutorials</strong></a> |
-    <a href="https://github.com/MinishLab"><strong>📖 Website </strong></a>
+    <a href="https://github.com/MinishLab"><strong>💻 Website </strong></a> |
+    <a href="https://huggingface.co/blog/Pringled/model2vec"><strong>📖 Blog</strong></a>
   </h2>
 </div>
 
@@ -125,6 +126,8 @@ Model2vec has 3 modes:
 - **Output**: behaves much like a real sentence transformer, i.e., it uses a subword tokenizer and simply encodes all wordpieces in its vocab. This is really quick to create (30 seconds on a CPU), very small (30 MB in float32), but might be less performant on some tasks.
 - **Vocab (word level)**: creates a word-level tokenizer and only encodes words that are in the vocabulary. This is a bit slower to create and creates a larger model, but might be more performant on some tasks. Note that this model can go out-of-vocabulary, which might be beneficial if your domain is very noisy
 - **Vocab (subword)**: a combination of the two methods above. In this mode, you can pass your own vocabulary, but it also uses the subword vocabulary to create representations for words not in the passed vocabulary.
+
+For a technical deepdive into Model2Vec, please refer to our [blog post](https://huggingface.co/blog/Pringled/model2vec).
 
 ## Main Features
 
