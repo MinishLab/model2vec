@@ -111,7 +111,7 @@ class StaticModel(nn.Module):
         """
         save_pretrained(
             folder_path=Path(path),
-            embeddings=self.embedding.weight.numpy(),
+            embeddings=self.embedding.weight.cpu().numpy(),
             tokenizer=self.tokenizer,
             config=self.config,
             base_model_name=self.base_model_name,
