@@ -144,7 +144,7 @@ class StaticModel:
 
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
-        :return: A StaticEmbedder
+        :return: A StaticModel
         """
         embeddings, tokenizer, config, metadata = load_pretrained(path, token=token)
 
