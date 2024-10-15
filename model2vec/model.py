@@ -153,7 +153,11 @@ class StaticModel:
         )
 
     def encode_as_sequence(
-        self, sentences: list[str] | str, max_length: int | None = None
+        self,
+        sentences: list[str] | str,
+        max_length: int | None = None,
+        batch_size: int = 1024,
+        show_progressbar: bool = False,
     ) -> list[np.ndarray] | np.ndarray:
         """
         Encode a list of sentences as a list of numpy arrays of tokens.
@@ -167,27 +171,35 @@ class StaticModel:
         :param sentences: The list of sentences to encode.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
+        :param batch_size: The batch size to use.
+        :param show_progressbar: Whether to show the progress bar.
         :return: The encoded sentences with an embedding per token.
         """
         was_single = False
         if isinstance(sentences, str):
-            was_single = True
             sentences = [sentences]
+            was_single = True
 
-        ids = self.tokenize(sentences=sentences, max_length=max_length)
-
-        out = self._sub_encode_as_sequence(ids)
+        out_array: list[np.ndarray] = []
+        for batch in tqdm(
+            self._batch(sentences, batch_size), total=(len(sentences) // batch_size) + 1, disable=not show_progressbar
+        ):
+            out_array.extend(self._encode_batch_as_sequence(batch, max_length))
 
         if was_single:
-            return out[0]
+            return out_array[0]
 
-        return out
+        return out_array
 
-    def _sub_encode_as_sequence(self, ids: list[int]) -> list[np.ndarray]:
-        """Helper function to reduce deduplication."""
-        out = []
+    def _encode_batch_as_sequence(self, sentences: list[str], max_length: int | None) -> list[np.ndarray]:
+        """Encode a batch of sentences as a sequence."""
+        ids = self.tokenize(sentences=sentences, max_length=max_length)
+        out: list[np.ndarray] = []
         for id_list in ids:
-            out.append(self.embedding[id_list])
+            if id_list:
+                out.append(self.embedding[id_list])
+            else:
+                out.append(np.zeros((0, self.dim)))
 
         return out
 
@@ -233,7 +245,19 @@ class StaticModel:
 
     def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
-        return np.stack([x.mean(0) for x in self.encode_as_sequence(sentences=sentences, max_length=max_length)])
+        ids = self.tokenize(sentences=sentences, max_length=max_length)
+        out: list[np.ndarray] = []
+        for id_list in ids:
+            if id_list:
+                out.append(self.embedding[id_list].mean(0))
+            else:
+                out.append(np.zeros(self.dim))
+
+        out_array = np.stack(out)
+        if self.normalize:
+            out_array = out_array / np.linalg.norm(out_array, axis=1, keepdims=True)
+
+        return out_array
 
     @staticmethod
     def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:

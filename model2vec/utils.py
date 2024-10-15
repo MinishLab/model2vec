@@ -4,7 +4,6 @@ import logging
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-import click
 import huggingface_hub
 import huggingface_hub.errors
 import numpy as np
@@ -31,7 +30,7 @@ def setup_logging() -> None:
         level="INFO",
         format="%(name)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[RichHandler(rich_tracebacks=True, tracebacks_suppress=[click])],
+        handlers=[RichHandler(rich_tracebacks=True)],
     )
 
 
