@@ -1,7 +1,9 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pytest
+import safetensors
 from tokenizers import Tokenizer
 
 from model2vec import StaticModel
@@ -157,3 +159,23 @@ def test_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: d
     model = StaticModel(mock_vectors, mock_tokenizer, mock_config)
     assert model.dim == 2
     assert model.dim == model.embedding.shape[1]
+
+
+def test_local_load_from_model(mock_tokenizer: Tokenizer) -> None:
+    """Test local load from a model."""
+    x = np.ones((mock_tokenizer.get_vocab_size(), 2))
+    with TemporaryDirectory() as tempdir:
+        tempdir_path = Path(tempdir)
+        safetensors.numpy.save_file({"embeddings": x}, Path(tempdir) / "model.safetensors")
+        mock_tokenizer.save(str(Path(tempdir) / "tokenizer.json"))
+
+        model = StaticModel.load_local(tempdir_path)
+        assert model.embedding.shape == x.shape
+        assert model.tokenizer.to_str() == mock_tokenizer.to_str()
+        assert model.config == {"normalize": False}
+
+
+def test_local_load_from_model_no_folder() -> None:
+    """Test local load from a model with no folder."""
+    with pytest.raises(ValueError):
+        StaticModel.load_local("woahbuddy_relax_this_is_just_a_test")

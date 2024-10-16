@@ -9,7 +9,7 @@ import numpy as np
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.hf_utils import load_pretrained, push_folder_to_hub, save_pretrained
+from model2vec.utils import load_local_model
 
 PathLike = Path | str
 
@@ -52,7 +52,7 @@ class StaticModel:
         if hasattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
             self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.model.unk_token]
         else:
-            self.unk_token_id = None
+            self.unk_token_id = None  # pragma: no cover  # Doesn't actually happen, but can happen.
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
         self.config = config or {}
@@ -96,6 +96,8 @@ class StaticModel:
         :param path: The path to save to.
         :param model_name: The model name to use in the Model Card.
         """
+        from model2vec.hf_utils import save_pretrained
+
         save_pretrained(
             folder_path=Path(path),
             embeddings=self.embedding,
@@ -146,6 +148,8 @@ class StaticModel:
         :param token: The huggingface token to use.
         :return: A StaticModel
         """
+        from model2vec.hf_utils import load_pretrained
+
         embeddings, tokenizer, config, metadata = load_pretrained(path, token=token)
 
         return cls(
@@ -275,6 +279,33 @@ class StaticModel:
             If the repo already exists, this doesn't change the visibility.
         :param token: The huggingface token to use.
         """
+        from model2vec.hf_utils import push_folder_to_hub
+
         with TemporaryDirectory() as temp_dir:
             self.save_pretrained(temp_dir, model_name=repo_id)
             push_folder_to_hub(Path(temp_dir), repo_id, private, token)
+
+    @classmethod
+    def load_local(cls: type[StaticModel], path: PathLike) -> StaticModel:
+        """
+        Loads a model from a local path.
+
+        You should only use this code path if you are concerned with start-up time.
+        Loading via the `from_pretrained` method is safer, and auto-downloads, but
+        also means we import a whole bunch of huggingface code that we don't need.
+
+        Additionally, huggingface will check the most recent version of the model,
+        which can be slow.
+
+        :param path: The path to load the model from. The path is a directory saved by the
+            `save_pretrained` method.
+        :return: A StaticModel
+        :raises: ValueError if the path is not a directory.
+        """
+        path = Path(path)
+        if not path.is_dir():
+            raise ValueError(f"Path {path} is not a directory.")
+
+        embeddings, tokenizer, config = load_local_model(path)
+
+        return StaticModel(embeddings, tokenizer, config)
