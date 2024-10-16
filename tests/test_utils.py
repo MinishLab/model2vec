@@ -5,7 +5,8 @@ from unittest.mock import patch
 import pytest
 
 from model2vec.distill.utils import select_optimal_device
-from model2vec.utils import _get_metadata_from_readme, get_package_extras, importable
+from model2vec.hf_utils import _get_metadata_from_readme
+from model2vec.utils import get_package_extras, importable
 
 
 def test__get_metadata_from_readme_not_exists() -> None:
