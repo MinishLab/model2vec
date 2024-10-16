@@ -71,8 +71,12 @@ def load_local_model(folder: Path) -> tuple[np.ndarray, Tokenizer, dict[str, str
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     embeddings = opened_tensor_file.get_tensor("embeddings")
 
+    if config_path.exists():
+        config = json.load(open(config_path))
+    else:
+        config = {}
+
     tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
-    config = json.load(open(config_path))
 
     if len(tokenizer.get_vocab()) != len(embeddings):
         logger.warning(
