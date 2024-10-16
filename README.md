@@ -61,7 +61,7 @@ Install the package and all required extras with:
 pip install model2vec[distill]
 ```
 
-If you want a light-weight version of the package which only requires `numpy`, omit the `distill` extra.
+If you want a light-weight version of the package which only requires `numpy`, omit the `distill` extra. This means you can't distill your own models, but you can use pre-trained models. This is useful for inference pipelines.
 
 ```bash
 pip install model2vec
