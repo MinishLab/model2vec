@@ -120,7 +120,7 @@ class StaticModel:
             m = max_length * self.median_token_length
             sentences = [sentence[:m] for sentence in sentences]
 
-        encodings: list[Encoding] = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
+        encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
         encodings_ids = [encoding.ids for encoding in encodings]
 
         if self.unk_token_id is not None:
