@@ -8,7 +8,6 @@ from typing import Iterator, Protocol, cast
 
 import numpy as np
 import safetensors
-from rich.logging import RichHandler
 from tokenizers import Tokenizer
 
 logger = logging.getLogger(__name__)
@@ -55,6 +54,8 @@ def importable(module: str, extra: str) -> None:
 
 def setup_logging() -> None:
     """Simple logging setup."""
+    from rich.logging import RichHandler
+
     logging.basicConfig(
         level="INFO",
         format="%(name)s - %(message)s",
