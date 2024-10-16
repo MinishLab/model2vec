@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -186,7 +187,9 @@ class StaticModel:
 
         out_array: list[np.ndarray] = []
         for batch in tqdm(
-            self._batch(sentences, batch_size), total=(len(sentences) // batch_size) + 1, disable=not show_progressbar
+            self._batch(sentences, batch_size),
+            total=math.ceil(len(sentences) / batch_size),
+            disable=not show_progressbar,
         ):
             out_array.extend(self._encode_batch_as_sequence(batch, max_length))
 
@@ -236,7 +239,9 @@ class StaticModel:
 
         out_arrays: list[np.ndarray] = []
         for batch in tqdm(
-            self._batch(sentences, batch_size), total=(len(sentences) // batch_size) + 1, disable=not show_progressbar
+            self._batch(sentences, batch_size),
+            total=math.ceil(len(sentences) / batch_size),
+            disable=not show_progressbar,
         ):
             out_arrays.append(self._encode_batch(batch, max_length))
 
