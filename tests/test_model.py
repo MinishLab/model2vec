@@ -10,7 +10,7 @@ from model2vec import StaticModel
 def test_initialization(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
     """Test successful initialization of StaticModel."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    assert model.embedding.weight.shape == (5, 2)
+    assert model.embedding.shape == (5, 2)
     assert len(model.tokens) == 5
     assert model.tokenizer == mock_tokenizer
     assert model.config == mock_config
@@ -60,21 +60,11 @@ def test_encode_as_tokens_empty(
     """Test encoding of an empty list of sentences."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     encoded = model.encode_as_sequence("")
-    assert np.array_equal(encoded, np.zeros(shape=(0, 2), dtype=model.embedding.weight.numpy().dtype))
+    assert np.array_equal(encoded, np.zeros(shape=(0, 2), dtype=model.embedding.dtype))
 
     encoded = model.encode_as_sequence(["", ""])
-    out = [np.zeros(shape=(0, 2), dtype=model.embedding.weight.numpy().dtype) for _ in range(2)]
-    assert np.array_equal(encoded, out)
-
-
-def test_forward(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
-    """Test forward pass of the model."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    encoded = model.forward(model.tokenize(["word1 word2"]))
-    assert encoded.shape == (1, model.embedding.weight.shape[1])
-
-    encoded = model.forward(model.tokenize(["word1", "word1 word2 word1"]))
-    assert encoded.shape == (2, model.embedding.weight.shape[1])
+    out = [np.zeros(shape=(0, 2), dtype=model.embedding.dtype) for _ in range(2)]
+    assert [np.array_equal(x, y) for x, y in zip(encoded, out)]
 
 
 def test_encode_empty_sentence(
@@ -130,7 +120,7 @@ def test_load_pretrained(
     loaded_model = StaticModel.from_pretrained(save_path)
 
     # Assert that the loaded model has the same properties as the original one
-    np.testing.assert_array_equal(loaded_model.embedding.weight.numpy(), mock_vectors)
+    np.testing.assert_array_equal(loaded_model.embedding, mock_vectors)
     assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
     assert loaded_model.config == mock_config
 
@@ -166,4 +156,4 @@ def test_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: d
     """Tests the dimensionality of the model."""
     model = StaticModel(mock_vectors, mock_tokenizer, mock_config)
     assert model.dim == 2
-    assert model.dim == model.embedding.weight.shape[1]
+    assert model.dim == model.embedding.shape[1]

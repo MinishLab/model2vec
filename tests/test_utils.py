@@ -5,7 +5,8 @@ from unittest.mock import patch
 import pytest
 
 from model2vec.distill.utils import select_optimal_device
-from model2vec.utils import _get_metadata_from_readme
+from model2vec.hf_utils import _get_metadata_from_readme
+from model2vec.utils import get_package_extras, importable
 
 
 def test__get_metadata_from_readme_not_exists() -> None:
@@ -50,3 +51,22 @@ def test_select_optimal_device(device: str | None, expected: str, cuda: bool, mp
         patch("torch.backends.mps.is_available", return_value=mps),
     ):
         assert select_optimal_device(device) == expected
+
+
+def test_importable() -> None:
+    """Test the importable function."""
+    with pytest.raises(ImportError):
+        importable("clown", "clown")
+
+    importable("os", "clown")
+
+
+def test_get_package_extras() -> None:
+    """Test package extras."""
+    extras = set(get_package_extras("model2vec", "distill"))
+    assert extras == {"torch", "transformers", "typer", "scikit-learn"}
+
+
+def test_get_package_extras_empty() -> None:
+    """Test package extras with an empty package."""
+    assert not list(get_package_extras("tqdm", "clown"))

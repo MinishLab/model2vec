@@ -56,7 +56,13 @@ Model2Vec is a technique to turn any sentence transformer into a really small fa
 
 ## Quickstart
 
-Install the package with:
+Install the package and all required extras with:
+```bash
+pip install model2vec[distill]
+```
+
+If you want a light-weight version of the package which only requires `numpy`, omit the `distill` extra. This means you can't distill your own models, but you can use pre-trained models. This is useful for inference pipelines.
+
 ```bash
 pip install model2vec
 ```
@@ -118,7 +124,7 @@ For more documentation, please refer to the [Sentence Transformers documentation
 
 ## Main Features
 
-Model2Vec is:
+Model2Vec has the following features:
 
 - **Small**: reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk, making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
 - **Static, but better**: smaller than GLoVe and BPEmb, but [much more performant](results/README.md), even with the same vocabulary.

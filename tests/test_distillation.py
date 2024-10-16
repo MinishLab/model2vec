@@ -90,7 +90,7 @@ def test_distill_from_model(
             use_subword=use_subword,
         )
 
-        assert static_model.embedding.weight.shape == static_model2.embedding.weight.shape
+        assert static_model.embedding.shape == static_model2.embedding.shape
         assert static_model.config == static_model2.config
         assert json.loads(static_model.tokenizer.to_str()) == json.loads(static_model2.tokenizer.to_str())
         assert static_model.base_model_name == static_model2.base_model_name
@@ -159,7 +159,7 @@ def test_distill(
 
         # Assert the model is correctly generated
         assert isinstance(static_model, StaticModel)
-        assert static_model.embedding.weight.shape == expected_shape
+        assert static_model.embedding.shape == expected_shape
         assert "mock-model" in static_model.config["tokenizer_name"]
         assert static_model.tokenizer is not None
 

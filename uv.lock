@@ -436,16 +436,11 @@ name = "model2vec"
 version = "0.2.4"
 source = { editable = "." }
 dependencies = [
-    { name = "click" },
     { name = "numpy" },
     { name = "rich" },
-    { name = "scikit-learn" },
     { name = "setuptools" },
     { name = "tokenizers" },
-    { name = "torch" },
     { name = "tqdm" },
-    { name = "transformers" },
-    { name = "typer" },
 ]
 
 [package.optional-dependencies]
@@ -458,11 +453,16 @@ dev = [
     { name = "pytest-coverage" },
     { name = "ruff" },
 ]
+distill = [
+    { name = "scikit-learn" },
+    { name = "torch" },
+    { name = "transformers" },
+    { name = "typer" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
-    { name = "click" },
     { name = "ipython", marker = "extra == 'dev'" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numpy" },
@@ -471,13 +471,13 @@ requires-dist = [
     { name = "pytest-coverage", marker = "extra == 'dev'" },
     { name = "rich" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scikit-learn" },
+    { name = "scikit-learn", marker = "extra == 'distill'" },
     { name = "setuptools" },
     { name = "tokenizers" },
-    { name = "torch" },
+    { name = "torch", marker = "extra == 'distill'" },
     { name = "tqdm" },
-    { name = "transformers" },
-    { name = "typer" },
+    { name = "transformers", marker = "extra == 'distill'" },
+    { name = "typer", marker = "extra == 'distill'" },
 ]
 
 [[package]]
