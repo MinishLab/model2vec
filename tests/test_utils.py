@@ -69,4 +69,4 @@ def test_get_package_extras() -> None:
 
 def test_get_package_extras_empty() -> None:
     """Test package extras with an empty package."""
-    assert not list(get_package_extras("tqdm", "clown"))
+    assert not list(get_package_extras("tqdm", ""))

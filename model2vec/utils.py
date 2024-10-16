@@ -18,7 +18,7 @@ class SafeOpenProtocol(Protocol):
 
     def get_tensor(self, key: str) -> np.ndarray:
         """Get a tensor."""
-        ...
+        ...  # pragma: no cover
 
 
 _MODULE_MAP = (("scikit-learn", "sklearn"),)
@@ -27,9 +27,7 @@ _MODULE_MAP = (("scikit-learn", "sklearn"),)
 def get_package_extras(package: str, extra: str) -> Iterator[str]:
     """Get the extras of the package."""
     message = metadata(package)
-    all_packages = message.get_all("Requires-Dist")
-    if all_packages is None:
-        return
+    all_packages = message.get_all("Requires-Dist") or []
     for package in all_packages:
         name, *rest = package.split(";", maxsplit=1)
         if not rest:

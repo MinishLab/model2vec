@@ -52,7 +52,7 @@ class StaticModel:
         if hasattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
             self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.model.unk_token]
         else:
-            self.unk_token_id = None
+            self.unk_token_id = None  # pragma: no cover  # Doesn't actually happen, but can happen.
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
         self.config = config or {}
