@@ -173,3 +173,9 @@ def test_local_load_from_model(mock_tokenizer: Tokenizer) -> None:
         assert model.embedding.shape == x.shape
         assert model.tokenizer.to_str() == mock_tokenizer.to_str()
         assert model.config == {"normalize": False}
+
+
+def test_local_load_from_model_no_folder() -> None:
+    """Test local load from a model with no folder."""
+    with pytest.raises(ValueError):
+        StaticModel.load_local("woahbuddy_relax_this_is_just_a_test")
