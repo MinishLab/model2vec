@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, cast
 
 import huggingface_hub
 import huggingface_hub.errors
@@ -11,15 +11,9 @@ from huggingface_hub import ModelCard, ModelCardData
 from safetensors.numpy import save_file
 from tokenizers import Tokenizer
 
+from model2vec.utils import SafeOpenProtocol
+
 logger = logging.getLogger(__name__)
-
-
-class SafeOpenProtocol(Protocol):
-    """Protocol to fix safetensors safe open."""
-
-    def get_tensor(self, key: str) -> np.ndarray:
-        """Get a tensor."""
-        ...
 
 
 def save_pretrained(
