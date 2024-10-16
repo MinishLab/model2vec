@@ -9,7 +9,7 @@ import numpy as np
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.utils import load_pretrained, push_folder_to_hub, save_pretrained
+from model2vec.hf_utils import load_pretrained, push_folder_to_hub, save_pretrained
 
 PathLike = Path | str
 
