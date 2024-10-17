@@ -104,4 +104,4 @@ ignore_missing_imports = true
 # can be empty if no extra settings are needed, presence enables setuptools_scm
 
 [tool.setuptools.dynamic]
-version = {attr = "model2vec._version.__version__"}
+version = {attr = "model2vec.version.__version__"}
