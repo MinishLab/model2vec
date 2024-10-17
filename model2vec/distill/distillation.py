@@ -214,8 +214,16 @@ def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCADimType, apply
         elif pca_dims <= embeddings.shape[1]:
             logger.info(f"Applying PCA with n_components {pca_dims}")
 
+            orig_dims = embeddings.shape[1]
             p = PCA(n_components=pca_dims, whiten=False)
             embeddings = p.fit_transform(embeddings)
+
+            if embeddings.shape[1] < orig_dims:
+                explained_variance_ratio = np.sum(p.explained_variance_ratio_)
+                explained_variance = np.sum(p.explained_variance_)
+                logger.info(f"Reduced dimensionality from {orig_dims} to {embeddings.shape[1]}.")
+                logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
+                logger.info(f"Explained variance: {explained_variance:.3f}.")
 
     if apply_zipf:
         logger.info("Applying Zipf weighting")
