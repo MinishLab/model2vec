@@ -4,7 +4,7 @@ import math
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator
+from typing import Any, Iterator, Union
 
 import numpy as np
 from tokenizers import Encoding, Tokenizer
@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from model2vec.utils import load_local_model
 
-PathLike = Path | str
+PathLike = Union[Path, str]
 
 
 logger = getLogger(__name__)
