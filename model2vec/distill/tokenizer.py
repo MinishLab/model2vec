@@ -49,29 +49,31 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
     # Load the vocabulary.
     model_type = tokenizer_data["model"]["type"]
 
-    match model_type:
-        case "WordPiece":
-            # Vocab is a dictionary.
-            vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
-            n_tokens = len(vocab)
+    if model_type == "WordPiece":
+        # Vocab is a dictionary.
+        vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
+        n_tokens = len(vocab)
 
-            # Remove the tokens.
-            for token in tokens_to_remove:
-                if vocab.pop(token, None) is None:
-                    logger.warning(f"Token {token} was not in the vocabulary.")
+        # Remove the tokens.
+        for token in tokens_to_remove:
+            if vocab.pop(token, None) is None:
+                logger.warning(f"Token {token} was not in the vocabulary.")
 
-            n_removed = n_tokens - len(vocab)
-            logger.info(f"Removed {n_removed} tokens from the vocabulary.")
+        n_removed = n_tokens - len(vocab)
+        logger.info(f"Removed {n_removed} tokens from the vocabulary.")
 
-            # Reindex the vocabulary so that it is contiguous.
-            reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
-            tokenizer_data["model"]["vocab"] = reindexed
-        case "Unigram":
-            raise ValueError("Removing tokens from a unigram tokenizer is not supported.")
-        case "BPE":
-            raise ValueError("Removing tokens from a bpe tokenizer is not supported.")
-        case _:
-            raise ValueError(f"Unknown model type {model_type}")
+        # Reindex the vocabulary so that it is contiguous.
+        reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
+        tokenizer_data["model"]["vocab"] = reindexed
+
+    elif model_type == "Unigram":
+        raise ValueError("Removing tokens from a unigram tokenizer is not supported.")
+
+    elif model_type == "BPE":
+        raise ValueError("Removing tokens from a BPE tokenizer is not supported.")
+
+    else:
+        raise ValueError(f"Unknown model type {model_type}")
 
     # Reindex the special tokens (i.e., CLS and SEP for BertTokenizers.)
     special_tokens_post_processor: dict[str, dict] = tokenizer_data["post_processor"]["special_tokens"]
@@ -97,18 +99,20 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
 
     model = data["model"]["type"]
 
-    match model:
-        case "WordPiece":
-            wordpiece_vocab: dict[str, int] = data["model"]["vocab"]
-            for token in tokens_to_add:
-                if token not in wordpiece_vocab:
-                    wordpiece_vocab[token] = len(wordpiece_vocab)
-        case "Unigram":
-            raise ValueError("Adding tokens to a unigram tokenizer is not supported.")
-        case "BPE":
-            raise ValueError("Adding tokens to a bpe tokenizer is not supported.")
-        case _:
-            raise ValueError(f"Unknown model type {model}")
+    if model == "WordPiece":
+        wordpiece_vocab: dict[str, int] = data["model"]["vocab"]
+        for token in tokens_to_add:
+            if token not in wordpiece_vocab:
+                wordpiece_vocab[token] = len(wordpiece_vocab)
+
+    elif model == "Unigram":
+        raise ValueError("Adding tokens to a unigram tokenizer is not supported.")
+
+    elif model == "BPE":
+        raise ValueError("Adding tokens to a BPE tokenizer is not supported.")
+
+    else:
+        raise ValueError(f"Unknown model type {model}")
 
     tokenizer = Tokenizer.from_str(json.dumps(data))
 
