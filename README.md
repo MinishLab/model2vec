@@ -7,7 +7,7 @@
 </div>
 
 <div align="center">
-  <h2>Distill a Small Fast Model from any Sentence Transformer</h2>
+  <h2>Distill a Small Static Model from any Sentence Transformer</h2>
 </div>
 
 <div align="center">
@@ -39,7 +39,7 @@
     <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="90%">
 </div>
 
-Model2Vec is a technique to turn any sentence transformer into a really small fast model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](results/README.md), or dive in to see how it works.
+Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](results/README.md), or dive in to see how it works.
 
 ## Table of Contents
 - [Quickstart](#quickstart)
