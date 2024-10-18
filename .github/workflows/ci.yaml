@@ -11,14 +11,14 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
+        exclude:
+          - os: windows-latest
+            python-version: "3.9"
+          - os: windows-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.12"
       fail-fast: false
-      exclude:
-        - os: windows-latest
-          python-version: "3.9"
-        - os: windows-latest
-          python-version: "3.11"
-        - os: windows-latest
-          python-version: "3.12"
 
     steps:
       - uses: actions/checkout@v4
