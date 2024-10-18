@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Literal, Union
 
 import numpy as np
 from huggingface_hub import model_info
@@ -28,7 +28,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-PCADimType = int | None | Literal["auto"]
+PCADimType = Union[int, None, Literal["auto"]]
 
 
 def distill_from_model(

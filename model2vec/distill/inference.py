@@ -4,7 +4,7 @@ from __future__ import annotations
 import inspect
 import logging
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, Union
 
 import numpy as np
 import torch
@@ -15,7 +15,7 @@ from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAtte
 logger = logging.getLogger(__name__)
 
 
-PathLike = str | Path
+PathLike = Union[Path, str]
 
 _DEFAULT_BATCH_SIZE = 1024
 
