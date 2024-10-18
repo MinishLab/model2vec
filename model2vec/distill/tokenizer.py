@@ -99,18 +99,20 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
 
     model = data["model"]["type"]
 
-    match model:
-        case "WordPiece":
-            wordpiece_vocab: dict[str, int] = data["model"]["vocab"]
-            for token in tokens_to_add:
-                if token not in wordpiece_vocab:
-                    wordpiece_vocab[token] = len(wordpiece_vocab)
-        case "Unigram":
-            raise ValueError("Adding tokens to a unigram tokenizer is not supported.")
-        case "BPE":
-            raise ValueError("Adding tokens to a bpe tokenizer is not supported.")
-        case _:
-            raise ValueError(f"Unknown model type {model}")
+    if model == "WordPiece":
+        wordpiece_vocab: dict[str, int] = data["model"]["vocab"]
+        for token in tokens_to_add:
+            if token not in wordpiece_vocab:
+                wordpiece_vocab[token] = len(wordpiece_vocab)
+
+    elif model == "Unigram":
+        raise ValueError("Adding tokens to a unigram tokenizer is not supported.")
+
+    elif model == "BPE":
+        raise ValueError("Adding tokens to a BPE tokenizer is not supported.")
+
+    else:
+        raise ValueError(f"Unknown model type {model}")
 
     tokenizer = Tokenizer.from_str(json.dumps(data))
 
