@@ -254,17 +254,6 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 
 </details>
 
-<details>
-<summary>  Distilling via CLI </summary>
-<br>
-
-We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
-```bash
-python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-path vocab.txt --device mps --save-path model2vec_model
-```
-
-</details>
-
 ### Inference
 
 <details>

@@ -51,7 +51,7 @@ dev = [
     "pytest-coverage",
     "ruff",
 ]
-distill = ["torch", "transformers", "scikit-learn", "typer"]
+distill = ["torch", "transformers", "scikit-learn"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"
