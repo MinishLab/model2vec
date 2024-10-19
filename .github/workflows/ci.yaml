@@ -49,7 +49,7 @@ jobs:
 
       # Install dependencies using uv pip
       - name: Install dependencies
-        run: make install-no-precommit
+        run: make install-no-pre-commit
 
       # Run tests with coverage
       - name: Run tests under coverage
