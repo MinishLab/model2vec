@@ -9,7 +9,7 @@ install:
 	uv run pre-commit install
 
 install-no-pre-commit:
-	uv sync --all-extras
+	uv pip install ".[dev,distill]"
 
 install-base:
 	uv sync --extra dev
