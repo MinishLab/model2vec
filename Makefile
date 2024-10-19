@@ -8,6 +8,9 @@ install:
 	uv sync --all-extras
 	uv run pre-commit install
 
+install-no-pre-commit:
+	uv sync --all-extras
+
 install-base:
 	uv sync --extra dev
 
