@@ -162,7 +162,7 @@ class StaticModel:
         sentences: list[str] | str,
         max_length: int | None = None,
         batch_size: int = 1024,
-        show_progressbar: bool = False,
+        show_progress_bar: bool = False,
     ) -> list[np.ndarray] | np.ndarray:
         """
         Encode a list of sentences as a list of numpy arrays of tokens.
@@ -177,7 +177,7 @@ class StaticModel:
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
-        :param show_progressbar: Whether to show the progress bar.
+        :param show_progress_bar: Whether to show the progress bar.
         :return: The encoded sentences with an embedding per token.
         """
         was_single = False
@@ -189,7 +189,7 @@ class StaticModel:
         for batch in tqdm(
             self._batch(sentences, batch_size),
             total=math.ceil(len(sentences) / batch_size),
-            disable=not show_progressbar,
+            disable=not show_progress_bar,
         ):
             out_array.extend(self._encode_batch_as_sequence(batch, max_length))
 
@@ -213,7 +213,7 @@ class StaticModel:
     def encode(
         self,
         sentences: list[str] | str,
-        show_progressbar: bool = False,
+        show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
         **kwargs: Any,
@@ -225,7 +225,7 @@ class StaticModel:
         For ease of use, we don't batch sentences together.
 
         :param sentences: The list of sentences to encode. You can also pass a single sentence.
-        :param show_progressbar: Whether to show the progress bar.
+        :param show_progress_bar: Whether to show the progress bar.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
@@ -241,7 +241,7 @@ class StaticModel:
         for batch in tqdm(
             self._batch(sentences, batch_size),
             total=math.ceil(len(sentences) / batch_size),
-            disable=not show_progressbar,
+            disable=not show_progress_bar,
         ):
             out_arrays.append(self._encode_batch(batch, max_length))
 
