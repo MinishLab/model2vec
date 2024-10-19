@@ -35,6 +35,7 @@ jobs:
         run: |
           irm https://astral.sh/uv/install.ps1 | iex
           uv venv .venv
+          uv lock
           "VIRTUAL_ENV=.venv" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$PWD/.venv/Scripts" | Out-File -FilePath $env:GITHUB_PATH -Append
 
@@ -44,6 +45,7 @@ jobs:
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           uv venv .venv
+          uv lock
           echo "VIRTUAL_ENV=.venv" >> $GITHUB_ENV
           echo "$PWD/.venv/bin" >> $GITHUB_PATH
 
