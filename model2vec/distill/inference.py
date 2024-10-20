@@ -124,7 +124,8 @@ def create_output_embeddings_from_model_name(
     bos = torch.full([len(ids)], fill_value=bos_token_id)
     eos = torch.full([len(ids)], fill_value=eos_token_id)
 
-    stacked = torch.stack([bos, ids, eos], dim=1)
+    # NOTE: reversing the bos and eos tokens works better on our benchmarks.
+    stacked = torch.stack([eos, ids, bos], dim=1)
 
     intermediate_weights: list[np.ndarray] = []
     for batch_idx in tqdm(range(0, len(stacked), _DEFAULT_BATCH_SIZE)):
