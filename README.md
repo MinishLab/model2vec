@@ -14,8 +14,8 @@
   <h2>
     <a href="https://huggingface.co/minishlab"><strong>🤗 Models</strong></a> |
     <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>📚 Tutorials</strong></a> |
-    <a href="https://github.com/MinishLab"><strong>💻 Website </strong></a> |
     <a href="https://huggingface.co/blog/Pringled/model2vec"><strong>📖 Blog</strong></a>
+    <a href="https://github.com/MinishLab/model2vec/blob/add-results-link/results/README.md"><strong>🏆 Results</strong></a>
   </h2>
 </div>
 
