@@ -1,4 +1,4 @@
-from model2vec.distill import distill
 from model2vec.model import StaticModel
+from model2vec.version import __version__
 
-__all__ = ["distill", "StaticModel"]
+__all__ = ["StaticModel", "__version__"]

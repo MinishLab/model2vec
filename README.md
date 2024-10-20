@@ -7,15 +7,15 @@
 </div>
 
 <div align="center">
-  <h2>Distill a Small Fast Model from any Sentence Transformer</h2>
+  <h2>Distill a Small Static Model from any Sentence Transformer</h2>
 </div>
 
 <div align="center">
   <h2>
     <a href="https://huggingface.co/minishlab"><strong>🤗 Models</strong></a> |
     <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>📚 Tutorials</strong></a> |
-    <a href="https://github.com/MinishLab"><strong>💻 Website </strong></a> |
-    <a href="https://huggingface.co/blog/Pringled/model2vec"><strong>📖 Blog</strong></a>
+    <a href="https://huggingface.co/blog/Pringled/model2vec"><strong>📖 Blog</strong></a> |
+    <a href="https://github.com/MinishLab/model2vec/blob/main/results/README.md"><strong>🏆 Results</strong></a>
   </h2>
 </div>
 
@@ -39,7 +39,7 @@
     <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="90%">
 </div>
 
-Model2Vec is a technique to turn any sentence transformer into a really small fast model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](results/README.md), or dive in to see how it works.
+Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](results/README.md), or dive in to see how it works.
 
 ## Table of Contents
 - [Quickstart](#quickstart)
@@ -56,7 +56,13 @@ Model2Vec is a technique to turn any sentence transformer into a really small fa
 
 ## Quickstart
 
-Install the package with:
+Install the package and all required extras with:
+```bash
+pip install model2vec[distill]
+```
+
+If you want a light-weight version of the package which only requires `numpy`, omit the `distill` extra. This means you can't distill your own models, but you can use pre-trained models. This is useful for inference pipelines.
+
 ```bash
 pip install model2vec
 ```
@@ -118,7 +124,7 @@ For more documentation, please refer to the [Sentence Transformers documentation
 
 ## Main Features
 
-Model2Vec is:
+Model2Vec has the following features:
 
 - **Small**: reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk, making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
 - **Static, but better**: smaller than GLoVe and BPEmb, but [much more performant](results/README.md), even with the same vocabulary.
@@ -245,17 +251,6 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 ```
 
 **Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
-
-</details>
-
-<details>
-<summary>  Distilling via CLI </summary>
-<br>
-
-We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
-```bash
-python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-path vocab.txt --device mps --save-path model2vec_model
-```
 
 </details>
 
