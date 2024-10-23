@@ -115,7 +115,15 @@ def create_output_embeddings_from_model_name(
     :return: The tokens and output embeddings.
     """
     model = model.to(device)
-    ids = torch.arange(tokenizer.vocab_size)
+
+    # Quick check to see if the tokenizer is consistent.
+    vocab_length = len(tokenizer.get_vocab())
+    if vocab_length != tokenizer.vocab_size:
+        logger.warning(
+            f"Reported vocab size {tokenizer.vocab_size} is inconsistent with the vocab size {vocab_length}."
+        )
+
+    ids = torch.arange(vocab_length)
 
     # Work-around to get the eos and bos token ids without having to go into tokenizer internals.
     dummy_encoding = tokenizer.encode("A")
