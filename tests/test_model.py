@@ -25,6 +25,17 @@ def test_initialization_token_vector_mismatch(mock_tokenizer: Tokenizer, mock_co
         StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
 
 
+def test_tokenize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
+    """Test tokenization of a sentence."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    model._can_encode_fast = True
+    tokens_fast = model.tokenize(["word1 word2"])
+    model._can_encode_fast = False
+    tokens_slow = model.tokenize(["word1 word2"])
+
+    assert tokens_fast == tokens_slow
+
+
 def test_encode_single_sentence(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
