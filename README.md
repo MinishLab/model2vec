@@ -307,7 +307,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). Install the evaluation package with:
 
 ```bash
-pip install evaluation@git+https://github.com MinishLab/evaluation@main
+pip install git+https://github.com/MinishLab/evaluation.git@main
 ```
 </details>
 
