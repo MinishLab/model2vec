@@ -59,6 +59,10 @@ class StaticModel:
         self.config = config or {}
         self.base_model_name = base_model_name
         self.language = language
+        if hasattr(self.tokenizer, "encode_batch_fast"):
+            self._can_encode_fast = True
+        else:
+            self._can_encode_fast = False
 
         if normalize is not None:
             self.normalize = normalize
@@ -121,7 +125,11 @@ class StaticModel:
             m = max_length * self.median_token_length
             sentences = [sentence[:m] for sentence in sentences]
 
-        encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
+        if self._can_encode_fast:
+            encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
+        else:
+            encodings = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
+
         encodings_ids = [encoding.ids for encoding in encodings]
 
         if self.unk_token_id is not None:
