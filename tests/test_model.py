@@ -36,6 +36,16 @@ def test_tokenize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_conf
     assert tokens_fast == tokens_slow
 
 
+def test_encode_batch_fast(
+    mock_vectors: np.ndarray, mock_berttokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test tokenization of a sentence."""
+    if hasattr(mock_berttokenizer, "encode_batch_fast"):
+        del mock_berttokenizer.encode_batch_fast
+        model = StaticModel(vectors=mock_vectors, tokenizer=mock_berttokenizer, config=mock_config)
+        assert not model._can_encode_fast
+
+
 def test_encode_single_sentence(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
