@@ -272,7 +272,8 @@ class StaticModel:
 
         out_array = np.stack(out)
         if self.normalize:
-            out_array = out_array / np.linalg.norm(out_array, axis=1, keepdims=True)
+            norm = np.linalg.norm(out_array, axis=1, keepdims=True) + 1e-32
+            out_array = out_array / norm
 
         return out_array
 
