@@ -46,9 +46,9 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 - [Main Features](#main-features)
 - [What is Model2Vec?](#what-is-model2vec)
 - [Usage](#usage)
-    - [Distilling a Model2Vec model](#distilling-a-model2vec-model)
-    - [Inferencing a Model2Vec model](#inference-with-a-model2vec-model)
-    - [Evaluating a Model2Vec model](#evaluating-a-model2vec-model)
+    - [Distillation](#distillation)
+    - [Inference](#inference)
+    - [Evaluation](#evaluation)
 - [Model List](#model-list)
 - [Results](#results)
 - [Related Work](#related-work)
@@ -307,7 +307,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). Install the evaluation package with:
 
 ```bash
-pip install evaluation@git+https://github.com MinishLab/evaluation@main
+pip install git+https://github.com/MinishLab/evaluation.git@main
 ```
 </details>
 
