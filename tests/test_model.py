@@ -55,6 +55,17 @@ def test_encode_single_sentence(
     assert encoded.shape == (2,)
 
 
+def test_encode_single_sentence_empty(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test encoding of a single empty sentence."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    model.normalize = True
+    encoded = model.encode("")
+    assert not np.isnan(encoded).any()
+    assert np.all(encoded == 0)
+
+
 def test_encode_multiple_sentences(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
