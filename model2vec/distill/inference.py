@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
+import inspect
 import logging
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, Union
 
 import numpy as np
 import torch
@@ -12,7 +15,7 @@ from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAtte
 logger = logging.getLogger(__name__)
 
 
-PathLike = str | Path
+PathLike = Union[Path, str]
 
 _DEFAULT_BATCH_SIZE = 1024
 
@@ -112,35 +115,51 @@ def create_output_embeddings_from_model_name(
     :return: The tokens and output embeddings.
     """
     model = model.to(device)
-    ids = torch.arange(tokenizer.vocab_size)
+
+    # Quick check to see if the tokenizer is consistent.
+    vocab_length = len(tokenizer.get_vocab())
+    if vocab_length != tokenizer.vocab_size:
+        logger.warning(
+            f"Reported vocab size {tokenizer.vocab_size} is inconsistent with the vocab size {vocab_length}."
+        )
+
+    ids = torch.arange(vocab_length)
 
     # Work-around to get the eos and bos token ids without having to go into tokenizer internals.
     dummy_encoding = tokenizer.encode("A")
-    eos_token_id, bos_token_id = dummy_encoding[0], dummy_encoding[-1]
+    bos_token_id, eos_token_id = dummy_encoding[0], dummy_encoding[-1]
 
-    eos = torch.full([len(ids)], fill_value=eos_token_id)
     bos = torch.full([len(ids)], fill_value=bos_token_id)
+    eos = torch.full([len(ids)], fill_value=eos_token_id)
 
-    stacked = torch.stack([bos, ids, eos], dim=1)
+    # NOTE: reversing the bos and eos tokens works better on our benchmarks.
+    stacked = torch.stack([eos, ids, bos], dim=1)
 
     intermediate_weights: list[np.ndarray] = []
     for batch_idx in tqdm(range(0, len(stacked), _DEFAULT_BATCH_SIZE)):
         batch = stacked[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE].to(model.device)
         with torch.no_grad():
-            # NOTE: we create these masks because nomic embed requires them.
-            # Normally, we could set them to None
-            token_type_ids = torch.zeros_like(batch)
             attention_mask = torch.ones_like(batch)
-            encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(
-                input_ids=batch.to(device), attention_mask=attention_mask, token_type_ids=token_type_ids
-            )
-            out: torch.Tensor = encoded.last_hidden_state
+            # Prepare model inputs
+            model_inputs = {"input_ids": batch.to(device), "attention_mask": attention_mask}
+
+            # Add token_type_ids only if the model supports it
+            if "token_type_ids" in inspect.getfullargspec(model.forward).args:
+                model_inputs["token_type_ids"] = torch.zeros_like(batch)
+
+            # Perform the forward pass
+            encoded_output: BaseModelOutputWithPoolingAndCrossAttentions = model(**model_inputs)
+            out: torch.Tensor = encoded_output.last_hidden_state
             # NOTE: If the dtype is bfloat 16, we convert to float32,
             # because numpy does not suport bfloat16
             # See here: https://github.com/numpy/numpy/issues/19808
             if out.dtype == torch.bfloat16:
                 out = out.float()
-        intermediate_weights.append(out[:, 1].cpu().numpy())
+
+        # Add the output to the intermediate weights
+        intermediate_weights.append(out[:, 1].detach().cpu().numpy())
+
+    # Concatenate the intermediate weights
     out_weights = np.concatenate(intermediate_weights)
 
     return tokenizer.convert_ids_to_tokens(ids), out_weights

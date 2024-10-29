@@ -1,26 +1,24 @@
 from __future__ import annotations
 
+import math
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator
+from typing import Any, Iterator, Union
 
 import numpy as np
-import torch
 from tokenizers import Encoding, Tokenizer
-from torch import nn
-from torch.nn import Embedding, EmbeddingBag
 from tqdm import tqdm
 
-from model2vec.utils import load_pretrained, push_folder_to_hub, save_pretrained
+from model2vec.utils import load_local_model
 
-PathLike = Path | str
+PathLike = Union[Path, str]
 
 
 logger = getLogger(__name__)
 
 
-class StaticModel(nn.Module):
+class StaticModel:
     def __init__(
         self,
         vectors: np.ndarray,
@@ -44,13 +42,8 @@ class StaticModel(nn.Module):
         super().__init__()
         tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
         self.tokens = tokens
-        tensor = torch.from_numpy(vectors)
 
-        # NOTE: We make two embedding modules, but since they share the same memory,
-        # there's no overhead.
-        # Gradients are also integrated into both.
-        self.embedding_bag = EmbeddingBag.from_pretrained(tensor, mode="mean")
-        self.embedding = Embedding.from_pretrained(tensor)
+        self.embedding = vectors
 
         if len(tokens) != vectors.shape[0]:
             raise ValueError(f"Number of tokens ({len(tokens)}) does not match number of vectors ({vectors.shape[0]})")
@@ -60,12 +53,16 @@ class StaticModel(nn.Module):
         if hasattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
             self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.model.unk_token]
         else:
-            self.unk_token_id = None
+            self.unk_token_id = None  # pragma: no cover  # Doesn't actually happen, but can happen.
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
         self.config = config or {}
         self.base_model_name = base_model_name
         self.language = language
+        if hasattr(self.tokenizer, "encode_batch_fast"):
+            self._can_encode_fast = True
+        else:
+            self._can_encode_fast = False
 
         if normalize is not None:
             self.normalize = normalize
@@ -75,12 +72,7 @@ class StaticModel(nn.Module):
     @property
     def dim(self) -> int:
         """Get the dimension of the model."""
-        return self.embedding.weight.shape[1]
-
-    @property
-    def device(self) -> torch.device:
-        """Get the device of the model."""
-        return next(self.parameters()).device
+        return self.embedding.shape[1]
 
     @property
     def normalize(self) -> bool:
@@ -109,9 +101,11 @@ class StaticModel(nn.Module):
         :param path: The path to save to.
         :param model_name: The model name to use in the Model Card.
         """
+        from model2vec.hf_utils import save_pretrained
+
         save_pretrained(
             folder_path=Path(path),
-            embeddings=self.embedding.weight.numpy(),
+            embeddings=self.embedding,
             tokenizer=self.tokenizer,
             config=self.config,
             base_model_name=self.base_model_name,
@@ -119,31 +113,7 @@ class StaticModel(nn.Module):
             model_name=model_name,
         )
 
-    def forward(self, X: tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
-        """
-        Helper method to facilitate training.
-
-        :param X: a tuple of ids and offsets.
-        :return: A padded output tensor.
-        """
-        ids, offsets = X
-        return self.embedding_bag(ids, offsets)
-
-    def forward_mean(self, ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the model.
-
-        :param ids: The input tensor.
-        :param offsets: The offsets tensor.
-        :return: The output tensor.
-        """
-        means = self.embedding_bag(ids, offsets)
-
-        if self.normalize:
-            return torch.nn.functional.normalize(means)
-        return means
-
-    def tokenize(self, sentences: list[str], max_length: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[int]:
         """
         Tokenize a sentence.
 
@@ -155,7 +125,11 @@ class StaticModel(nn.Module):
             m = max_length * self.median_token_length
             sentences = [sentence[:m] for sentence in sentences]
 
-        encodings: list[Encoding] = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
+        if self._can_encode_fast:
+            encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
+        else:
+            encodings = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
+
         encodings_ids = [encoding.ids for encoding in encodings]
 
         if self.unk_token_id is not None:
@@ -166,10 +140,7 @@ class StaticModel(nn.Module):
         if max_length is not None:
             encodings_ids = [token_ids[:max_length] for token_ids in encodings_ids]
 
-        offsets = torch.from_numpy(np.cumsum([0] + [len(token_ids) for token_ids in encodings_ids[:-1]]))
-        ids = torch.tensor([token_id for token_ids in encodings_ids for token_id in token_ids], dtype=torch.long)
-
-        return ids, offsets
+        return encodings_ids
 
     @classmethod
     def from_pretrained(
@@ -184,8 +155,10 @@ class StaticModel(nn.Module):
 
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
-        :return: A StaticEmbedder
+        :return: A StaticModel
         """
+        from model2vec.hf_utils import load_pretrained
+
         embeddings, tokenizer, config, metadata = load_pretrained(path, token=token)
 
         return cls(
@@ -193,7 +166,11 @@ class StaticModel(nn.Module):
         )
 
     def encode_as_sequence(
-        self, sentences: list[str] | str, max_length: int | None = None
+        self,
+        sentences: list[str] | str,
+        max_length: int | None = None,
+        batch_size: int = 1024,
+        show_progress_bar: bool = False,
     ) -> list[np.ndarray] | np.ndarray:
         """
         Encode a list of sentences as a list of numpy arrays of tokens.
@@ -207,38 +184,44 @@ class StaticModel(nn.Module):
         :param sentences: The list of sentences to encode.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
+        :param batch_size: The batch size to use.
+        :param show_progress_bar: Whether to show the progress bar.
         :return: The encoded sentences with an embedding per token.
         """
         was_single = False
         if isinstance(sentences, str):
-            was_single = True
             sentences = [sentences]
+            was_single = True
 
-        ids, offsets = self.tokenize(sentences=sentences, max_length=max_length)
-        ids = ids.to(self.device)
-        offsets = offsets.to(self.device)
-
-        out = [tensor.cpu().numpy() for tensor in self._sub_encode_as_sequence(ids, offsets)]
+        out_array: list[np.ndarray] = []
+        for batch in tqdm(
+            self._batch(sentences, batch_size),
+            total=math.ceil(len(sentences) / batch_size),
+            disable=not show_progress_bar,
+        ):
+            out_array.extend(self._encode_batch_as_sequence(batch, max_length))
 
         if was_single:
-            return out[0]
+            return out_array[0]
 
-        return out
+        return out_array
 
-    def _sub_encode_as_sequence(self, ids: torch.Tensor, offsets: torch.Tensor) -> list[torch.Tensor]:
-        """Helper function to reduce deduplication."""
-        out = []
-        for x in range(len(offsets) - 1):
-            start, end = offsets[x], offsets[x + 1]
-            out.append(self.embedding(ids[start:end]))
-        out.append(self.embedding(ids[offsets[-1] :]))
+    def _encode_batch_as_sequence(self, sentences: list[str], max_length: int | None) -> list[np.ndarray]:
+        """Encode a batch of sentences as a sequence."""
+        ids = self.tokenize(sentences=sentences, max_length=max_length)
+        out: list[np.ndarray] = []
+        for id_list in ids:
+            if id_list:
+                out.append(self.embedding[id_list])
+            else:
+                out.append(np.zeros((0, self.dim)))
 
         return out
 
     def encode(
         self,
         sentences: list[str] | str,
-        show_progressbar: bool = False,
+        show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
         **kwargs: Any,
@@ -250,7 +233,7 @@ class StaticModel(nn.Module):
         For ease of use, we don't batch sentences together.
 
         :param sentences: The list of sentences to encode. You can also pass a single sentence.
-        :param show_progressbar: Whether to show the progress bar.
+        :param show_progress_bar: Whether to show the progress bar.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
@@ -264,7 +247,9 @@ class StaticModel(nn.Module):
 
         out_arrays: list[np.ndarray] = []
         for batch in tqdm(
-            self._batch(sentences, batch_size), total=(len(sentences) // batch_size) + 1, disable=not show_progressbar
+            self._batch(sentences, batch_size),
+            total=math.ceil(len(sentences) / batch_size),
+            disable=not show_progress_bar,
         ):
             out_arrays.append(self._encode_batch(batch, max_length))
 
@@ -275,13 +260,22 @@ class StaticModel(nn.Module):
 
         return out_array
 
-    @torch.no_grad()
     def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
-        ids, offsets = self.tokenize(sentences, max_length)
-        ids = ids.to(self.device)
-        offsets = offsets.to(self.device)
-        return self.forward_mean(ids, offsets).cpu().numpy()
+        ids = self.tokenize(sentences=sentences, max_length=max_length)
+        out: list[np.ndarray] = []
+        for id_list in ids:
+            if id_list:
+                out.append(self.embedding[id_list].mean(0))
+            else:
+                out.append(np.zeros(self.dim))
+
+        out_array = np.stack(out)
+        if self.normalize:
+            norm = np.linalg.norm(out_array, axis=1, keepdims=True) + 1e-32
+            out_array = out_array / norm
+
+        return out_array
 
     @staticmethod
     def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:
@@ -299,6 +293,33 @@ class StaticModel(nn.Module):
             If the repo already exists, this doesn't change the visibility.
         :param token: The huggingface token to use.
         """
+        from model2vec.hf_utils import push_folder_to_hub
+
         with TemporaryDirectory() as temp_dir:
             self.save_pretrained(temp_dir, model_name=repo_id)
             push_folder_to_hub(Path(temp_dir), repo_id, private, token)
+
+    @classmethod
+    def load_local(cls: type[StaticModel], path: PathLike) -> StaticModel:
+        """
+        Loads a model from a local path.
+
+        You should only use this code path if you are concerned with start-up time.
+        Loading via the `from_pretrained` method is safer, and auto-downloads, but
+        also means we import a whole bunch of huggingface code that we don't need.
+
+        Additionally, huggingface will check the most recent version of the model,
+        which can be slow.
+
+        :param path: The path to load the model from. The path is a directory saved by the
+            `save_pretrained` method.
+        :return: A StaticModel
+        :raises: ValueError if the path is not a directory.
+        """
+        path = Path(path)
+        if not path.is_dir():
+            raise ValueError(f"Path {path} is not a directory.")
+
+        embeddings, tokenizer, config = load_local_model(path)
+
+        return StaticModel(embeddings, tokenizer, config)

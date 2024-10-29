@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import logging
-from typing import Literal
+from typing import Literal, Union
 
 import numpy as np
 from huggingface_hub import model_info
@@ -26,7 +28,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-PCADimType = int | None | Literal["auto"]
+PCADimType = Union[int, None, Literal["auto"]]
 
 
 def distill_from_model(
@@ -53,7 +55,7 @@ def distill_from_model(
     :param device: The device to use.
     :param pca_dims: The number of components to use for PCA.
         If this is None, we don't apply PCA.
-        If this is 'auto', we don't reduce dimenionality, but still apply PCA.
+        If this is 'auto', we don't reduce dimensionality, but still apply PCA.
     :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
@@ -214,8 +216,16 @@ def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCADimType, apply
         elif pca_dims <= embeddings.shape[1]:
             logger.info(f"Applying PCA with n_components {pca_dims}")
 
+            orig_dims = embeddings.shape[1]
             p = PCA(n_components=pca_dims, whiten=False)
             embeddings = p.fit_transform(embeddings)
+
+            if embeddings.shape[1] < orig_dims:
+                explained_variance_ratio = np.sum(p.explained_variance_ratio_)
+                explained_variance = np.sum(p.explained_variance_)
+                logger.info(f"Reduced dimensionality from {orig_dims} to {embeddings.shape[1]}.")
+                logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
+                logger.info(f"Explained variance: {explained_variance:.3f}.")
 
     if apply_zipf:
         logger.info("Applying Zipf weighting")

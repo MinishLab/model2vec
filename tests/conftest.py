@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -25,7 +24,7 @@ def mock_tokenizer() -> Tokenizer:
     return tokenizer
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_berttokenizer() -> AutoTokenizer:
     """Load the real BertTokenizerFast from the provided tokenizer.json file."""
     return AutoTokenizer.from_pretrained("tests/data/test_tokenizer")
@@ -44,7 +43,7 @@ def mock_transformer() -> AutoModel:
             self.device = device
             return self
 
-        def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        def forward(self, *args: Any, **kwargs: Any) -> Any:
             # Simulate a last_hidden_state output for a transformer model
             batch_size, seq_length = kwargs["input_ids"].shape
             # Return a tensor of shape (batch_size, seq_length, 768)
@@ -55,6 +54,10 @@ def mock_transformer() -> AutoModel:
                     "last_hidden_state": torch.rand(batch_size, seq_length, 768)  # Simulate 768 hidden units
                 },
             )
+
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
+            # Simply call the forward method to simulate the same behavior as transformers models
+            return self.forward(*args, **kwargs)
 
     return MockPreTrainedModel()
 
