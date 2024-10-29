@@ -106,7 +106,7 @@ from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import StaticEmbedding
 
 # Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/M2V_base_output")
+static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
 model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
@@ -265,7 +265,7 @@ Inference works as follows. The example shows one of our own models, but you can
 from model2vec import StaticModel
 
 # Load a model from the HuggingFace hub, or a local one.
-model_name = "minishlab/M2V_base_output"
+model_name = "minishlab/potion-base-8M"
 # You can optionally pass a token if you're loading a private model
 model = StaticModel.from_pretrained(model_name, token=None)
 
@@ -352,12 +352,13 @@ print(make_leaderboard(task_scores))
 
 We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e) and can be loaded using the `from_pretrained` method. The models are listed below.
 
-| Model                  | Language    | Vocab            | Sentence Transformer | Tokenizer Type | Params       |
-|------------------------|-------------|------------------|----------------------|----------------|--------------|
-| [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)           | English     | GloVe            | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Word-level     | 102M         |
-| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)          | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Subword        | 7.5M         |
-| [M2V_base_glove_subword](https://huggingface.co/minishlab/M2V_base_glove_subword)          | English     | Output + GloVe   | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Subword        | 103M         |
-| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output)          | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)        | Subword        | 471M         |
+
+| Model                                                                 | Language    | Vocab            | Sentence Transformer                                            | Tokenizer Type | Params  | Tokenlearn |
+|-----------------------------------------------------------------------|-------------|------------------|-----------------------------------------------------------------|----------------|---------|------------|
+| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 7.5M    | True       |
+| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 3.75M   | True       |
+| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 1.875M  | True       |
+| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output) | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)      | Subword        | 471M    | False      |
 
 
 ## Results
