@@ -289,7 +289,7 @@ from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import StaticEmbedding
 
 # Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/M2V_base_output")
+static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
 model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
@@ -365,7 +365,6 @@ We provide a number of models that can be used out of the box. These models are 
 
 We have performed extensive experiments to evaluate the performance of Model2Vec models. The results are documented in the [results](results/README.md) folder. The results are presented in the following sections:
 - [MTEB Results](results/README.md#mteb-results)
-- [Classification and Speed Benchmarks](results/README.md#classification-and-speed-benchmarks)
 - [Ablations](results/README.md#ablations)
 
 ## Related work
