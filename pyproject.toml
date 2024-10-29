@@ -3,12 +3,7 @@ name = "model2vec"
 description = "Distill a Small Static Model from any Sentence Transformer"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
-<<<<<<< HEAD
-version = "0.2.4"
-requires-python = ">=3.10"
-=======
 requires-python = ">=3.9"
->>>>>>> 3de37ed06e873fd22a25396789cff6d97ef8a6e3
 authors = [{ name = "Stéphan Tulkens", email = "stephantul@gmail.com"}, {name = "Thomas van Dongen", email = "thomas123@live.nl"}]
 dynamic = ["version"]
 
