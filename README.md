@@ -152,6 +152,9 @@ Model2vec has 3 modes:
 
 For a technical deepdive into Model2Vec, please refer to our [blog post](https://huggingface.co/blog/Pringled/model2vec).
 
+### Tokenlearn
+
+Our flagship POTION models are pre-trained using [Tokenlearn](https://github.com/MinishLab/tokenlearn). This method is described in our [Tokenlearn blogpost](https://minishlab.github.io/tokenlearn_blogpost/).
 
 
 ## Usage
