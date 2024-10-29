@@ -2,7 +2,6 @@
 
 This page contains the experiments results of the Model2Vec project. The results are presented in the following sections:
 - [MTEB Results](#mteb-results)
-- [Classification and Speed Benchmarks](#classification-and-speed-benchmarks)
 - [Ablations](#ablations)
 
 ## MTEB Results
@@ -21,9 +20,6 @@ Model2Vec is evaluated on MTEB, as well as two additional tasks: [PEARL](https:/
 | potion-base-2M         |       45.52 |        44.77 |   58.45 |   27.5  |       73.72 |  46.82 |  24.13 |  70.14 |  31.51 |   50.82 |     44.72 |
 | GloVe_300d             |       42.84 |        42.36 |   57.31 |   27.66 |       72.48 |  43.3  |  22.78 |  61.9  |  28.81 |   45.65 |     43.05 |
 | BPEmb_50k_300d         |       39.34 |        37.78 |   55.76 |   23.35 |       57.86 |  43.21 |  17.5  |  55.1  |  29.74 |   47.56 |     41.28 |
-| WL256*                 |       48.88 |        49.36 |   58.98 |   33.34 |       74    |  52.03 |  33.12 |  73.34 |  29.05 |   48.81 |     45.16 |
-
-
 
 
 <details>
@@ -39,37 +35,12 @@ For readability, the MTEB task names are abbreviated as follows:
 - Sum: Summarization
 </details>
 
-\
-\* WL256, introduced in the [WordLlama](https://github.com/dleemiller/WordLlama/tree/main) package is included for comparison due to its similarities to Model2Vec. However, we believe it is heavily overfit to the MTEB dataset since it is trained on datasets used in MTEB itself. This can be seen by the fact that the WL256 model performs much worse on the non-MTEB tasks (PEARL and WordSim) than our models and GLoVe. The results shown in the [Classification and Speed Benchmarks](#classification-and-speed-benchmarks) further support this.
+The figure below shows the relationship between the number of sentences per second and the average MTEB score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
+This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
 
-## Classification and Speed Benchmarks
-
-In addition to the MTEB evaluation, we evaluate Model2Vec on a number of classification datasets. These are used as additional evidence to avoid overfitting to the MTEB dataset and to benchmark the speed of the model. The results are shown in the table below.
-
-
-| Model                  | Average | SST2   | IMDB  | TREC   | AG News |
-|:-----------------------|:-------:|:------:|:-----:|:------:|:-------:|
-| bge-base-en-v1.5        | 90.00   | 91.54  | 91.88 | 85.16  | 91.45   |
-| all-MiniLM-L6-v2        | 84.10   | 83.95  | 81.36 | 81.31  | 89.77   |
-| M2V_base_output         | 82.23   | 80.92  | 84.56 | 75.27  | 88.17   |
-| M2V_base_glove_subword  | 81.95   | 82.84  | 85.96 | 70.51  | 88.49   |
-| potion-base-8M          | 81.42   | 81.99  | 86.04 | 68.86  | 88.81   |
-| BPEmb_50k_300d          | 81.15   | 80.42  | 84.04 | 71.25  | 88.92   |
-| M2V_base_glove          | 80.76   | 83.07  | 85.24 | 66.12  | 88.61   |
-| potion-base-4M          | 79.90   | 80.03  | 84.36 | 59.89  | 87.13   |
-| WL256                   | 78.48   | 76.88  | 80.12 | 69.23  | 87.68   |
-| GloVe_300d              | 77.77   | 81.68  | 84.00 | 55.67  | 89.71   |
-| potion-base-2M          | 76.71   | 78.62  | 81.00 | 55.86  | 83.38   |
-
-
-As can be seen, Model2Vec models outperform the GloVe, BPEmb, and WL256 models on all classification tasks, and are competitive with the all-MiniLM-L6-v2 model, while being much faster.
-
-The figure below shows the relationship between the number of sentences per second and the average classification score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
-This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of classification performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
-
-| ![Description](../assets/images/speed_vs_accuracy_v4.png) |
+| ![Description](../assets/images/speed_vs_mteb_score.png) |
 |:--:|
-|*Figure: The average accuracy over all classification datasets plotted against sentence per second. The circle size indicates model size.*|
+|*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
 
 ## Ablations
