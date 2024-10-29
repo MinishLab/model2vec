@@ -71,8 +71,8 @@ The easiest way to get started with Model2Vec is to download one of our [flagshi
 ```python
 from model2vec import StaticModel
 
-# Load a model from the HuggingFace hub (in this case the M2V_base_output model)
-model_name = "minishlab/M2V_base_output"
+# Load a model from the HuggingFace hub (in this case the potion-base-8M model)
+model_name = "minishlab/potion-base-8M"
 model = StaticModel.from_pretrained(model_name)
 
 # Make embeddings
@@ -373,7 +373,7 @@ We have performed extensive experiments to evaluate the performance of Model2Vec
 If you are interested in fast small models, also consider looking at these techniques:
 * [BPEmb](https://bpemb.h-its.org/): GLoVE embeddings trained on BPE-encoded Wikipedias. Huge inspiration to this project, multilingual, very fast. If you don't find a sentence transformer in the language you need, check this out.
 * [fast-sentence-transformers](https://github.com/davidberenstein1957/fast-sentence-transformers): distillation using Model2Vec comes at a cost. If that cost is too steep for you, and you have access to a GPU, this package is for you. It automates the quantization and optimization of sentence transformers without loss of performance.
-* [wordllama](https://github.com/dleemiller/WordLlama): Uses the _input_ embeddings of a LLama2 model and then performs contrastive learning on these embeddings. As we show above, we think this is a bit overfit on MTEB, as the model is trained on MTEB datasets, and only evaluated on MTEB. It provides an interesting point of comparison to Model2Vec, and, fun fact, was invented at the same time.
+* [wordllama](https://github.com/dleemiller/WordLlama): Uses the _input_ embeddings of a LLama2 model and then performs contrastive learning on these embeddings. We think this is a bit overfit on MTEB, as the model is trained on MTEB datasets, and only evaluated on MTEB. Fun fact: this was invented at the same time as Model2Vec.
 
 If you find other related work, please let us know.
 
