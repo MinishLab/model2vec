@@ -41,6 +41,11 @@
 
 Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](results/README.md), or dive in to see how it works.
 
+
+## Updates & Announcements
+
+- **30/10/2024**: We released three new models: [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M), [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M), and [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M). These models are trained using [Tokenlearn](https://github.com/MinishLab/tokenlearn). Find out more in our [blog post](https://minishlab.github.io/tokenlearn_blogpost/). NOTE: for users of any of our old English M2V models, we recommend switching to these new models as they [perform better on all tasks](https://github.com/MinishLab/model2vec/tree/main/results).
+
 ## Table of Contents
 - [Quickstart](#quickstart)
 - [Main Features](#main-features)
@@ -71,8 +76,8 @@ The easiest way to get started with Model2Vec is to download one of our [flagshi
 ```python
 from model2vec import StaticModel
 
-# Load a model from the HuggingFace hub (in this case the M2V_base_output model)
-model_name = "minishlab/M2V_base_output"
+# Load a model from the HuggingFace hub (in this case the potion-base-8M model)
+model_name = "minishlab/potion-base-8M"
 model = StaticModel.from_pretrained(model_name)
 
 # Make embeddings
@@ -106,7 +111,7 @@ from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import StaticEmbedding
 
 # Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/M2V_base_output")
+static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
 model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
@@ -152,6 +157,9 @@ Model2vec has 3 modes:
 
 For a technical deepdive into Model2Vec, please refer to our [blog post](https://huggingface.co/blog/Pringled/model2vec).
 
+### Tokenlearn
+
+Our flagship POTION models are pre-trained using [Tokenlearn](https://github.com/MinishLab/tokenlearn). This method is described in our [Tokenlearn blogpost](https://minishlab.github.io/tokenlearn_blogpost/).
 
 
 ## Usage
@@ -265,7 +273,7 @@ Inference works as follows. The example shows one of our own models, but you can
 from model2vec import StaticModel
 
 # Load a model from the HuggingFace hub, or a local one.
-model_name = "minishlab/M2V_base_output"
+model_name = "minishlab/potion-base-8M"
 # You can optionally pass a token if you're loading a private model
 model = StaticModel.from_pretrained(model_name, token=None)
 
@@ -289,7 +297,7 @@ from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import StaticEmbedding
 
 # Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/M2V_base_output")
+static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
 model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
@@ -352,19 +360,19 @@ print(make_leaderboard(task_scores))
 
 We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e) and can be loaded using the `from_pretrained` method. The models are listed below.
 
-| Model                  | Language    | Vocab            | Sentence Transformer | Tokenizer Type | Params       |
-|------------------------|-------------|------------------|----------------------|----------------|--------------|
-| [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)           | English     | GloVe            | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Word-level     | 102M         |
-| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)          | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Subword        | 7.5M         |
-| [M2V_base_glove_subword](https://huggingface.co/minishlab/M2V_base_glove_subword)          | English     | Output + GloVe   | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Subword        | 103M         |
-| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output)          | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)        | Subword        | 471M         |
+
+| Model                                                                 | Language    | Vocab            | Sentence Transformer                                            | Tokenizer Type | Params  | Tokenlearn |
+|-----------------------------------------------------------------------|-------------|------------------|-----------------------------------------------------------------|----------------|---------|------------|
+| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 7.5M    | True       |
+| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 3.7M   | True       |
+| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 1.8M  | True       |
+| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output) | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)      | Subword        | 471M    | False      |
 
 
 ## Results
 
 We have performed extensive experiments to evaluate the performance of Model2Vec models. The results are documented in the [results](results/README.md) folder. The results are presented in the following sections:
 - [MTEB Results](results/README.md#mteb-results)
-- [Classification and Speed Benchmarks](results/README.md#classification-and-speed-benchmarks)
 - [Ablations](results/README.md#ablations)
 
 ## Related work
@@ -372,7 +380,7 @@ We have performed extensive experiments to evaluate the performance of Model2Vec
 If you are interested in fast small models, also consider looking at these techniques:
 * [BPEmb](https://bpemb.h-its.org/): GLoVE embeddings trained on BPE-encoded Wikipedias. Huge inspiration to this project, multilingual, very fast. If you don't find a sentence transformer in the language you need, check this out.
 * [fast-sentence-transformers](https://github.com/davidberenstein1957/fast-sentence-transformers): distillation using Model2Vec comes at a cost. If that cost is too steep for you, and you have access to a GPU, this package is for you. It automates the quantization and optimization of sentence transformers without loss of performance.
-* [wordllama](https://github.com/dleemiller/WordLlama): Uses the _input_ embeddings of a LLama2 model and then performs contrastive learning on these embeddings. As we show above, we think this is a bit overfit on MTEB, as the model is trained on MTEB datasets, and only evaluated on MTEB. It provides an interesting point of comparison to Model2Vec, and, fun fact, was invented at the same time.
+* [wordllama](https://github.com/dleemiller/WordLlama): Uses the _input_ embeddings of a LLama2 model and then performs contrastive learning on these embeddings. We think this is a bit overfit on MTEB, as the model is trained on MTEB datasets, and only evaluated on MTEB. Fun fact: this was invented at the same time as Model2Vec.
 
 If you find other related work, please let us know.
 
