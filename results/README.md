@@ -38,7 +38,7 @@ For readability, the MTEB task names are abbreviated as follows:
 The figure below shows the relationship between the number of sentences per second and the average MTEB score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
 This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
 
-| ![Description](../assets/images/speed_vs_mteb_score.png) |
+| ![Description](../assets/images/speed_vs_mteb_score_v2.png) |
 |:--:|
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
