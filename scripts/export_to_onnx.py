@@ -12,6 +12,8 @@ import logging
 from pathlib import Path
 
 import torch
+from tokenizers import Tokenizer
+from transformers import PreTrainedTokenizerFast
 
 from model2vec import StaticModel
 
@@ -70,30 +72,40 @@ class TorchStaticModel(torch.nn.Module):
             encodings_ids = [token_ids[:max_length] for token_ids in encodings_ids]
         # Flatten input_ids and compute offsets
         offsets = torch.tensor([0] + [len(ids) for ids in encodings_ids[:-1]], dtype=torch.long).cumsum(dim=0)
-        input_ids = torch.tensor([token_id for token_ids in encodings_ids for token_id in token_ids], dtype=torch.long)
+        input_ids = torch.tensor(
+            [token_id for token_ids in encodings_ids for token_id in token_ids],
+            dtype=torch.long,
+        )
         return input_ids, offsets
 
 
-def export_model_to_onnx(model_path: str, save_path: str) -> None:
+def export_model_to_onnx(model_path: str, save_path: Path) -> None:
     """
-    Export the StaticModel to ONNX format.
+    Export the StaticModel to ONNX format and save tokenizer files.
 
     :param model_path: The path to the pretrained StaticModel.
-    :param save_path: The path to save the exported ONNX model
+    :param save_path: The directory to save the model and related files.
     """
-    # Convert the StaticModel to TorchStaticModel
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    # Load the StaticModel
     model = StaticModel.from_pretrained(model_path)
     torch_model = TorchStaticModel(model)
+
+    # Save the model using save_pretrained
+    model.save_pretrained(save_path)
 
     # Prepare dummy input data
     texts = ["hello", "hello world"]
     input_ids, offsets = torch_model.tokenize(texts)
 
     # Export the model to ONNX
+    onnx_model_path = save_path / "onnx/model.onnx"
+    onnx_model_path.parent.mkdir(parents=True, exist_ok=True)
     torch.onnx.export(
         torch_model,
         (input_ids, offsets),
-        save_path,
+        str(onnx_model_path),
         export_params=True,
         opset_version=14,
         do_constant_folding=True,
@@ -106,13 +118,52 @@ def export_model_to_onnx(model_path: str, save_path: str) -> None:
         },
     )
 
-    logger.info(f"Model has been successfully exported to {save_path}")
+    logger.info(f"Model has been successfully exported to {onnx_model_path}")
+
+    # Save the tokenizer files required for transformers.js
+    save_tokenizer(model.tokenizer, save_path)
+    logger.info(f"Tokenizer files have been saved to {save_path}")
+
+
+def save_tokenizer(tokenizer: Tokenizer, save_directory: Path) -> None:
+    """
+    Save tokenizer files in a format compatible with Transformers.
+
+    :param tokenizer: The tokenizer from the StaticModel.
+    :param save_directory: The directory to save the tokenizer files.
+    """
+    # Convert the tokenizers.Tokenizer to a PreTrainedTokenizerFast and save
+    tokenizer_json_path = save_directory / "tokenizer.json"
+    tokenizer.save(str(tokenizer_json_path))
+
+    # Load the tokenizer using PreTrainedTokenizerFast
+    fast_tokenizer = PreTrainedTokenizerFast(
+        tokenizer_file=str(tokenizer_json_path),
+        unk_token="[UNK]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        sep_token="[SEP]",
+        mask_token="[MASK]",
+    )
+
+    # Save the tokenizer files
+    fast_tokenizer.save_pretrained(str(save_directory))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export StaticModel to ONNX format")
-    parser.add_argument("--model_path", type=Path, required=True, help="Path to the pretrained StaticModel")
-    parser.add_argument("--save_path", type=Path, required=True, help="Path to save the exported ONNX model")
+    parser.add_argument(
+        "--model_path",
+        type=str,
+        required=True,
+        help="Path to the pretrained StaticModel",
+    )
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        required=True,
+        help="Directory to save the exported model and files",
+    )
     args = parser.parse_args()
 
-    export_model_to_onnx(args.model_path, args.save_path)
+    export_model_to_onnx(args.model_path, Path(args.save_path))
