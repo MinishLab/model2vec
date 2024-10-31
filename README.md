@@ -393,6 +393,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 <summary>  Transformers.js </summary>
 
 <br>
+
 To use a Model2Vec model in [transformers.js](https://github.com/huggingface/transformers.js), the following code snippet can be used as a starting point:
 
 ```javascript
