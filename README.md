@@ -360,6 +360,7 @@ print(make_leaderboard(task_scores))
 ### Integrations
 <details>
 <summary>  Sentence Transformers </summary>
+<br>
 
 Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) using the `StaticEmbedding` module.
 
@@ -385,13 +386,13 @@ model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
-<br>
 </details>
 
 
 <details>
 <summary>  Transformers.js </summary>
 
+<br>
 To use a Model2Vec model in [transformers.js](https://github.com/huggingface/transformers.js), the following code snippet can be used as a starting point:
 
 ```javascript
@@ -427,14 +428,16 @@ const { embeddings } = await model(modelInputs);
 console.log(embeddings.tolist()); // output matches python version
 ```
 
-<br>
-</details>
-
 Note that this requires that the Model2Vec has a `model.onnx` file and several required tokenizers file. To generate these for a model that does not have them yet, the following code snippet can be used:
 
 ```bash
 python scripts/export_to_onnx.py --model_path <path-to-a-model2vec-model> --save_path "<path-to-save-the-onnx-model>"
 ```
+
+
+<br>
+</details>
+
 
 ## Model List
 
