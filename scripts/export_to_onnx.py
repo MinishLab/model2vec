@@ -133,6 +133,7 @@ def save_tokenizer(tokenizer: Tokenizer, save_directory: Path) -> None:
     :param tokenizer: The tokenizer from the StaticModel.
     :param save_directory: The directory to save the tokenizer files.
     :raises FileNotFoundError: If config.json is not found in save_directory.
+    :raises FileNotFoundError: If tokenizer_config.json is not found in save_directory.
     :raises ValueError: If tokenizer_name is not found in config.json.
     """
     tokenizer_json_path = save_directory / "tokenizer.json"
@@ -164,15 +165,28 @@ def save_tokenizer(tokenizer: Tokenizer, save_directory: Path) -> None:
     special_tokens = original_tokenizer.special_tokens_map
     tokenizer_class = original_tokenizer.__class__.__name__
 
-    # Load the tokenizer using PreTrainedTokenizerFast with the correct class and special tokens
+    # Load the tokenizer using PreTrainedTokenizerFast with special tokens
     fast_tokenizer = PreTrainedTokenizerFast(
         tokenizer_file=str(tokenizer_json_path),
-        tokenizer_class=tokenizer_class,
         **special_tokens,
     )
 
     # Save the tokenizer files
     fast_tokenizer.save_pretrained(str(save_directory))
+    # Modify tokenizer_config.json to set the correct tokenizer_class
+    tokenizer_config_path = save_directory / "tokenizer_config.json"
+    if tokenizer_config_path.exists():
+        with open(tokenizer_config_path, "r", encoding="utf-8") as f:
+            tokenizer_config = json.load(f)
+    else:
+        raise FileNotFoundError(f"tokenizer_config.json not found in {save_directory}")
+
+    # Update the tokenizer_class field
+    tokenizer_config["tokenizer_class"] = tokenizer_class
+
+    # Write the updated tokenizer_config.json back to disk
+    with open(tokenizer_config_path, "w", encoding="utf-8") as f:
+        json.dump(tokenizer_config, f, indent=4, sort_keys=True)
 
 
 if __name__ == "__main__":

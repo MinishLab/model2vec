@@ -54,6 +54,7 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
     - [Distillation](#distillation)
     - [Inference](#inference)
     - [Evaluation](#evaluation)
+    - [Integrations](#integrations)
 - [Model List](#model-list)
 - [Results](#results)
 - [Related Work](#related-work)
@@ -355,6 +356,14 @@ task_scores = summarize_results(parsed_results)
 print(make_leaderboard(task_scores))
 ```
 </details>
+
+### Integrations
+<details>
+<summary>  Sentence Transformers </summary>
+<br>
+</details>
+
+
 
 ## Model List
 
