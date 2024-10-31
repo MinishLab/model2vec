@@ -8,12 +8,13 @@ for extra_dependency in get_package_extras("model2vec", _REQUIRED_EXTRA):
     importable(extra_dependency, _REQUIRED_EXTRA)
 
 import argparse
+import json
 import logging
 from pathlib import Path
 
 import torch
 from tokenizers import Tokenizer
-from transformers import PreTrainedTokenizerFast
+from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 from model2vec import StaticModel
 
@@ -131,25 +132,44 @@ def save_tokenizer(tokenizer: Tokenizer, save_directory: Path) -> None:
 
     :param tokenizer: The tokenizer from the StaticModel.
     :param save_directory: The directory to save the tokenizer files.
+    :raises FileNotFoundError: If config.json is not found in save_directory.
+    :raises ValueError: If tokenizer_name is not found in config.json.
     """
-    # Convert the tokenizers.Tokenizer to a PreTrainedTokenizerFast and save
     tokenizer_json_path = save_directory / "tokenizer.json"
     tokenizer.save(str(tokenizer_json_path))
 
-    # Load the tokenizer using PreTrainedTokenizerFast
-    fast_tokenizer = PreTrainedTokenizerFast(
-        tokenizer_file=str(tokenizer_json_path),
-        unk_token="[UNK]",
-        pad_token="[PAD]",
-        cls_token="[CLS]",
-        sep_token="[SEP]",
-        mask_token="[MASK]",
-    )
+    # Save vocab.txt
     vocab = tokenizer.get_vocab()
     vocab_path = save_directory / "vocab.txt"
     with open(vocab_path, "w", encoding="utf-8") as vocab_file:
         for token in sorted(vocab, key=vocab.get):
             vocab_file.write(f"{token}\n")
+
+    # Load config.json to get tokenizer_name
+    config_path = save_directory / "config.json"
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    else:
+        raise FileNotFoundError(f"config.json not found in {save_directory}")
+
+    tokenizer_name = config.get("tokenizer_name")
+    if not tokenizer_name:
+        raise ValueError("tokenizer_name not found in config.json")
+
+    # Load the original tokenizer
+    original_tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+
+    # Extract special tokens and tokenizer class
+    special_tokens = original_tokenizer.special_tokens_map
+    tokenizer_class = original_tokenizer.__class__.__name__
+
+    # Load the tokenizer using PreTrainedTokenizerFast with the correct class and special tokens
+    fast_tokenizer = PreTrainedTokenizerFast(
+        tokenizer_file=str(tokenizer_json_path),
+        tokenizer_class=tokenizer_class,
+        **special_tokens,
+    )
 
     # Save the tokenizer files
     fast_tokenizer.save_pretrained(str(save_directory))
