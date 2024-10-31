@@ -145,6 +145,11 @@ def save_tokenizer(tokenizer: Tokenizer, save_directory: Path) -> None:
         sep_token="[SEP]",
         mask_token="[MASK]",
     )
+    vocab = tokenizer.get_vocab()
+    vocab_path = save_directory / "vocab.txt"
+    with open(vocab_path, "w", encoding="utf-8") as vocab_file:
+        for token in sorted(vocab, key=vocab.get):
+            vocab_file.write(f"{token}\n")
 
     # Save the tokenizer files
     fast_tokenizer.save_pretrained(str(save_directory))
