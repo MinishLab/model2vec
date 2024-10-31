@@ -18,6 +18,9 @@ from model2vec.utils import SafeOpenProtocol
 logger = logging.getLogger(__name__)
 
 
+import json
+
+
 def save_pretrained(
     folder_path: Path,
     embeddings: np.ndarray,
@@ -40,6 +43,53 @@ def save_pretrained(
     save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"))
     json.dump(config, open(folder_path / "config.json", "w"))
+
+    # Save vocab.txt
+    with open(folder_path / "vocab.txt", "w") as vocab_file:
+        vocab = tokenizer.get_vocab()
+        for token in sorted(vocab, key=vocab.get):
+            vocab_file.write(f"{token}\n")
+
+    # Load tokenizer.json
+    with open(folder_path / "tokenizer.json", "r") as f:
+        tokenizer_data = json.load(f)
+
+    # Save special_tokens_map.json
+    special_tokens = {
+        "cls_token": "[CLS]",
+        "sep_token": "[SEP]",
+        "pad_token": "[PAD]",
+        "unk_token": "[UNK]",
+        "mask_token": "[MASK]",
+    }
+    json.dump(special_tokens, open(folder_path / "special_tokens_map.json", "w"), indent=4)
+
+    # Save tokenizer_config.json based on tokenizer.json
+    tokenizer_config = {
+        "added_tokens_decoder": {
+            str(token["id"]): {
+                "content": token["content"],
+                "lstrip": token.get("lstrip", False),
+                "normalized": token.get("normalized", False),
+                "rstrip": token.get("rstrip", False),
+                "single_word": token.get("single_word", False),
+                "special": token.get("special", True),
+            }
+            for token in tokenizer_data.get("added_tokens", [])
+        },
+        "clean_up_tokenization_spaces": True,
+        "cls_token": special_tokens["cls_token"],
+        "do_lower_case": tokenizer_data.get("normalizer", {}).get("lowercase", config.get("do_lower_case", True)),
+        "mask_token": special_tokens["mask_token"],
+        "model_max_length": config.get("seq_length", 512),
+        "pad_token": special_tokens["pad_token"],
+        "sep_token": special_tokens["sep_token"],
+        "strip_accents": tokenizer_data.get("normalizer", {}).get("strip_accents"),
+        "tokenize_chinese_chars": tokenizer_data.get("normalizer", {}).get("handle_chinese_chars", True),
+        "tokenizer_class": "BertTokenizer",
+        "unk_token": special_tokens["unk_token"],
+    }
+    json.dump(tokenizer_config, open(folder_path / "tokenizer_config.json", "w"), indent=4)
 
     logger.info(f"Saved model to {folder_path}")
 
