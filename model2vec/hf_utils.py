@@ -42,7 +42,8 @@ def save_pretrained(
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"))
-    json.dump(config, open(folder_path / "config.json", "w"))
+    with open(folder_path / "config.json", "w") as config_file:
+        json.dump(config, config_file, indent=4, sort_keys=True)
 
     # Save vocab.txt
     with open(folder_path / "vocab.txt", "w") as vocab_file:
@@ -50,7 +51,7 @@ def save_pretrained(
         for token in sorted(vocab, key=vocab.get):
             vocab_file.write(f"{token}\n")
 
-    # Load tokenizer.json
+    # Load tokenizer.json to use for generating tokenizer_config.json
     with open(folder_path / "tokenizer.json", "r") as f:
         tokenizer_data = json.load(f)
 
@@ -62,7 +63,14 @@ def save_pretrained(
         "unk_token": "[UNK]",
         "mask_token": "[MASK]",
     }
-    json.dump(special_tokens, open(folder_path / "special_tokens_map.json", "w"), indent=4)
+    with open(folder_path / "special_tokens_map.json", "w") as special_tokens_file:
+        json.dump(special_tokens, special_tokens_file, indent=4, sort_keys=True)
+
+    # Set fallback values for normalizer attributes in case normalizer is None
+    normalizer = tokenizer_data.get("normalizer")
+    do_lower_case = normalizer.get("lowercase") if normalizer else config.get("do_lower_case", True)
+    strip_accents = normalizer.get("strip_accents") if normalizer else None
+    tokenize_chinese_chars = normalizer.get("handle_chinese_chars", True) if normalizer else True
 
     # Save tokenizer_config.json based on tokenizer.json
     tokenizer_config = {
@@ -79,17 +87,18 @@ def save_pretrained(
         },
         "clean_up_tokenization_spaces": True,
         "cls_token": special_tokens["cls_token"],
-        "do_lower_case": tokenizer_data.get("normalizer", {}).get("lowercase", config.get("do_lower_case", True)),
+        "do_lower_case": do_lower_case,
         "mask_token": special_tokens["mask_token"],
         "model_max_length": config.get("seq_length", 512),
         "pad_token": special_tokens["pad_token"],
         "sep_token": special_tokens["sep_token"],
-        "strip_accents": tokenizer_data.get("normalizer", {}).get("strip_accents"),
-        "tokenize_chinese_chars": tokenizer_data.get("normalizer", {}).get("handle_chinese_chars", True),
+        "strip_accents": strip_accents,
+        "tokenize_chinese_chars": tokenize_chinese_chars,
         "tokenizer_class": "BertTokenizer",
         "unk_token": special_tokens["unk_token"],
     }
-    json.dump(tokenizer_config, open(folder_path / "tokenizer_config.json", "w"), indent=4)
+    with open(folder_path / "tokenizer_config.json", "w") as tokenizer_config_file:
+        json.dump(tokenizer_config, tokenizer_config_file, indent=4, sort_keys=True)
 
     logger.info(f"Saved model to {folder_path}")
 

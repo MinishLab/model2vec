@@ -1,3 +1,12 @@
+from model2vec.utils import get_package_extras, importable
+
+# Define the optional dependency group name
+_REQUIRED_EXTRA = "onnx"
+
+# Check if each dependency for the "onnx" group is importable
+for extra_dependency in get_package_extras("model2vec", _REQUIRED_EXTRA):
+    importable(extra_dependency, _REQUIRED_EXTRA)
+
 import argparse
 import logging
 from pathlib import Path
@@ -6,6 +15,7 @@ import torch
 
 from model2vec import StaticModel
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

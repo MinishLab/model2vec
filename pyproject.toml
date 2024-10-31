@@ -27,6 +27,7 @@ dependencies = [
     "rich",
     "tqdm",
     "tokenizers>=0.20",
+    "safetensors",
     "setuptools",
 ]
 
@@ -52,6 +53,8 @@ dev = [
     "ruff",
 ]
 distill = ["torch", "transformers", "scikit-learn"]
+
+onnx = ["onnx", "torch"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"

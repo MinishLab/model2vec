@@ -26,17 +26,19 @@ _MODULE_MAP = (("scikit-learn", "sklearn"),)
 
 def get_package_extras(package: str, extra: str) -> Iterator[str]:
     """Get the extras of the package."""
-    message = metadata(package)
+    try:
+        message = metadata(package)
+    except Exception as e:
+        raise ImportError(f"Could not retrieve metadata for package '{package}': {e}")
+
     all_packages = message.get_all("Requires-Dist") or []
     for package in all_packages:
         name, *rest = package.split(";", maxsplit=1)
-        if not rest:
-            continue
-        _, found_extra = rest[0].split("==", maxsplit=1)
-        # Strip off quotes
-        found_extra = found_extra.strip(' "')
-        if found_extra == extra:
-            yield name
+        if rest:
+            # Extract and clean the extra requirement
+            found_extra = rest[0].split("==")[-1].strip(" \"'")
+            if found_extra == extra:
+                yield name.strip()
 
 
 def importable(module: str, extra: str) -> None:
