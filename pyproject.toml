@@ -54,6 +54,8 @@ dev = [
 ]
 distill = ["torch", "transformers", "scikit-learn"]
 
+onnx = ["onnx", "torch"]
+
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"
 "Bug Reports" = "https://github.com/MinishLab/model2vec/issues"
