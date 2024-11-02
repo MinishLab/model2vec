@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -25,7 +24,7 @@ def mock_tokenizer() -> Tokenizer:
     return tokenizer
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_berttokenizer() -> AutoTokenizer:
     """Load the real BertTokenizerFast from the provided tokenizer.json file."""
     return AutoTokenizer.from_pretrained("tests/data/test_tokenizer")

@@ -1,7 +1,9 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pytest
+import safetensors
 from tokenizers import Tokenizer
 
 from model2vec import StaticModel
@@ -10,7 +12,7 @@ from model2vec import StaticModel
 def test_initialization(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
     """Test successful initialization of StaticModel."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    assert model.embedding.weight.shape == (5, 2)
+    assert model.embedding.shape == (5, 2)
     assert len(model.tokens) == 5
     assert model.tokenizer == mock_tokenizer
     assert model.config == mock_config
@@ -23,6 +25,27 @@ def test_initialization_token_vector_mismatch(mock_tokenizer: Tokenizer, mock_co
         StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
 
 
+def test_tokenize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
+    """Test tokenization of a sentence."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    model._can_encode_fast = True
+    tokens_fast = model.tokenize(["word1 word2"])
+    model._can_encode_fast = False
+    tokens_slow = model.tokenize(["word1 word2"])
+
+    assert tokens_fast == tokens_slow
+
+
+def test_encode_batch_fast(
+    mock_vectors: np.ndarray, mock_berttokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test tokenization of a sentence."""
+    if hasattr(mock_berttokenizer, "encode_batch_fast"):
+        del mock_berttokenizer.encode_batch_fast
+        model = StaticModel(vectors=mock_vectors, tokenizer=mock_berttokenizer, config=mock_config)
+        assert not model._can_encode_fast
+
+
 def test_encode_single_sentence(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
@@ -30,6 +53,17 @@ def test_encode_single_sentence(
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     encoded = model.encode("word1 word2")
     assert encoded.shape == (2,)
+
+
+def test_encode_single_sentence_empty(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test encoding of a single empty sentence."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    model.normalize = True
+    encoded = model.encode("")
+    assert not np.isnan(encoded).any()
+    assert np.all(encoded == 0)
 
 
 def test_encode_multiple_sentences(
@@ -60,21 +94,11 @@ def test_encode_as_tokens_empty(
     """Test encoding of an empty list of sentences."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     encoded = model.encode_as_sequence("")
-    assert np.array_equal(encoded, np.zeros(shape=(0, 2), dtype=model.embedding.weight.numpy().dtype))
+    assert np.array_equal(encoded, np.zeros(shape=(0, 2), dtype=model.embedding.dtype))
 
     encoded = model.encode_as_sequence(["", ""])
-    out = [np.zeros(shape=(0, 2), dtype=model.embedding.weight.numpy().dtype) for _ in range(2)]
-    assert np.array_equal(encoded, out)
-
-
-def test_forward(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
-    """Test forward pass of the model."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    encoded = model.forward(model.tokenize(["word1 word2"]))
-    assert encoded.shape == (1, model.embedding.weight.shape[1])
-
-    encoded = model.forward(model.tokenize(["word1", "word1 word2 word1"]))
-    assert encoded.shape == (2, model.embedding.weight.shape[1])
+    out = [np.zeros(shape=(0, 2), dtype=model.embedding.dtype) for _ in range(2)]
+    assert [np.array_equal(x, y) for x, y in zip(encoded, out)]
 
 
 def test_encode_empty_sentence(
@@ -130,7 +154,7 @@ def test_load_pretrained(
     loaded_model = StaticModel.from_pretrained(save_path)
 
     # Assert that the loaded model has the same properties as the original one
-    np.testing.assert_array_equal(loaded_model.embedding.weight.numpy(), mock_vectors)
+    np.testing.assert_array_equal(loaded_model.embedding, mock_vectors)
     assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
     assert loaded_model.config == mock_config
 
@@ -166,4 +190,24 @@ def test_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: d
     """Tests the dimensionality of the model."""
     model = StaticModel(mock_vectors, mock_tokenizer, mock_config)
     assert model.dim == 2
-    assert model.dim == model.embedding.weight.shape[1]
+    assert model.dim == model.embedding.shape[1]
+
+
+def test_local_load_from_model(mock_tokenizer: Tokenizer) -> None:
+    """Test local load from a model."""
+    x = np.ones((mock_tokenizer.get_vocab_size(), 2))
+    with TemporaryDirectory() as tempdir:
+        tempdir_path = Path(tempdir)
+        safetensors.numpy.save_file({"embeddings": x}, Path(tempdir) / "model.safetensors")
+        mock_tokenizer.save(str(Path(tempdir) / "tokenizer.json"))
+
+        model = StaticModel.load_local(tempdir_path)
+        assert model.embedding.shape == x.shape
+        assert model.tokenizer.to_str() == mock_tokenizer.to_str()
+        assert model.config == {"normalize": False}
+
+
+def test_local_load_from_model_no_folder() -> None:
+    """Test local load from a model with no folder."""
+    with pytest.raises(ValueError):
+        StaticModel.load_local("woahbuddy_relax_this_is_just_a_test")

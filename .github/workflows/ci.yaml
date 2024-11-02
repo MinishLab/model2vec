@@ -10,7 +10,14 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
-        python-version: ["3.10"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        exclude:
+          - os: windows-latest
+            python-version: "3.9"
+          - os: windows-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.12"
       fail-fast: false
 
     steps:
@@ -42,8 +49,7 @@ jobs:
 
       # Install dependencies using uv pip
       - name: Install dependencies
-        run: make install
-       # run: uv pip install -e ".[pytest]"
+        run: make install-no-pre-commit
 
       # Run tests with coverage
       - name: Run tests under coverage

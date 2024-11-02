@@ -1,11 +1,11 @@
 [project]
 name = "model2vec"
-description = "Distill a Small Fast Model from any Sentence Transformer"
+description = "Distill a Small Static Model from any Sentence Transformer"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
-version = "0.2.4"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 authors = [{ name = "Stéphan Tulkens", email = "stephantul@gmail.com"}, {name = "Thomas van Dongen", email = "thomas123@live.nl"}]
+dynamic = ["version"]
 
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -15,6 +15,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -22,15 +23,11 @@ classifiers = [
 ]
 
 dependencies = [
-    "click",
     "numpy",
     "rich",
     "tqdm",
-    "typer",
-    "transformers",
-    "torch",
-    "tokenizers",
-    "scikit-learn",
+    "tokenizers>=0.20",
+    "safetensors",
     "setuptools",
 ]
 
@@ -55,13 +52,14 @@ dev = [
     "pytest-coverage",
     "ruff",
 ]
+distill = ["torch", "transformers", "scikit-learn"]
 
+onnx = ["onnx", "torch"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"
 "Bug Reports" = "https://github.com/MinishLab/model2vec/issues"
 "Source" = "https://github.com/MinishLab/model2vec"
-
 
 [tool.ruff]
 exclude = [".venv/"]
@@ -108,3 +106,6 @@ ignore_missing_imports = true
 
 [tool.setuptools_scm]
 # can be empty if no extra settings are needed, presence enables setuptools_scm
+
+[tool.setuptools.dynamic]
+version = {attr = "model2vec.version.__version__"}
