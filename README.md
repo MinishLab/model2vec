@@ -38,11 +38,8 @@
     <img src="assets/images/model2vec_model_diagram_transparant_dark.png#gh-dark-mode-only" width="90%">
     <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="90%">
 </div>
-<<<<<<< HEAD
-=======
 
 Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](results/README.md), or dive in to see how it works.
->>>>>>> 54a64605fb896b247d8fbb9917d89059210aa28f
 
 
 ## Updates & Announcements
@@ -168,15 +165,9 @@ Our flagship POTION models are pre-trained using [Tokenlearn](https://github.com
 
 ## Usage
 
-<<<<<<< HEAD
-
-### Distilling a Model2Vec model
-
-=======
 
 ### Distillation
 
->>>>>>> 54a64605fb896b247d8fbb9917d89059210aa28f
 <details>
 <summary>  Distilling from a Sentence Transformer </summary>
 <br>
@@ -263,32 +254,6 @@ m2v_model.push_to_hub("my_organization/my_model", token="<it's a secret to every
 ```
 
 By default, this will distill a model with a subword tokenizer, combining the models (subword) vocab with the new vocabulary. If you want to get a word-level tokenizer instead (with only the passed vocabulary), the `use_subword` parameter can be set to `False`, e.g.:
-<<<<<<< HEAD
-
-```python
-m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=False)
-```
-
-**Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
-
-</details>
-
-<details>
-<summary>  Distilling via CLI </summary>
-<br>
-
-We also provide a command line interface for distillation. Note that `vocab.txt` should be a file with one word per line.
-```bash
-python3 -m model2vec.distill --model-name BAAI/bge-base-en-v1.5 --vocabulary-path vocab.txt --device mps --save-path model2vec_model
-```
-
-</details>
-
-### Inference with Model2Vec
-
-<details>
-<summary>  Inference a pretrained model </summary>
-=======
 
 ```python
 m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=False)
@@ -302,7 +267,6 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 
 <details>
 <summary>  Inference using pretrained model </summary>
->>>>>>> 54a64605fb896b247d8fbb9917d89059210aa28f
 <br>
 
 Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
@@ -324,11 +288,7 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 
 
 <details>
-<<<<<<< HEAD
-<summary>  Inference with the Sentence Transformers library </summary>
-=======
 <summary>  Inference using the Sentence Transformers library </summary>
->>>>>>> 54a64605fb896b247d8fbb9917d89059210aa28f
 <br>
 
 The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
@@ -338,28 +298,17 @@ from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import StaticEmbedding
 
 # Initialize a StaticEmbedding module
-<<<<<<< HEAD
-static_embedding = StaticEmbedding.from_model2vec("minishlab/M2V_base_output")
-=======
 static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
->>>>>>> 54a64605fb896b247d8fbb9917d89059210aa28f
 model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
 </details>
 
-<<<<<<< HEAD
-
-### Evaluating a Model2Vec model
-
-
-=======
 
 ### Evaluation
 
 
->>>>>>> 54a64605fb896b247d8fbb9917d89059210aa28f
 <details>
 <summary>  Installation </summary>
 <br>
@@ -413,26 +362,12 @@ print(make_leaderboard(task_scores))
 <summary>  Sentence Transformers </summary>
 <br>
 
-<<<<<<< HEAD
-We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e) and can be loaded using the `from_pretrained` method. The models are listed below.
-
-| Model                  | Language    | Vocab            | Sentence Transformer | Tokenizer Type | Params       |
-|------------------------|-------------|------------------|----------------------|----------------|--------------|
-| [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)           | English     | GloVe            | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Word-level     | 102M         |
-| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)          | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Subword        | 7.5M         |
-| [M2V_base_glove_subword](https://huggingface.co/minishlab/M2V_base_glove_subword)          | English     | Output + GloVe   | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5)  | Subword        | 103M         |
-| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output)          | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)        | Subword        | 471M         |
-
-
-## Results
-=======
 Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) using the `StaticEmbedding` module.
 
 The following code snippet shows how to load a Model2Vec model into a Sentence Transformer model:
 ```python
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.models import StaticEmbedding
->>>>>>> 54a64605fb896b247d8fbb9917d89059210aa28f
 
 # Initialize a StaticEmbedding module
 static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
