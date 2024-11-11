@@ -34,6 +34,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           irm https://astral.sh/uv/install.ps1 | iex
+          $env:Path = "C:\Users\runneradmin\.local\bin;$env:Path"
           uv venv .venv
           "VIRTUAL_ENV=.venv" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$PWD/.venv/Scripts" | Out-File -FilePath $env:GITHUB_PATH -Append
