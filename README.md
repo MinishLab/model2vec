@@ -395,7 +395,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 <details>
 <summary>  LangChain </summary>
-
+<a name="langchain"></a>
 <br>
 
 Model2Vec can be used in [LangChain](https://github.com/langchain-ai/langchain) using the `langchain-huggingface` package. The following code snippet shows how to use Model2Vec in LangChain:
@@ -430,7 +430,7 @@ query_result = embeddings.embed_query("It's dangerous to go alone!")
 
 <details>
 <summary>  Transformers.js </summary>
-
+<a name="transformersjs"></a>
 <br>
 
 To use a Model2Vec model in [transformers.js](https://github.com/huggingface/transformers.js), the following code snippet can be used as a starting point:
