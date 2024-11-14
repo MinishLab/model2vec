@@ -54,10 +54,10 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
     - [Distillation](#distillation)
     - [Inference](#inference)
     - [Evaluation](#evaluation)
-    - [Integrations](#integrations)
-        - [Sentence Transformers](#sentence-transformers)
-        - [LangChain](#langchain)
-        - [Transformers.js](#transformersjs)
+- [Integrations](#integrations)
+    - [Sentence Transformers](#sentence-transformers)
+    - [LangChain](#langchain)
+    - [Transformers.js](#transformersjs)
 - [Model List](#model-list)
 - [Results](#results)
 - [Related Work](#related-work)
@@ -360,7 +360,7 @@ print(make_leaderboard(task_scores))
 ```
 </details>
 
-### Integrations
+## Integrations
 <details>
 <summary>  Sentence Transformers </summary>
 <a name="sentence-transformers"></a>
