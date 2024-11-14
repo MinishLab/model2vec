@@ -363,6 +363,7 @@ print(make_leaderboard(task_scores))
 ### Integrations
 <details>
 <summary>  Sentence Transformers </summary>
+<a name="sentence-transformers"></a>
 <br>
 
 Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) using the `StaticEmbedding` module.
