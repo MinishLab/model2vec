@@ -23,12 +23,13 @@ classifiers = [
 ]
 
 dependencies = [
+    "jinja2",
     "numpy",
     "rich",
-    "tqdm",
-    "tokenizers>=0.20",
     "safetensors",
     "setuptools",
+    "tokenizers>=0.20",
+    "tqdm",
 ]
 
 [build-system]
