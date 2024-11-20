@@ -7,7 +7,7 @@
 </div>
 
 <div align="center">
-  <h2>Distill a Small Static Model from any Sentence Transformer</h2>
+  <h2>The Fastest State-of-the-Art Static Embeddings in the World</h2>
 </div>
 
 <div align="center">
@@ -39,16 +39,12 @@
     <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="90%">
 </div>
 
-<<<<<<< HEAD
-Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](results/README.md), or dive in to see how it works.
-=======
 Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is the most performant static embedding model in the world. See our results [here](results/README.md), or dive in to see how it works.
 
 
 ## Updates & Announcements
 
 - **30/10/2024**: We released three new models: [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M), [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M), and [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M). These models are trained using [Tokenlearn](https://github.com/MinishLab/tokenlearn). Find out more in our [blog post](https://minishlab.github.io/tokenlearn_blogpost/). NOTE: for users of any of our old English M2V models, we recommend switching to these new models as they [perform better on all tasks](https://github.com/MinishLab/model2vec/tree/main/results).
->>>>>>> b1358a9c2e777800e8f89c7a5f830fa2176c15b5
 
 ## Table of Contents
 - [Quickstart](#quickstart)
