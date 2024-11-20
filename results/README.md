@@ -8,18 +8,19 @@ This page contains the experiments results of the Model2Vec project. The results
 
 Model2Vec is evaluated on MTEB, as well as two additional tasks: [PEARL](https://github.com/tigerchen52/PEARL) (a phrase representation task) and WordSim (a collection of _word_ similarity tasks). The results are shown in the table below.
 
+Note: The `potion` and `M2V` models are our static models.
 
 | Model                  |   Avg (All) |   Avg (MTEB) |   Class |   Clust |   PairClass |   Rank |    Ret |    STS |    Sum |   Pearl |   WordSim |
 |:-----------------------|------------:|-------------:|--------:|--------:|------------:|-------:|-------:|-------:|-------:|--------:|----------:|
-| all-MiniLM-L6-v2        | 56.08     | 56.09      | 62.62  | 41.94  | 82.37     | 58.04  | 41.95  | 78.90  | 30.81  | 60.83  | 49.91   |
-| potion-base-8M         |       50.54 |        50.03 |   64.44 |   32.93 |       76.62 |  49.73 |  31.71 |  73.24 |  29.28 |   53.54 |     50.75 |
-| M2V_base_glove_subword |       49.06 |        46.69 |   61.27 |   30.03 |       74.71 |  49.15 |  27.16 |  69.09 |  30.08 |   56.82 |     57.99 |
-| potion-base-4M         |       48.87 |        48.23 |   62.19 |   31.47 |       75.37 |  48.75 |  29.11 |  72.19 |  28.89 |   52.55 |     49.21 |
-| M2V_base_glove         |       48.58 |        47.6  |   61.35 |   30.52 |       75.34 |  48.5  |  29.26 |  70.31 |  31.5  |   50.28 |     54.29 |
-| M2V_base_output        |       46.79 |        45.34 |   61.25 |   25.58 |       74.9  |  47.63 |  26.14 |  68.58 |  29.2  |   54.02 |     49.18 |
-| potion-base-2M         |       45.52 |        44.77 |   58.45 |   27.5  |       73.72 |  46.82 |  24.13 |  70.14 |  31.51 |   50.82 |     44.72 |
-| GloVe_300d             |       42.84 |        42.36 |   57.31 |   27.66 |       72.48 |  43.3  |  22.78 |  61.9  |  28.81 |   45.65 |     43.05 |
-| BPEmb_50k_300d         |       39.34 |        37.78 |   55.76 |   23.35 |       57.86 |  43.21 |  17.5  |  55.1  |  29.74 |   47.56 |     41.28 |
+| [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)        | 56.08     | 56.09      | 62.62  | 41.94  | 82.37     | 58.04  | 41.95  | 78.90  | 30.81  | 60.83  | 49.91   |
+| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)         |       50.54 |        50.03 |   64.44 |   32.93 |       76.62 |  49.73 |  31.71 |  73.24 |  29.28 |   53.54 |     50.75 |
+| [M2V_base_glove_subword](https://huggingface.co/minishlab/M2V_base_glove_subword) |       49.06 |        46.69 |   61.27 |   30.03 |       74.71 |  49.15 |  27.16 |  69.09 |  30.08 |   56.82 |     57.99 |
+| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)         |       48.87 |        48.23 |   62.19 |   31.47 |       75.37 |  48.75 |  29.11 |  72.19 |  28.89 |   52.55 |     49.21 |
+| [M2V_base_glove](https://huggingface.co/minishlab/M2V_base_glove)         |       48.58 |        47.6  |   61.35 |   30.52 |       75.34 |  48.5  |  29.26 |  70.31 |  31.5  |   50.28 |     54.29 |
+| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)        |       46.79 |        45.34 |   61.25 |   25.58 |       74.9  |  47.63 |  26.14 |  68.58 |  29.2  |   54.02 |     49.18 |
+| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)         |       45.52 |        44.77 |   58.45 |   27.5  |       73.72 |  46.82 |  24.13 |  70.14 |  31.51 |   50.82 |     44.72 |
+| [GloVe_300d](https://huggingface.co/sentence-transformers/average_word_embeddings_glove.6B.300d)             |       42.84 |        42.36 |   57.31 |   27.66 |       72.48 |  43.3  |  22.78 |  61.9  |  28.81 |   45.65 |     43.05 |
+| [BPEmb_50k_300d](https://github.com/bheinzerling/bpemb)         |       39.34 |        37.78 |   55.76 |   23.35 |       57.86 |  43.21 |  17.5  |  55.1  |  29.74 |   47.56 |     41.28 |
 
 
 <details>
@@ -36,7 +37,7 @@ For readability, the MTEB task names are abbreviated as follows:
 </details>
 
 The figure below shows the relationship between the number of sentences per second and the average MTEB score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
-This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
+This plot shows that the potion and M2V models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
 
 | ![Description](../assets/images/speed_vs_mteb_score_v2.png) |
 |:--:|

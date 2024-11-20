@@ -7,7 +7,7 @@
 </div>
 
 <div align="center">
-  <h2>Distill a Small Static Model from any Sentence Transformer</h2>
+  <h2>The Fastest State-of-the-Art Static Embeddings in the World</h2>
 </div>
 
 <div align="center">
@@ -39,7 +39,7 @@
     <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="90%">
 </div>
 
-Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. See our results [here](results/README.md), or dive in to see how it works.
+Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by 15x and making the models up to 500x faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is the most performant static embedding model in the world. See our results [here](results/README.md), or dive in to see how it works.
 
 
 ## Updates & Announcements
@@ -54,6 +54,7 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
     - [Distillation](#distillation)
     - [Inference](#inference)
     - [Evaluation](#evaluation)
+    - [Integrations](#integrations)
 - [Model List](#model-list)
 - [Results](#results)
 - [Related Work](#related-work)
@@ -355,6 +356,89 @@ task_scores = summarize_results(parsed_results)
 print(make_leaderboard(task_scores))
 ```
 </details>
+
+### Integrations
+<details>
+<summary>  Sentence Transformers </summary>
+<br>
+
+Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) using the `StaticEmbedding` module.
+
+The following code snippet shows how to load a Model2Vec model into a Sentence Transformer model:
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+# Initialize a StaticEmbedding module
+static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+The following code snippet shows how to distill a model directly into a Sentence Transformer model:
+
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+static_embedding = StaticEmbedding.from_distillation("BAAI/bge-base-en-v1.5", device="cpu", pca_dims=256)
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+</details>
+
+
+<details>
+<summary>  Transformers.js </summary>
+
+<br>
+
+To use a Model2Vec model in [transformers.js](https://github.com/huggingface/transformers.js), the following code snippet can be used as a starting point:
+
+```javascript
+import { AutoModel, AutoTokenizer, Tensor } from '@huggingface/transformers';
+
+const modelName = 'minishlab/potion-base-8M';
+
+const modelConfig = {
+    config: { model_type: 'model2vec' },
+    dtype: 'fp32',
+    revision: 'refs/pr/1'
+};
+const tokenizerConfig = {
+    revision: 'refs/pr/2'
+};
+
+const model = await AutoModel.from_pretrained(modelName, modelConfig);
+const tokenizer = await AutoTokenizer.from_pretrained(modelName, tokenizerConfig);
+
+const texts = ['hello', 'hello world'];
+const { input_ids } = await tokenizer(texts, { add_special_tokens: false, return_tensor: false });
+
+const cumsum = arr => arr.reduce((acc, num, i) => [...acc, num + (acc[i - 1] || 0)], []);
+const offsets = [0, ...cumsum(input_ids.slice(0, -1).map(x => x.length))];
+
+const flattened_input_ids = input_ids.flat();
+const modelInputs = {
+    input_ids: new Tensor('int64', flattened_input_ids, [flattened_input_ids.length]),
+    offsets: new Tensor('int64', offsets, [offsets.length])
+};
+
+const { embeddings } = await model(modelInputs);
+console.log(embeddings.tolist()); // output matches python version
+```
+
+Note that this requires that the Model2Vec has a `model.onnx` file and several required tokenizers file. To generate these for a model that does not have them yet, the following code snippet can be used:
+
+```bash
+python scripts/export_to_onnx.py --model_path <path-to-a-model2vec-model> --save_path "<path-to-save-the-onnx-model>"
+```
+
+
+<br>
+</details>
+
 
 ## Model List
 
