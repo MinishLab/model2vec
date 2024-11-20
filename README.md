@@ -7,7 +7,7 @@
 </div>
 
 <div align="center">
-  <h2>Distill a Small Static Model from any Sentence Transformer</h2>
+  <h2>The Fastest State-of-the-Art Static Embeddings in the World</h2>
 </div>
 
 <div align="center">
