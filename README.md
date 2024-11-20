@@ -51,10 +51,10 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 - [Main Features](#main-features)
 - [What is Model2Vec?](#what-is-model2vec)
 - [Usage](#usage)
-    - [Distillation](#distillation)
     - [Inference](#inference)
+    - [Distillation](#distillation)
     - [Evaluation](#evaluation)
-    - [Integrations](#integrations)
+- [Integrations](#integrations)
 - [Model List](#model-list)
 - [Results](#results)
 - [Related Work](#related-work)
@@ -167,6 +167,48 @@ Our flagship POTION models are pre-trained using [Tokenlearn](https://github.com
 ## Usage
 
 
+### Inference
+
+<details>
+<summary>  Inference using pretrained model </summary>
+<br>
+
+Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
+```python
+from model2vec import StaticModel
+
+# Load a model from the HuggingFace hub, or a local one.
+model_name = "minishlab/potion-base-8M"
+# You can optionally pass a token if you're loading a private model
+model = StaticModel.from_pretrained(model_name, token=None)
+
+# Make embeddings
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+
+# Make sequences of token embeddings
+token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+</details>
+
+
+<details>
+<summary>  Inference using the Sentence Transformers library </summary>
+<br>
+
+The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
+
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+# Initialize a StaticEmbedding module
+static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+</details>
+
 ### Distillation
 
 <details>
@@ -264,48 +306,6 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 
 </details>
 
-### Inference
-
-<details>
-<summary>  Inference using pretrained model </summary>
-<br>
-
-Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
-```python
-from model2vec import StaticModel
-
-# Load a model from the HuggingFace hub, or a local one.
-model_name = "minishlab/potion-base-8M"
-# You can optionally pass a token if you're loading a private model
-model = StaticModel.from_pretrained(model_name, token=None)
-
-# Make embeddings
-embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
-
-# Make sequences of token embeddings
-token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
-```
-</details>
-
-
-<details>
-<summary>  Inference using the Sentence Transformers library </summary>
-<br>
-
-The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
-
-```python
-from sentence_transformers import SentenceTransformer
-from sentence_transformers.models import StaticEmbedding
-
-# Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
-model = SentenceTransformer(modules=[static_embedding])
-embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
-```
-
-</details>
-
 
 ### Evaluation
 
@@ -358,7 +358,7 @@ print(make_leaderboard(task_scores))
 ```
 </details>
 
-### Integrations
+## Integrations
 <details>
 <summary>  Sentence Transformers </summary>
 <br>
