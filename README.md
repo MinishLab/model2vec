@@ -57,7 +57,6 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 - [Integrations](#integrations)
 - [Model List](#model-list)
 - [Results](#results)
-- [Related Work](#related-work)
 - [Citing](#citing)
 
 ## Quickstart
@@ -90,7 +89,7 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 
 And that's it. You can use the model to classify texts, to cluster, or to build a RAG system.
 
-Instead of using one of our models, you can distill your own Model2Vec model from a Sentence Transformer model. The following code snippet shows how to distill a model:
+Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. The following code snippet shows how to distill a model:
 ```python
 from model2vec.distill import distill
 
@@ -101,73 +100,45 @@ m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 ```
 
-Distillation is really fast, and only takes about 5 seconds on a 2024 macbook using the MPS backend, 30 seconds on CPU. Best of all, distillation requires no training data.
+Distillation is really fast and only takes 30 seconds on CPU. Best of all, distillation requires no training data.
 
-You can also directly use Model2Vec in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) using the [StaticEmbedding](https://github.com/UKPLab/sentence-transformers/blob/master/sentence_transformers/models/StaticEmbedding.py) module. You can either load a Model2Vec model into a Sentence Transformer with the following code snippet:
-```python
-from sentence_transformers import SentenceTransformer
-from sentence_transformers.models import StaticEmbedding
+For advanced usage, such as using Model2Vec in the [Sentence Transformers library](https://github.com/UKPLab/sentence-transformers), please refer to the [Usage](#usage) sections.
 
-# Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
-model = SentenceTransformer(modules=[static_embedding])
-embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
-```
-
-Or you can distill a model directly into a Sentence Transformer model:
-```python
-from sentence_transformers import SentenceTransformer
-from sentence_transformers.models import StaticEmbedding
-
-static_embedding = StaticEmbedding.from_distillation("BAAI/bge-base-en-v1.5", device="cpu", pca_dims=256)
-model = SentenceTransformer(modules=[static_embedding])
-embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
-```
-For more documentation, please refer to the [Sentence Transformers documentation](https://sbert.net/docs/package_reference/sentence_transformer/models.html#sentence_transformers.models.StaticEmbedding).
 
 ## Main Features
 
-Model2Vec has the following features:
-
-- **Small**: reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk, making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
-- **Static, but better**: smaller than GLoVe and BPEmb, but [much more performant](results/README.md), even with the same vocabulary.
-- **Lightweight inference**: the base package's only major dependency is `numpy`.
-- **Fast distillation**: make your own model in 30 seconds.
-- **Fast inference**: up to 500 times faster on CPU than the original model. Go green or go home.
-- **No data needed**: Distillation happens directly on the token level, so no dataset is needed.
-- **Simple to use**: An easy to use interface for distilling and inferencing.
+- **State-of-the-Art Performance**: Model2Vec models outperform any other static embeddings (such as GLoVe and BPEmb) by a large margin, as can be seen in our [results](results/README.md).
+- **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk, making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
+- **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
+- **Lightning-fast Inference**: up to 500 times faster on CPU than the original model. Go green or go home.
+- **Fast Distillation**: distill your own model in 30 seconds on a CPU.
+- **No Data Needed**: distillation happens directly on the token level, so no dataset is needed.
 - **Integrated into Sentence Transformers and txtai**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [txtai](https://github.com/neuml/txtai).
-- **Bring your own model**: Can be applied to any Sentence Transformer model.
-- **Bring your own vocabulary**: Can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary. Need biomedical? Just get a medical dictionary, a biomedical model, and inference it.
-- **Multi-lingual**: Use any language. Need a French model? [Pick one](https://huggingface.co/models?library=sentence-transformers&language=fr&sort=trending). Need multilingual? [Here you go](https://huggingface.co/sentence-transformers/LaBSE).
+- **Bring your own Model and Voculabary**: Model2Vec can be applied to any Sentence Transformer model. You can also use your own domain-specific vocabulary. Need a biomedical model? Just get a medical dictionary, a biomedical model, and distill it.
+- **Multi-lingual**: use any language. Need a French model? [Pick one](https://huggingface.co/models?library=sentence-transformers&language=fr&sort=trending). Need multilingual? [Here you go](https://huggingface.co/sentence-transformers/LaBSE).
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab). Feel free to share your own.
-- **Easy Evaluation**: evaluate your models on MTEB and some of our own tasks to measure the performance of the distilled model. Model2Vec models work out of the box on [MTEB](https://huggingface.co/spaces/mteb/leaderboard).
 
 ## What is Model2Vec?
 
-Model2vec creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on all tasks we could find, while being much faster to create than traditional static embedding models such as GloVe. Like BPEmb, it can create subword embeddings, but with much better performance. Best of all, you don't need _any_ data to distill a model using Model2Vec.
+Model2vec creates a small, fast, and powerful model that outperforms other static embedding models by a large margin on all tasks we could find, while being much faster to create than traditional static embedding models such as GloVe. Like BPEmb, it can create subword embeddings, but with much better performance. Distillation doesn't need _any_ data, just a vocabulary and a model.
 
-It works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using zipf weighting. During inference, we simply take the mean of all token embeddings occurring in a sentence.
+The base model2vec technique works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using zipf weighting. During inference, we simply take the mean of all token embeddings occurring in a sentence.
 
-Model2vec has 3 modes:
-- **Output**: behaves much like a real sentence transformer, i.e., it uses a subword tokenizer and simply encodes all wordpieces in its vocab. This is really quick to create (30 seconds on a CPU), very small (30 MB in float32), but might be less performant on some tasks.
-- **Vocab (word level)**: creates a word-level tokenizer and only encodes words that are in the vocabulary. This is a bit slower to create and creates a larger model, but might be more performant on some tasks. Note that this model can go out-of-vocabulary, which might be beneficial if your domain is very noisy
-- **Vocab (subword)**: a combination of the two methods above. In this mode, you can pass your own vocabulary, but it also uses the subword vocabulary to create representations for words not in the passed vocabulary.
+Our [potion models](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062) are pre-trained using [tokenlearn](https://github.com/MinishLab/tokenlearn), a technique to pre-train model2vec distillation models. These models are created with the following steps:
+- **Distillation**: We distill a Model2Vec model from a Sentence Transformer model, using the method described above.
+- **Sentence Transformer inference**: We use the Sentence Transformer model to create mean embeddings for a large number of texts from a corpus.
+- **Training**: We train a model to minimize the cosine distance between the mean embeddings generated by the Sentence Transformer model and the mean embeddings generated by the Model2Vec model.
+- **Post-training re-regularization**: We re-regularize the trained emebeddings by first performing PCA, and then weighting the embeddings using `smooth inverse frequency (SIF)` weighting using the following formula: `w = 1e-3 / (1e-3 + proba)`. Here, `proba` is the probability of the token in the corpus we used for training.
 
-For a technical deepdive into Model2Vec, please refer to our [blog post](https://huggingface.co/blog/Pringled/model2vec).
 
-### Tokenlearn
-
-Our flagship POTION models are pre-trained using [Tokenlearn](https://github.com/MinishLab/tokenlearn). This method is described in our [Tokenlearn blogpost](https://minishlab.github.io/tokenlearn_blogpost/).
-
+For a much more extensive deepdive, please refer to our [Model2Vec blog post](https://huggingface.co/blog/Pringled/model2vec) and our [Tokenlearn blog post](https://minishlab.github.io/tokenlearn_blogpost/).
 
 ## Usage
-
 
 ### Inference
 
 <details>
-<summary>  Inference using pretrained model </summary>
+<summary>  Inference with a pretrained model </summary>
 <br>
 
 Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
@@ -187,7 +158,7 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 
 
 <details>
-<summary>  Inference using the Sentence Transformers library </summary>
+<summary>  Inference with the Sentence Transformers library </summary>
 <br>
 
 The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
@@ -377,6 +348,8 @@ model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
+For more documentation, please refer to the [Sentence Transformers documentation](https://sbert.net/docs/package_reference/sentence_transformer/models.html#sentence_transformers.models.StaticEmbedding).
+
 </details>
 
 
@@ -475,15 +448,6 @@ We have performed extensive experiments to evaluate the performance of Model2Vec
 - [MTEB Results](results/README.md#mteb-results)
 - [Ablations](results/README.md#ablations)
 
-## Related work
-
-If you are interested in fast small models, also consider looking at these techniques:
-* [BPEmb](https://bpemb.h-its.org/): GLoVE embeddings trained on BPE-encoded Wikipedias. Huge inspiration to this project, multilingual, very fast. If you don't find a sentence transformer in the language you need, check this out.
-* [fast-sentence-transformers](https://github.com/davidberenstein1957/fast-sentence-transformers): distillation using Model2Vec comes at a cost. If that cost is too steep for you, and you have access to a GPU, this package is for you. It automates the quantization and optimization of sentence transformers without loss of performance.
-* [wordllama](https://github.com/dleemiller/WordLlama): Uses the _input_ embeddings of a LLama2 model and then performs contrastive learning on these embeddings. We think this is a bit overfit on MTEB, as the model is trained on MTEB datasets, and only evaluated on MTEB. Fun fact: this was invented at the same time as Model2Vec.
-
-If you find other related work, please let us know.
-
 ## License
 
 MIT
@@ -494,7 +458,7 @@ If you use Model2Vec in your research, please cite the following:
 ```bibtex
 @software{minishlab2024model2vec,
   authors = {Stephan Tulkens, Thomas van Dongen},
-  title = {Model2Vec: Turn any Sentence Transformer into a Small Fast Model},
+  title = {Model2Vec: The Fastest State-of-the-Art Static Embeddings in the World},
   year = {2024},
   url = {https://github.com/MinishLab/model2vec},
 }
