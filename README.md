@@ -138,7 +138,7 @@ Model2Vec has the following features:
 - **Fast inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **No data needed**: Distillation happens directly on the token level, so no dataset is needed.
 - **Simple to use**: An easy to use interface for distilling and inferencing.
-- **Integrated into Sentence Transformers**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers).
+- **Integrated into Sentence Transformers and txtai**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [txtai](https://github.com/neuml/txtai).
 - **Bring your own model**: Can be applied to any Sentence Transformer model.
 - **Bring your own vocabulary**: Can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary. Need biomedical? Just get a medical dictionary, a biomedical model, and inference it.
 - **Multi-lingual**: Use any language. Need a French model? [Pick one](https://huggingface.co/models?library=sentence-transformers&language=fr&sort=trending). Need multilingual? [Here you go](https://huggingface.co/sentence-transformers/LaBSE).
@@ -390,7 +390,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 
 <details>
-<summary>  txtai </summary>
+<summary>  Txtai </summary>
 <br>
 
 Model2Vec can be used in [txtai](https://github.com/neuml/txtai) for text embeddings, nearest-neighbors search, and any of the other functionalities that txtai offers. The following code snippet shows how to use Model2Vec in txtai:
