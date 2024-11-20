@@ -390,6 +390,31 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 
 <details>
+<summary>  txtai </summary>
+<br>
+
+Model2Vec can be used in [txtai](https://github.com/neuml/txtai) for text embeddings, nearest-neighbors search, and any of the other functionalities that txtai offers. The following code snippet shows how to use Model2Vec in txtai:
+
+```python
+from txtai import Embeddings
+
+# Load a model2vec model
+embeddings = Embeddings(path="minishlab/potion-base-8M", method="model2vec", backend="numpy")
+
+# Create some example texts
+texts = ["Enduring Stew", "Hearty Elixir", "Mighty Mushroom Risotto", "Spicy Meat Skewer", "Chilly Fruit Salad"]
+
+# Create embeddings for downstream tasks
+vectors = embeddings.batchtransform(texts)
+
+# Or create a nearest-neighbors index and search it
+embeddings.index(texts)
+result = embeddings.search("Risotto", 1)
+```
+
+</details>
+
+<details>
 <summary>  Transformers.js </summary>
 
 <br>
