@@ -57,7 +57,6 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 - [Integrations](#integrations)
 - [Model List](#model-list)
 - [Results](#results)
-- [Citing](#citing)
 
 ## Quickstart
 
