@@ -111,11 +111,8 @@ For advanced usage, such as using Model2Vec in the [Sentence Transformers librar
 - **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk, making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
 - **Lightning-fast Inference**: up to 500 times faster on CPU than the original model. Go green or go home.
-- **Fast Distillation**: distill your own model in 30 seconds on a CPU.
-- **No Data Needed**: distillation happens directly on the token level, so no dataset is needed.
+- **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset. All you need is a model and (optionally) a custom vocabulary.
 - **Integrated into Sentence Transformers and txtai**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [txtai](https://github.com/neuml/txtai).
-- **Bring your own Model and Voculabary**: Model2Vec can be applied to any Sentence Transformer model. You can also use your own domain-specific vocabulary. Need a biomedical model? Just get a medical dictionary, a biomedical model, and distill it.
-- **Multi-lingual**: use any language. Need a French model? [Pick one](https://huggingface.co/models?library=sentence-transformers&language=fr&sort=trending). Need multilingual? [Here you go](https://huggingface.co/sentence-transformers/LaBSE).
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab). Feel free to share your own.
 
 ## What is Model2Vec?
@@ -434,12 +431,13 @@ python scripts/export_to_onnx.py --model_path <path-to-a-model2vec-model> --save
 We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e) and can be loaded using the `from_pretrained` method. The models are listed below.
 
 
-| Model                                                                 | Language    | Vocab            | Sentence Transformer                                            | Tokenizer Type | Params  | Tokenlearn |
-|-----------------------------------------------------------------------|-------------|------------------|-----------------------------------------------------------------|----------------|---------|------------|
-| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 7.5M    | ✅        |
-| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 3.7M   | ✅        |
-| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 1.8M  | ✅        |
-| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output) | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)      | Subword        | 471M    | ❌       |
+| Model                                                                 | Language    | Vocab            | Sentence Transformer                                            | Tokenizer Type | Params  | Tokenlearn        |
+|-----------------------------------------------------------------------|-------------|------------------|-----------------------------------------------------------------|----------------|---------|-------------------|
+| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 7.5M    | <div align="center">✅</div> |
+| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 3.7M    | <div align="center">✅</div> |
+| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 1.8M    | <div align="center">✅</div> |
+| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output) | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)      | Subword        | 471M    | <div align="center">❌</div> |
+
 
 
 ## Results
