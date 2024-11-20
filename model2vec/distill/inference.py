@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 import inspect
 import logging
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, Union
 
 import numpy as np
 import torch
@@ -13,7 +15,7 @@ from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAtte
 logger = logging.getLogger(__name__)
 
 
-PathLike = str | Path
+PathLike = Union[Path, str]
 
 _DEFAULT_BATCH_SIZE = 1024
 
@@ -113,7 +115,15 @@ def create_output_embeddings_from_model_name(
     :return: The tokens and output embeddings.
     """
     model = model.to(device)
-    ids = torch.arange(tokenizer.vocab_size)
+
+    # Quick check to see if the tokenizer is consistent.
+    vocab_length = len(tokenizer.get_vocab())
+    if vocab_length != tokenizer.vocab_size:
+        logger.warning(
+            f"Reported vocab size {tokenizer.vocab_size} is inconsistent with the vocab size {vocab_length}."
+        )
+
+    ids = torch.arange(vocab_length)
 
     # Work-around to get the eos and bos token ids without having to go into tokenizer internals.
     dummy_encoding = tokenizer.encode("A")
@@ -122,7 +132,8 @@ def create_output_embeddings_from_model_name(
     bos = torch.full([len(ids)], fill_value=bos_token_id)
     eos = torch.full([len(ids)], fill_value=eos_token_id)
 
-    stacked = torch.stack([bos, ids, eos], dim=1)
+    # NOTE: reversing the bos and eos tokens works better on our benchmarks.
+    stacked = torch.stack([eos, ids, bos], dim=1)
 
     intermediate_weights: list[np.ndarray] = []
     for batch_idx in tqdm(range(0, len(stacked), _DEFAULT_BATCH_SIZE)):

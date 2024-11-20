@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -70,7 +72,7 @@ def test_importable() -> None:
 def test_get_package_extras() -> None:
     """Test package extras."""
     extras = set(get_package_extras("model2vec", "distill"))
-    assert extras == {"torch", "transformers", "typer", "scikit-learn"}
+    assert extras == {"torch", "transformers", "scikit-learn"}
 
 
 def test_get_package_extras_empty() -> None:

@@ -10,7 +10,14 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
-        python-version: ["3.10"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        exclude:
+          - os: windows-latest
+            python-version: "3.9"
+          - os: windows-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.12"
       fail-fast: false
 
     steps:
@@ -27,6 +34,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           irm https://astral.sh/uv/install.ps1 | iex
+          $env:Path = "C:\Users\runneradmin\.local\bin;$env:Path"
           uv venv .venv
           "VIRTUAL_ENV=.venv" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$PWD/.venv/Scripts" | Out-File -FilePath $env:GITHUB_PATH -Append
@@ -42,8 +50,7 @@ jobs:
 
       # Install dependencies using uv pip
       - name: Install dependencies
-        run: make install
-       # run: uv pip install -e ".[pytest]"
+        run: make install-no-pre-commit
 
       # Run tests with coverage
       - name: Run tests under coverage

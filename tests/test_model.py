@@ -25,6 +25,27 @@ def test_initialization_token_vector_mismatch(mock_tokenizer: Tokenizer, mock_co
         StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
 
 
+def test_tokenize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
+    """Test tokenization of a sentence."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    model._can_encode_fast = True
+    tokens_fast = model.tokenize(["word1 word2"])
+    model._can_encode_fast = False
+    tokens_slow = model.tokenize(["word1 word2"])
+
+    assert tokens_fast == tokens_slow
+
+
+def test_encode_batch_fast(
+    mock_vectors: np.ndarray, mock_berttokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test tokenization of a sentence."""
+    if hasattr(mock_berttokenizer, "encode_batch_fast"):
+        del mock_berttokenizer.encode_batch_fast
+        model = StaticModel(vectors=mock_vectors, tokenizer=mock_berttokenizer, config=mock_config)
+        assert not model._can_encode_fast
+
+
 def test_encode_single_sentence(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
@@ -32,6 +53,17 @@ def test_encode_single_sentence(
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     encoded = model.encode("word1 word2")
     assert encoded.shape == (2,)
+
+
+def test_encode_single_sentence_empty(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test encoding of a single empty sentence."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    model.normalize = True
+    encoded = model.encode("")
+    assert not np.isnan(encoded).any()
+    assert np.all(encoded == 0)
 
 
 def test_encode_multiple_sentences(

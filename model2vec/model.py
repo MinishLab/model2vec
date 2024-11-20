@@ -4,7 +4,7 @@ import math
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator
+from typing import Any, Iterator, Union
 
 import numpy as np
 from tokenizers import Encoding, Tokenizer
@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from model2vec.utils import load_local_model
 
-PathLike = Path | str
+PathLike = Union[Path, str]
 
 
 logger = getLogger(__name__)
@@ -59,6 +59,10 @@ class StaticModel:
         self.config = config or {}
         self.base_model_name = base_model_name
         self.language = language
+        if hasattr(self.tokenizer, "encode_batch_fast"):
+            self._can_encode_fast = True
+        else:
+            self._can_encode_fast = False
 
         if normalize is not None:
             self.normalize = normalize
@@ -121,7 +125,11 @@ class StaticModel:
             m = max_length * self.median_token_length
             sentences = [sentence[:m] for sentence in sentences]
 
-        encodings: list[Encoding] = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
+        if self._can_encode_fast:
+            encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
+        else:
+            encodings = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
+
         encodings_ids = [encoding.ids for encoding in encodings]
 
         if self.unk_token_id is not None:
@@ -162,7 +170,7 @@ class StaticModel:
         sentences: list[str] | str,
         max_length: int | None = None,
         batch_size: int = 1024,
-        show_progressbar: bool = False,
+        show_progress_bar: bool = False,
     ) -> list[np.ndarray] | np.ndarray:
         """
         Encode a list of sentences as a list of numpy arrays of tokens.
@@ -177,7 +185,7 @@ class StaticModel:
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
-        :param show_progressbar: Whether to show the progress bar.
+        :param show_progress_bar: Whether to show the progress bar.
         :return: The encoded sentences with an embedding per token.
         """
         was_single = False
@@ -189,7 +197,7 @@ class StaticModel:
         for batch in tqdm(
             self._batch(sentences, batch_size),
             total=math.ceil(len(sentences) / batch_size),
-            disable=not show_progressbar,
+            disable=not show_progress_bar,
         ):
             out_array.extend(self._encode_batch_as_sequence(batch, max_length))
 
@@ -213,7 +221,7 @@ class StaticModel:
     def encode(
         self,
         sentences: list[str] | str,
-        show_progressbar: bool = False,
+        show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
         **kwargs: Any,
@@ -225,7 +233,7 @@ class StaticModel:
         For ease of use, we don't batch sentences together.
 
         :param sentences: The list of sentences to encode. You can also pass a single sentence.
-        :param show_progressbar: Whether to show the progress bar.
+        :param show_progress_bar: Whether to show the progress bar.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
@@ -241,7 +249,7 @@ class StaticModel:
         for batch in tqdm(
             self._batch(sentences, batch_size),
             total=math.ceil(len(sentences) / batch_size),
-            disable=not show_progressbar,
+            disable=not show_progress_bar,
         ):
             out_arrays.append(self._encode_batch(batch, max_length))
 
@@ -264,7 +272,8 @@ class StaticModel:
 
         out_array = np.stack(out)
         if self.normalize:
-            out_array = out_array / np.linalg.norm(out_array, axis=1, keepdims=True)
+            norm = np.linalg.norm(out_array, axis=1, keepdims=True) + 1e-32
+            out_array = out_array / norm
 
         return out_array
 
