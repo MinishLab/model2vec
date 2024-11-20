@@ -23,6 +23,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "jinja2",
     "numpy",
     "rich",
     "tqdm",

@@ -505,9 +505,10 @@ wheels = [
 
 [[package]]
 name = "model2vec"
-version = "0.3.1"
+version = "0.3.2"
 source = { editable = "." }
 dependencies = [
+    { name = "jinja2" },
     { name = "numpy" },
     { name = "rich" },
     { name = "safetensors" },
@@ -540,6 +541,7 @@ onnx = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "ipython", marker = "extra == 'dev'" },
+    { name = "jinja2" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numpy" },
     { name = "onnx", marker = "extra == 'onnx'" },
