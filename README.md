@@ -51,10 +51,10 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 - [Main Features](#main-features)
 - [What is Model2Vec?](#what-is-model2vec)
 - [Usage](#usage)
-    - [Distillation](#distillation)
     - [Inference](#inference)
+    - [Distillation](#distillation)
     - [Evaluation](#evaluation)
-    - [Integrations](#integrations)
+- [Integrations](#integrations)
 - [Model List](#model-list)
 - [Results](#results)
 - [Related Work](#related-work)
@@ -62,24 +62,24 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 
 ## Quickstart
 
-Install the package and all required extras with:
-```bash
-pip install model2vec[distill]
-```
-
-If you want a light-weight version of the package which only requires `numpy`, omit the `distill` extra. This means you can't distill your own models, but you can use pre-trained models. This is useful for inference pipelines.
+Install the package with:
 
 ```bash
 pip install model2vec
 ```
 
-The easiest way to get started with Model2Vec is to download one of our [flagship models from the HuggingFace hub](https://huggingface.co/minishlab). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
+This will install the base inference package, which only depends on `numpy` and a few other minor dependencies. If you want to distill your own models, you can install the distillation extras with:
+
+```bash
+pip install model2vec[distill]
+```
+
+The easiest way to get started with Model2Vec is to load one of our [flagship models from the HuggingFace hub](https://huggingface.co/minishlab). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
 ```python
 from model2vec import StaticModel
 
 # Load a model from the HuggingFace hub (in this case the potion-base-8M model)
-model_name = "minishlab/potion-base-8M"
-model = StaticModel.from_pretrained(model_name)
+model = StaticModel.from_pretrained("minishlab/potion-base-8M")
 
 # Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
@@ -94,11 +94,8 @@ Instead of using one of our models, you can distill your own Model2Vec model fro
 ```python
 from model2vec.distill import distill
 
-# Choose a Sentence Transformer model
-model_name = "BAAI/bge-base-en-v1.5"
-
-# Distill the model
-m2v_model = distill(model_name=model_name, pca_dims=256)
+# Distill a Sentence Transformer model, in this case the BAAI/bge-base-en-v1.5 model
+m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
@@ -134,11 +131,12 @@ Model2Vec has the following features:
 
 - **Small**: reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk, making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
 - **Static, but better**: smaller than GLoVe and BPEmb, but [much more performant](results/README.md), even with the same vocabulary.
+- **Lightweight inference**: the base package's only major dependency is `numpy`.
 - **Fast distillation**: make your own model in 30 seconds.
 - **Fast inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **No data needed**: Distillation happens directly on the token level, so no dataset is needed.
 - **Simple to use**: An easy to use interface for distilling and inferencing.
-- **Integrated into Sentence Transformers**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers).
+- **Integrated into Sentence Transformers and txtai**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [txtai](https://github.com/neuml/txtai).
 - **Bring your own model**: Can be applied to any Sentence Transformer model.
 - **Bring your own vocabulary**: Can be applied to any vocabulary, allowing you to use your own domain-specific vocabulary. Need biomedical? Just get a medical dictionary, a biomedical model, and inference it.
 - **Multi-lingual**: Use any language. Need a French model? [Pick one](https://huggingface.co/models?library=sentence-transformers&language=fr&sort=trending). Need multilingual? [Here you go](https://huggingface.co/sentence-transformers/LaBSE).
@@ -166,6 +164,46 @@ Our flagship POTION models are pre-trained using [Tokenlearn](https://github.com
 ## Usage
 
 
+### Inference
+
+<details>
+<summary>  Inference using pretrained model </summary>
+<br>
+
+Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
+```python
+from model2vec import StaticModel
+
+# Load a model from the Hub. You can optionally pass a token when loading a private model
+model = StaticModel.from_pretrained(model_name="minishlab/potion-base-8M", token=None)
+
+# Make embeddings
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+
+# Make sequences of token embeddings
+token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+</details>
+
+
+<details>
+<summary>  Inference using the Sentence Transformers library </summary>
+<br>
+
+The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
+
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.models import StaticEmbedding
+
+# Initialize a StaticEmbedding module
+static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
+model = SentenceTransformer(modules=[static_embedding])
+embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
+```
+
+</details>
+
 ### Distillation
 
 <details>
@@ -176,11 +214,8 @@ The following code can be used to distill a model from a Sentence Transformer. A
 ```python
 from model2vec.distill import distill
 
-# Choose a Sentence Transformer model
-model_name = "BAAI/bge-base-en-v1.5"
-
-# Distill the model
-m2v_model = distill(model_name=model_name, pca_dims=256)
+# Distill a Sentence Transformer model
+m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
@@ -240,11 +275,9 @@ from model2vec.distill import distill
 
 # Load a vocabulary as a list of strings
 vocabulary = ["word1", "word2", "word3"]
-# Choose a Sentence Transformer model
-model_name = "BAAI/bge-base-en-v1.5"
 
-# Distill the model with the custom vocabulary
-m2v_model = distill(model_name=model_name, vocabulary=vocabulary)
+# Distill a Sentence Transformer model with the custom vocabulary
+m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", vocabulary=vocabulary)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
@@ -260,48 +293,6 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 ```
 
 **Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
-
-</details>
-
-### Inference
-
-<details>
-<summary>  Inference using pretrained model </summary>
-<br>
-
-Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
-```python
-from model2vec import StaticModel
-
-# Load a model from the HuggingFace hub, or a local one.
-model_name = "minishlab/potion-base-8M"
-# You can optionally pass a token if you're loading a private model
-model = StaticModel.from_pretrained(model_name, token=None)
-
-# Make embeddings
-embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
-
-# Make sequences of token embeddings
-token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
-```
-</details>
-
-
-<details>
-<summary>  Inference using the Sentence Transformers library </summary>
-<br>
-
-The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
-
-```python
-from sentence_transformers import SentenceTransformer
-from sentence_transformers.models import StaticEmbedding
-
-# Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
-model = SentenceTransformer(modules=[static_embedding])
-embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
-```
 
 </details>
 
@@ -357,7 +348,7 @@ print(make_leaderboard(task_scores))
 ```
 </details>
 
-### Integrations
+## Integrations
 <details>
 <summary>  Sentence Transformers </summary>
 <br>
@@ -388,6 +379,31 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 </details>
 
+
+<details>
+<summary>  Txtai </summary>
+<br>
+
+Model2Vec can be used in [txtai](https://github.com/neuml/txtai) for text embeddings, nearest-neighbors search, and any of the other functionalities that txtai offers. The following code snippet shows how to use Model2Vec in txtai:
+
+```python
+from txtai import Embeddings
+
+# Load a model2vec model
+embeddings = Embeddings(path="minishlab/potion-base-8M", method="model2vec", backend="numpy")
+
+# Create some example texts
+texts = ["Enduring Stew", "Hearty Elixir", "Mighty Mushroom Risotto", "Spicy Meat Skewer", "Chilly Fruit Salad"]
+
+# Create embeddings for downstream tasks
+vectors = embeddings.batchtransform(texts)
+
+# Or create a nearest-neighbors index and search it
+embeddings.index(texts)
+result = embeddings.search("Risotto", 1)
+```
+
+</details>
 
 <details>
 <summary>  Transformers.js </summary>
