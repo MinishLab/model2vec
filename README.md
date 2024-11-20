@@ -79,8 +79,7 @@ The easiest way to get started with Model2Vec is to load one of our [flagship mo
 from model2vec import StaticModel
 
 # Load a model from the HuggingFace hub (in this case the potion-base-8M model)
-model_name = "minishlab/potion-base-8M"
-model = StaticModel.from_pretrained(model_name)
+model = StaticModel.from_pretrained("minishlab/potion-base-8M")
 
 # Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
@@ -95,11 +94,8 @@ Instead of using one of our models, you can distill your own Model2Vec model fro
 ```python
 from model2vec.distill import distill
 
-# Choose a Sentence Transformer model
-model_name = "BAAI/bge-base-en-v1.5"
-
-# Distill the model
-m2v_model = distill(model_name=model_name, pca_dims=256)
+# Distill a Sentence Transformer model, in this case the BAAI/bge-base-en-v1.5 model
+m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
@@ -178,10 +174,8 @@ Inference works as follows. The example shows one of our own models, but you can
 ```python
 from model2vec import StaticModel
 
-# Load a model from the HuggingFace hub, or a local one.
-model_name = "minishlab/potion-base-8M"
-# You can optionally pass a token if you're loading a private model
-model = StaticModel.from_pretrained(model_name, token=None)
+# Load a model from the Hub. You can optionally pass a token when loading a private model
+model = StaticModel.from_pretrained(model_name="minishlab/potion-base-8M", token=None)
 
 # Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
@@ -220,11 +214,8 @@ The following code can be used to distill a model from a Sentence Transformer. A
 ```python
 from model2vec.distill import distill
 
-# Choose a Sentence Transformer model
-model_name = "BAAI/bge-base-en-v1.5"
-
-# Distill the model
-m2v_model = distill(model_name=model_name, pca_dims=256)
+# Distill a Sentence Transformer model
+m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
@@ -284,11 +275,9 @@ from model2vec.distill import distill
 
 # Load a vocabulary as a list of strings
 vocabulary = ["word1", "word2", "word3"]
-# Choose a Sentence Transformer model
-model_name = "BAAI/bge-base-en-v1.5"
 
-# Distill the model with the custom vocabulary
-m2v_model = distill(model_name=model_name, vocabulary=vocabulary)
+# Distill a Sentence Transformer model with the custom vocabulary
+m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", vocabulary=vocabulary)
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
