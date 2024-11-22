@@ -381,13 +381,13 @@ result = embeddings.search("Risotto", 1)
 Model2Vec is the default model for semantic chunking in [Chonkie](https://github.com/bhavnicksm/chonkie). To use Model2Vec for semantic chunking in Chonkie, simply install Chonkie with `pip install chonkie[semantic]` and use one of the `potion` models in the `SemanticChunker` class. The following code snippet shows how to use Model2Vec in Chonkie:
 
 ```python
-from chonkie import SemanticChunker
+from chonkie import SDPMChunker
 
 # Create some example text to chunk
 text = "It's dangerous to go alone! Take this."
 
 # Initialize the SemanticChunker with a potion model
-chunker = SemanticChunker(
+chunker = SDPMChunker(
     embedding_model="minishlab/potion-base-8M",
     similarity_threshold=0.3
 )
