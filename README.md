@@ -111,7 +111,7 @@ For advanced usage, such as using Model2Vec in the [Sentence Transformers librar
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
 - **Lightning-fast Inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset. All you need is a model and (optionally) a custom vocabulary.
-- **Integrated into Sentence Transformers and txtai**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [txtai](https://github.com/neuml/txtai).
+- **Integrated into Sentence Transformers, txtai, and Chonkie**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers), [txtai](https://github.com/neuml/txtai), and [Chonkie](https://github.com/bhavnicksm/chonkie).
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab). Feel free to share your own.
 
 ## What is Model2Vec?
@@ -370,6 +370,30 @@ vectors = embeddings.batchtransform(texts)
 # Or create a nearest-neighbors index and search it
 embeddings.index(texts)
 result = embeddings.search("Risotto", 1)
+```
+
+</details>
+
+<details>
+<summary>  Chonkie </summary>
+<br>
+
+Model2Vec is the default model for semantic chunking in [Chonkie](https://github.com/bhavnicksm/chonkie). To use Model2Vec for semantic chunking in Chonkie, simply install Chonkie with `pip install chonkie[semantic]` and use one of the `potion` models in the `SemanticChunker` class. The following code snippet shows how to use Model2Vec in Chonkie:
+
+```python
+from chonkie import SDPMChunker
+
+# Create some example text to chunk
+text = "It's dangerous to go alone! Take this."
+
+# Initialize the SemanticChunker with a potion model
+chunker = SDPMChunker(
+    embedding_model="minishlab/potion-base-8M",
+    similarity_threshold=0.3
+)
+
+# Chunk the text
+chunks = chunker.chunk(text)
 ```
 
 </details>
