@@ -136,6 +136,8 @@ def distill_from_model(
     model_name = getattr(model, "name_or_path", "")
 
     config = {
+        "model_type": "model2vec",
+        "architectures": ["StaticModel"],
         "tokenizer_name": model_name,
         "apply_pca": pca_dims,
         "apply_zipf": apply_zipf,
