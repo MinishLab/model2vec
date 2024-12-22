@@ -587,8 +587,8 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'distill'" },
     { name = "setuptools" },
     { name = "tokenizers", specifier = ">=0.20" },
-    { name = "torch", marker = "extra == 'distill'", specifier = "!=2.5.1" },
-    { name = "torch", marker = "extra == 'onnx'", specifier = "!=2.5.1" },
+    { name = "torch", marker = "extra == 'distill'", specifier = "<2.5.0" },
+    { name = "torch", marker = "extra == 'onnx'", specifier = "<2.5.0" },
     { name = "tqdm" },
     { name = "transformers", marker = "extra == 'distill'" },
 ]
