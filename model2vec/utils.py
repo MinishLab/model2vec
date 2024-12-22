@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
+import re
 from importlib import import_module
 from importlib.metadata import metadata
 from pathlib import Path
@@ -22,6 +23,7 @@ class SafeOpenProtocol(Protocol):
 
 
 _MODULE_MAP = (("scikit-learn", "sklearn"),)
+_DIVIDERS = re.compile(r"[=<>!]+")
 
 
 def get_package_extras(package: str, extra: str) -> Iterator[str]:
@@ -38,7 +40,7 @@ def get_package_extras(package: str, extra: str) -> Iterator[str]:
             # Extract and clean the extra requirement
             found_extra = rest[0].split("==")[-1].strip(" \"'")
             if found_extra == extra:
-                prefix, *_ = name.split("==")
+                prefix, *_ = _DIVIDERS.split(name)
                 yield prefix.strip()
 
 
