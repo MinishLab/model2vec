@@ -50,7 +50,7 @@ dev = [
     "mypy",
     "pre-commit",
     "pytest",
-    "pytest-coverage",
+    "pytest-cov",
     "ruff",
 ]
 distill = ["torch", "transformers", "scikit-learn"]

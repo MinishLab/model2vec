@@ -38,7 +38,8 @@ def get_package_extras(package: str, extra: str) -> Iterator[str]:
             # Extract and clean the extra requirement
             found_extra = rest[0].split("==")[-1].strip(" \"'")
             if found_extra == extra:
-                yield name.strip()
+                prefix, *_ = name.split("==")
+                yield prefix.strip()
 
 
 def importable(module: str, extra: str) -> None:
