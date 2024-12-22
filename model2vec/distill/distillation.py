@@ -41,7 +41,7 @@ def distill_from_model(
     pca_dims: PCADimType = 256,
     apply_zipf: bool = True,
     use_subword: bool = True,
-    token_remove_pattern: str | None = "\[unused\d+\]",
+    token_remove_pattern: str | None = r"\[unused\d+\]",
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
