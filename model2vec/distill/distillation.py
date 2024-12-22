@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Literal, Union
 
 import numpy as np
 from huggingface_hub import model_info
 from sklearn.decomposition import PCA
+from tokenizers import Tokenizer
 from tokenizers.models import BPE, Unigram
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
@@ -39,6 +41,7 @@ def distill_from_model(
     pca_dims: PCADimType = 256,
     apply_zipf: bool = True,
     use_subword: bool = True,
+    token_remove_pattern: str | None = "\[unused\d+\]",
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -58,8 +61,12 @@ def distill_from_model(
         If this is 'auto', we don't reduce dimensionality, but still apply PCA.
     :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
+    :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
+        If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
     :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
     :raises: ValueError if the vocabulary contains duplicate tokens.
+    :raises: ValueError if the regex can't be compiled.
+    :raises: ValueError if the vocabulary is empty after token removal.
     :return: A StaticModel
 
     """
@@ -81,17 +88,7 @@ def distill_from_model(
     if use_subword:
         # Create the subword embeddings.
         tokens, embeddings = create_output_embeddings_from_model_name(model=model, tokenizer=tokenizer, device=device)
-
-        # Remove any unused tokens from the tokenizer and embeddings.
-        wrong_tokens = [x for x in tokens if x.startswith("[unused")]
-        vocab = tokenizer.get_vocab()
-        # Get the ids of the unused token.
-        wrong_token_ids = [vocab[token] for token in wrong_tokens]
-        # Remove the unused tokens from the tokenizer.
-        new_tokenizer = remove_tokens(tokenizer.backend_tokenizer, wrong_tokens)
-        # Remove the embeddings of the unused tokens.
-        embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
-        logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
+        new_tokenizer, embeddings = _remove_tokens_and_embeddings(tokenizer, token_remove_pattern, tokens, embeddings)
     else:
         # We need to keep the unk token in the tokenizer.
         unk_token = tokenizer.backend_tokenizer.model.unk_token
@@ -155,6 +152,37 @@ def distill_from_model(
     return StaticModel(
         vectors=embeddings, tokenizer=new_tokenizer, config=config, base_model_name=model_name, language=language
     )
+
+
+def _remove_tokens_and_embeddings(
+    tokenizer: PreTrainedTokenizerFast, token_remove_pattern: str | None, tokens: list[str], embeddings: np.ndarray
+) -> tuple[Tokenizer, np.ndarray]:
+    if not token_remove_pattern:
+        return tokenizer.backend_tokenizer, embeddings
+
+    try:
+        token_regex = re.compile(token_remove_pattern)
+    except re.error as e:
+        raise ValueError(f"Invalid regex pattern: {token_remove_pattern}") from e
+        # Remove any unused tokens from the tokenizer and embeddings.
+    wrong_tokens = [x for x in tokens if token_regex.match(x)]
+    vocab = tokenizer.get_vocab()
+    # Get the ids of the unused token.
+    wrong_token_ids = [vocab[token] for token in wrong_tokens]
+
+    if len(wrong_token_ids) == len(vocab):
+        raise ValueError(
+            "All tokens in the vocabulary are unused tokens. This will result in an empty tokenizer. "
+            "Please provide a valid token removal pattern. The pattern is now: {token_remove_pattern}"
+        )
+
+        # Remove the unused tokens from the tokenizer.
+    new_tokenizer = remove_tokens(tokenizer.backend_tokenizer, wrong_tokens)
+    # Remove the embeddings of the unused tokens.
+    embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
+    logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
+
+    return new_tokenizer, embeddings
 
 
 def distill(
