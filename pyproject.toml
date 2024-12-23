@@ -53,9 +53,10 @@ dev = [
     "pytest-cov",
     "ruff",
 ]
-distill = ["torch<2.5.0", "transformers", "scikit-learn"]
 
-onnx = ["onnx", "torch<2.5.0"]
+distill = ["torch", "transformers", "scikit-learn"]
+onnx = ["onnx", "torch"]
+train = ["torch"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"
