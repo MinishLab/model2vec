@@ -1,5 +1,6 @@
 from typing import Any
 
+import numpy as np
 import torch
 from tokenizers import Tokenizer
 from torch import nn
@@ -54,11 +55,11 @@ class ClassificationStaticModel(FinetunableStaticModel):
         vectors, _ = self.forward(input_ids)
         return vectors
 
-    def predict_proba(self, texts: list[str]) -> torch.Tensor:
+    def predict_proba(self, texts: list[str]) -> np.ndarray:
         """Predict the probability of each class."""
         logits = self._predict(texts)
 
-        return torch.softmax(logits, dim=1)
+        return torch.softmax(logits, dim=1).numpy()
 
     def loss_calculator(
         self, head_out: torch.Tensor, embedding_out: torch.Tensor, y: torch.Tensor
