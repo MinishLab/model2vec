@@ -2,6 +2,7 @@ from typing import Any
 
 import numpy as np
 import torch
+from sklearn.model_selection import train_test_split
 from tokenizers import Tokenizer
 from torch import nn
 
@@ -71,14 +72,12 @@ class ClassificationStaticModel(FinetunableStaticModel):
 
     def fit(
         self,
-        train_texts: list[str],
-        train_labels: list[str],
-        validation_texts: list[str],
-        validation_labels: list[str],
+        texts: list[str],
+        labels: list[str],
         **kwargs: Any,
     ) -> FinetunableStaticModel:
         """Fit a model."""
-        classes = sorted(set(train_labels) | set(validation_labels))
+        classes = sorted(set(labels))
         self.classes_ = classes
 
         if len(self.classes) != self.out_dim:
@@ -86,6 +85,8 @@ class ClassificationStaticModel(FinetunableStaticModel):
             self.head = self.construct_head()
 
         label_mapping = {label: idx for idx, label in enumerate(self.classes)}
+        train_texts, validation_texts, train_labels, validation_labels = train_test_split(texts, labels, test_size=0.1)
+
         # Turn labels into a LongTensor
         train_labels_tensor = torch.Tensor([label_mapping[label] for label in train_labels]).long()
         train_dataset = TextDataset(train_texts, train_labels_tensor, self.tokenizer)
