@@ -82,7 +82,8 @@ class ClassificationStaticModel(FinetunableStaticModel):
 
         if len(self.classes) != self.out_dim:
             self.out_dim = len(self.classes)
-            self.head = self.construct_head()
+        self.head = self.construct_head()
+        self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
 
         label_mapping = {label: idx for idx, label in enumerate(self.classes)}
         train_texts, validation_texts, train_labels, validation_labels = train_test_split(texts, labels, test_size=0.1)
