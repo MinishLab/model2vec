@@ -48,6 +48,7 @@ class ClassificationStaticModel(FinetunableStaticModel):
 
         return [self.classes[idx] for idx in logits.argmax(1)]
 
+    @torch.no_grad()
     def _predict(self, texts: list[str]) -> torch.Tensor:
         input_ids = self.tokenize(texts)
         vectors, _ = self.forward(input_ids)
