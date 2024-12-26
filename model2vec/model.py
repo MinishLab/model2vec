@@ -18,6 +18,12 @@ PathLike = Union[Path, str]
 logger = getLogger(__name__)
 
 
+from joblib import delayed
+from tqdm.auto import tqdm
+
+from model2vec.utils import ProgressParallel
+
+
 class StaticModel:
     def __init__(
         self,
@@ -224,6 +230,7 @@ class StaticModel:
         show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
+        use_multiprocessing: bool = True,
         **kwargs: Any,
     ) -> np.ndarray:
         """
@@ -237,6 +244,7 @@ class StaticModel:
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
+        :param use_multiprocessing: Whether to use multiprocessing.
         :param **kwargs: Any additional arguments. These are ignored.
         :return: The encoded sentences. If a single sentence was passed, a vector is returned.
         """
@@ -245,19 +253,29 @@ class StaticModel:
             sentences = [sentences]
             was_single = True
 
-        out_arrays: list[np.ndarray] = []
-        for batch in tqdm(
-            self._batch(sentences, batch_size),
-            total=math.ceil(len(sentences) / batch_size),
-            disable=not show_progress_bar,
-        ):
-            out_arrays.append(self._encode_batch(batch, max_length))
+        # Prepare all batches
+        sentence_batches = list(self._batch(sentences, batch_size))
+        total_batches = math.ceil(len(sentences) / batch_size)
 
-        out_array = np.concatenate(out_arrays, axis=0)
+        if use_multiprocessing:
+            # Use joblib for multiprocessing if requested
+            results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
+                delayed(self._encode_batch)(batch, max_length) for batch in sentence_batches
+            )
+            out_array = np.concatenate(results, axis=0)
+        else:
+            # Don't use multiprocessing
+            out_arrays: list[np.ndarray] = []
+            for batch in tqdm(
+                sentence_batches,
+                total=total_batches,
+                disable=not show_progress_bar,
+            ):
+                out_arrays.append(self._encode_batch(batch, max_length))
+            out_array = np.concatenate(out_arrays, axis=0)
 
         if was_single:
             return out_array[0]
-
         return out_array
 
     def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
