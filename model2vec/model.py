@@ -18,7 +18,7 @@ PathLike = Union[Path, str]
 
 logger = getLogger(__name__)
 
-MULTIPROCESSING_THRESHOLD = 10_000  # Minimum number of sentences to use multiprocessing
+_MULTIPROCESSING_THRESHOLD = 10_000  # Minimum number of sentences to use multiprocessing
 
 
 class StaticModel:
@@ -191,6 +191,7 @@ class StaticModel:
         :param batch_size: The batch size to use.
         :param show_progress_bar: Whether to show the progress bar.
         :param use_multiprocessing: Whether to use multiprocessing.
+            By default, this is enabled for inputs > 10k sentences and disabled otherwise.
         :return: The encoded sentences with an embedding per token.
         """
         was_single = False
@@ -203,7 +204,7 @@ class StaticModel:
         total_batches = math.ceil(len(sentences) / batch_size)
 
         # Use joblib for multiprocessing if requested, and if we have enough sentences
-        if use_multiprocessing and len(sentences) > MULTIPROCESSING_THRESHOLD:
+        if use_multiprocessing and len(sentences) > _MULTIPROCESSING_THRESHOLD:
             # Disable parallelism for tokenizers
             os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -259,6 +260,7 @@ class StaticModel:
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
         :param use_multiprocessing: Whether to use multiprocessing.
+            By default, this is enabled for inputs > 10k sentences and disabled otherwise.
         :param **kwargs: Any additional arguments. These are ignored.
         :return: The encoded sentences. If a single sentence was passed, a vector is returned.
         """
@@ -271,8 +273,10 @@ class StaticModel:
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
+        ids = self.tokenize(sentences=sentences, max_length=max_length)
+
         # Use joblib for multiprocessing if requested, and if we have enough sentences
-        if use_multiprocessing and len(sentences) > MULTIPROCESSING_THRESHOLD:
+        if use_multiprocessing and len(sentences) > _MULTIPROCESSING_THRESHOLD:
             # Disable parallelism for tokenizers
             os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
