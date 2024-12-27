@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -201,8 +202,11 @@ class StaticModel:
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
+        # Use joblib for multiprocessing if requested, and if we have enough sentences
         if use_multiprocessing and len(sentences) > MULTIPROCESSING_THRESHOLD:
-            # Use joblib for multiprocessing if requested, and if we have enough sentences
+            # Disable parallelism for tokenizers
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
             results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
                 delayed(self._encode_batch_as_sequence)(batch, max_length) for batch in sentence_batches
             )
@@ -267,8 +271,11 @@ class StaticModel:
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
+        # Use joblib for multiprocessing if requested, and if we have enough sentences
         if use_multiprocessing and len(sentences) > MULTIPROCESSING_THRESHOLD:
-            # Use joblib for multiprocessing if requested, and if we have enough sentences
+            # Disable parallelism for tokenizers
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
             results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
                 delayed(self._encode_batch)(batch, max_length) for batch in sentence_batches
             )
