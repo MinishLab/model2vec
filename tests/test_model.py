@@ -66,30 +66,48 @@ def test_encode_single_sentence_empty(
     assert np.all(encoded == 0)
 
 
-@pytest.mark.parametrize("use_multiprocessing", [True, False])
 def test_encode_multiple_sentences(
-    use_multiprocessing: bool, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
     """Test encoding of multiple sentences."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    encoded = model.encode(["word1 word2", "word1 word3"], use_multiprocessing=use_multiprocessing)
+    encoded = model.encode(["word1 word2", "word1 word3"])
     assert encoded.shape == (2, 2)
 
 
-@pytest.mark.parametrize("use_multiprocessing", [True, False])
-def test_encode_as_tokens(
-    use_multiprocessing: bool, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
-) -> None:
+def test_encode_as_sequence(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
     """Test encoding of sentences as tokens."""
     sentences = ["word1 word2", "word1 word3"]
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    encoded_sequence = model.encode_as_sequence(sentences, use_multiprocessing=use_multiprocessing)
+    encoded_sequence = model.encode_as_sequence(sentences)
     encoded = model.encode(sentences)
 
     assert len(encoded_sequence) == 2
 
     means = [np.mean(sequence, axis=0) for sequence in encoded_sequence]
     assert np.allclose(means, encoded)
+
+
+def test_encode_multiprocessing(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test encoding with multiprocessing."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    # Generate a list of 15k inputs to test multiprocessing
+    sentences = ["word1 word2"] * 15_000
+    encoded = model.encode(sentences, use_multiprocessing=True)
+    assert encoded.shape == (15000, 2)
+
+
+def test_encode_as_sequence_multiprocessing(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test encoding of sentences as tokens with multiprocessing."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    # Generate a list of 15k inputs to test multiprocessing
+    sentences = ["word1 word2"] * 15_000
+    encoded = model.encode_as_sequence(sentences, use_multiprocessing=True)
+    assert len(encoded) == 15_000
 
 
 def test_encode_as_tokens_empty(
