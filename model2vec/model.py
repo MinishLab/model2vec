@@ -7,21 +7,17 @@ from tempfile import TemporaryDirectory
 from typing import Any, Iterator, Union
 
 import numpy as np
+from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.utils import load_local_model
+from model2vec.utils import ProgressParallel, load_local_model
 
 PathLike = Union[Path, str]
 
-
 logger = getLogger(__name__)
 
-
-from joblib import delayed
-from tqdm.auto import tqdm
-
-from model2vec.utils import ProgressParallel
+MULTIPROCESSING_THRESHOLD = 6000
 
 
 class StaticModel:
@@ -205,7 +201,8 @@ class StaticModel:
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        if use_multiprocessing:
+        if use_multiprocessing and len(sentences) > MULTIPROCESSING_THRESHOLD:
+            # Use joblib for multiprocessing if requested, and if we have enough sentences
             results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
                 delayed(self._encode_batch_as_sequence)(batch, max_length) for batch in sentence_batches
             )
@@ -270,8 +267,8 @@ class StaticModel:
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        if use_multiprocessing:
-            # Use joblib for multiprocessing if requested
+        if use_multiprocessing and len(sentences) > MULTIPROCESSING_THRESHOLD:
+            # Use joblib for multiprocessing if requested, and if we have enough sentences
             results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
                 delayed(self._encode_batch)(batch, max_length) for batch in sentence_batches
             )
