@@ -17,7 +17,7 @@ PathLike = Union[Path, str]
 
 logger = getLogger(__name__)
 
-MULTIPROCESSING_THRESHOLD = 6000
+MULTIPROCESSING_THRESHOLD = 10_000
 
 
 class StaticModel:
