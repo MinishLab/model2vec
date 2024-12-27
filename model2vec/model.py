@@ -177,6 +177,7 @@ class StaticModel:
         max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
+        use_multiprocessing: bool = True,
     ) -> list[np.ndarray] | np.ndarray:
         """
         Encode a list of sentences as a list of numpy arrays of tokens.
@@ -192,6 +193,7 @@ class StaticModel:
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
         :param show_progress_bar: Whether to show the progress bar.
+        :param use_multiprocessing: Whether to use multiprocessing.
         :return: The encoded sentences with an embedding per token.
         """
         was_single = False
@@ -199,17 +201,28 @@ class StaticModel:
             sentences = [sentences]
             was_single = True
 
-        out_array: list[np.ndarray] = []
-        for batch in tqdm(
-            self._batch(sentences, batch_size),
-            total=math.ceil(len(sentences) / batch_size),
-            disable=not show_progress_bar,
-        ):
-            out_array.extend(self._encode_batch_as_sequence(batch, max_length))
+        # Prepare all batches
+        sentence_batches = list(self._batch(sentences, batch_size))
+        total_batches = math.ceil(len(sentences) / batch_size)
+
+        if use_multiprocessing:
+            results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
+                delayed(self._encode_batch_as_sequence)(batch, max_length) for batch in sentence_batches
+            )
+            out_array: list[np.ndarray] = []
+            for r in results:
+                out_array.extend(r)
+        else:
+            out_array = []
+            for batch in tqdm(
+                sentence_batches,
+                total=total_batches,
+                disable=not show_progress_bar,
+            ):
+                out_array.extend(self._encode_batch_as_sequence(batch, max_length))
 
         if was_single:
             return out_array[0]
-
         return out_array
 
     def _encode_batch_as_sequence(self, sentences: list[str], max_length: int | None) -> list[np.ndarray]:
