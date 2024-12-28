@@ -111,7 +111,7 @@ For advanced usage, such as using Model2Vec in the [Sentence Transformers librar
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
 - **Lightning-fast Inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset. All you need is a model and (optionally) a custom vocabulary.
-- **Integrated into Sentence Transformers, txtai, and Chonkie**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers), [txtai](https://github.com/neuml/txtai), and [Chonkie](https://github.com/bhavnicksm/chonkie).
+- **Integrated in many popular libraries**: Model2Vec can be used directly in popular libraries such as [Sentence Transformers](https://github.com/UKPLab/sentence-transformers), [LangChain](https://github.com/langchain-ai/langchain), [txtai](https://github.com/neuml/txtai), and [Chonkie](https://github.com/bhavnicksm/chonkie). See the [Integrations](#integrations) section for more information.
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab). Feel free to share your own.
 
 ## What is Model2Vec?
@@ -318,6 +318,7 @@ print(make_leaderboard(task_scores))
 ## Integrations
 <details>
 <summary>  Sentence Transformers </summary>
+<a name="sentence-transformers"></a>
 <br>
 
 Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) using the `StaticEmbedding` module.
@@ -348,12 +349,46 @@ For more documentation, please refer to the [Sentence Transformers documentation
 
 </details>
 
+<details>
+<summary>  LangChain </summary>
+<br>
+
+Model2Vec can be used in [LangChain](https://github.com/langchain-ai/langchain) using the `langchain-community` package. For more information, see the [LangChain Model2Vec docs](https://python.langchain.com/docs/integrations/text_embedding/model2vec/). The following code snippet shows how to use Model2Vec in LangChain after installing the `langchain-community` package with `pip install langchain-community`:
+
+```python
+from langchain_community.embeddings import Model2vecEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain.schema import Document
+
+# Initialize a Model2Vec embedder
+embedder = Model2vecEmbeddings("minishlab/potion-base-8M")
+
+# Create some example texts
+texts = [
+    "Enduring Stew",
+    "Hearty Elixir",
+    "Mighty Mushroom Risotto",
+    "Spicy Meat Skewer",
+    "Fruit Salad",
+]
+
+# Embed the texts
+embeddings = embedder.embed_documents(texts)
+
+# Or, create a vector store and query it
+documents = [Document(page_content=text) for text in texts]
+vector_store = FAISS.from_documents(documents, embedder)
+query = "Risotto"
+query_vector = embedder.embed_query(query)
+retrieved_docs = vector_store.similarity_search_by_vector(query_vector, k=1)
+```
+</details>
 
 <details>
 <summary>  Txtai </summary>
 <br>
 
-Model2Vec can be used in [txtai](https://github.com/neuml/txtai) for text embeddings, nearest-neighbors search, and any of the other functionalities that txtai offers. The following code snippet shows how to use Model2Vec in txtai:
+Model2Vec can be used in [txtai](https://github.com/neuml/txtai) for text embeddings, nearest-neighbors search, and any of the other functionalities that txtai offers. The following code snippet shows how to use Model2Vec in txtai after installing the `txtai` package (including the `vectors` dependency) with `pip install txtai[vectors]`:
 
 ```python
 from txtai import Embeddings
@@ -398,9 +433,9 @@ chunks = chunker.chunk(text)
 
 </details>
 
+
 <details>
 <summary>  Transformers.js </summary>
-
 <br>
 
 To use a Model2Vec model in [transformers.js](https://github.com/huggingface/transformers.js), the following code snippet can be used as a starting point:

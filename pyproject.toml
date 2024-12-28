@@ -24,6 +24,7 @@ classifiers = [
 
 dependencies = [
     "jinja2",
+    "joblib",
     "numpy",
     "rich",
     "safetensors",
