@@ -111,7 +111,7 @@ For advanced usage, such as using Model2Vec in the [Sentence Transformers librar
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
 - **Lightning-fast Inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset. All you need is a model and (optionally) a custom vocabulary.
-- **Integrated into Sentence Transformers, txtai, and Chonkie**: Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers), [txtai](https://github.com/neuml/txtai), and [Chonkie](https://github.com/bhavnicksm/chonkie).
+- **Integrated in many popular libraries**: Model2Vec can be used directly in popular libraries such as [Sentence Transformers](https://github.com/UKPLab/sentence-transformers), LangChain[https://github.com/langchain-ai/langchain], [txtai](https://github.com/neuml/txtai), and [Chonkie](https://github.com/bhavnicksm/chonkie). See the [Integrations](#integrations) section for more information.
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab). Feel free to share your own.
 
 ## What is Model2Vec?
