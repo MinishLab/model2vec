@@ -353,7 +353,7 @@ For more documentation, please refer to the [Sentence Transformers documentation
 <summary>  LangChain </summary>
 <br>
 
-Model2Vec can be used in [LangChain](https://github.com/langchain-ai/langchain) using the `langchain-community` package. The following code snippet shows how to use Model2Vec in LangChain after installing the `langchain-community` package with `pip install langchain-community`:
+Model2Vec can be used in [LangChain](https://github.com/langchain-ai/langchain) using the `langchain-community` package. For more information, see the [LangChain Model2Vec docs](https://python.langchain.com/docs/integrations/text_embedding/model2vec/). The following code snippet shows how to use Model2Vec in LangChain after installing the `langchain-community` package with `pip install langchain-community`:
 
 ```python
 from langchain_community.embeddings import Model2vecEmbeddings
@@ -436,7 +436,6 @@ chunks = chunker.chunk(text)
 
 <details>
 <summary>  Transformers.js </summary>
-<a name="transformersjs"></a>
 <br>
 
 To use a Model2Vec model in [transformers.js](https://github.com/huggingface/transformers.js), the following code snippet can be used as a starting point:
