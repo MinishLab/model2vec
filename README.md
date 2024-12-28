@@ -382,6 +382,7 @@ query = "Risotto"
 query_vector = embedder.embed_query(query)
 retrieved_docs = vector_store.similarity_search_by_vector(query_vector, k=1)
 ```
+</details>
 
 <details>
 <summary>  Txtai </summary>
