@@ -355,6 +355,39 @@ For more documentation, please refer to the [Sentence Transformers documentation
 
 </details>
 
+<details>
+<summary>  LangChain </summary>
+<br>
+
+Model2Vec can be used in [LangChain](https://github.com/langchain-ai/langchain) using the `langchain-community` package. The following code snippet shows how to use Model2Vec in LangChain after installing the `langchain-community` package with `pip install langchain-community`:
+
+```python
+from langchain_community.embeddings import Model2vecEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain.schema import Document
+
+# Initialize a Model2Vec embedder
+embedder= Model2vecEmbeddings("minishlab/potion-base-8M")
+
+# Create some example texts
+texts = [
+    "Enduring Stew",
+    "Hearty Exlixir",
+    "Mighty Mushroom Risotto",
+    "Spicy Meat Skewer",
+    "Fruit Salad",
+]
+
+# Embed the texts
+embeddings = embedder.embed_documents(texts)
+
+# Or, create a vector store and query it
+documents = [Document(page_content=text) for text in texts]
+vector_store = FAISS.from_documents(documents, embedder)
+query = "Risotto"
+query_vector = embedder.embed_query(query)
+retrieved_docs = vector_store.similarity_search_by_vector(query_vector, k=1)
+```
 
 <details>
 <summary>  Txtai </summary>
