@@ -1,16 +1,54 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 import json
 import logging
+import re
 from importlib import import_module
 from importlib.metadata import metadata
 from pathlib import Path
-from typing import Iterator, Protocol, cast
+from typing import Any, Iterator, Protocol, cast
 
 import numpy as np
 import safetensors
+from joblib import Parallel
 from tokenizers import Tokenizer
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
+
+
+class ProgressParallel(Parallel):
+    """A drop-in replacement for joblib.Parallel that shows a tqdm progress bar."""
+
+    def __init__(self, use_tqdm: bool = True, total: int | None = None, *args: Any, **kwargs: Any) -> None:
+        """
+        Initialize the ProgressParallel object.
+
+        :param use_tqdm: Whether to show the progress bar.
+        :param total: Total number of tasks (batches) you expect to process. If None,
+                    it updates the total dynamically to the number of dispatched tasks.
+        :param *args: Additional arguments to pass to `Parallel.__init__`.
+        :param **kwargs: Additional keyword arguments to pass to `Parallel.__init__`.
+        """
+        self._use_tqdm = use_tqdm
+        self._total = total
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Create a tqdm context."""
+        with tqdm(disable=not self._use_tqdm, total=self._total) as self._pbar:
+            self._pbar = self._pbar
+            return super().__call__(*args, **kwargs)
+
+    def print_progress(self) -> None:
+        """Hook called by joblib as tasks complete. We update the tqdm bar here."""
+        if self._total is None:
+            # If no fixed total was given, we dynamically set the total
+            self._pbar.total = self.n_dispatched_tasks
+        # Move the bar to the number of completed tasks
+        self._pbar.n = self.n_completed_tasks
+        self._pbar.refresh()
 
 
 class SafeOpenProtocol(Protocol):
@@ -22,6 +60,7 @@ class SafeOpenProtocol(Protocol):
 
 
 _MODULE_MAP = (("scikit-learn", "sklearn"),)
+_DIVIDERS = re.compile(r"[=<>!]+")
 
 
 def get_package_extras(package: str, extra: str) -> Iterator[str]:
@@ -38,7 +77,8 @@ def get_package_extras(package: str, extra: str) -> Iterator[str]:
             # Extract and clean the extra requirement
             found_extra = rest[0].split("==")[-1].strip(" \"'")
             if found_extra == extra:
-                yield name.strip()
+                prefix, *_ = _DIVIDERS.split(name)
+                yield prefix.strip()
 
 
 def importable(module: str, extra: str) -> None:

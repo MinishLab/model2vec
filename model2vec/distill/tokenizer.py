@@ -68,10 +68,12 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
         tokenizer_data["model"]["vocab"] = reindexed
 
     elif model_type == "Unigram":
-        raise ValueError("Removing tokens from a unigram tokenizer is not supported.")
+        logger.warning("Removing tokens from a unigram tokenizer is not supported.")
+        return tokenizer
 
     elif model_type == "BPE":
-        raise ValueError("Removing tokens from a BPE tokenizer is not supported.")
+        logger.warning("Removing tokens from a BPE tokenizer is not supported.")
+        return tokenizer
 
     else:
         raise ValueError(f"Unknown model type {model_type}")
