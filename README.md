@@ -366,7 +366,7 @@ embedder = Model2vecEmbeddings("minishlab/potion-base-8M")
 # Create some example texts
 texts = [
     "Enduring Stew",
-    "Hearty Exlixir",
+    "Hearty Elixir",
     "Mighty Mushroom Risotto",
     "Spicy Meat Skewer",
     "Fruit Salad",
