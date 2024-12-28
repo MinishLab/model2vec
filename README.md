@@ -361,7 +361,7 @@ from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 
 # Initialize a Model2Vec embedder
-embedder= Model2vecEmbeddings("minishlab/potion-base-8M")
+embedder = Model2vecEmbeddings("minishlab/potion-base-8M")
 
 # Create some example texts
 texts = [
