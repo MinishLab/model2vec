@@ -433,38 +433,6 @@ chunks = chunker.chunk(text)
 
 </details>
 
-<details>
-<summary>  Transformers.js </summary>
-
-Model2Vec can be used in [LangChain](https://github.com/langchain-ai/langchain) using the `langchain-huggingface` package. The following code snippet shows how to use Model2Vec in LangChain:
-
-First, install the `langchain-huggingface` package:
-
-```bash
-pip install langchain-huggingface
-```
-
-Then, use the following code snippet to load a Model2Vec model and embed a query:
-
-```python
-from langchain_huggingface import HuggingFaceEmbeddings
-from sentence_transformers import SentenceTransformer
-from sentence_transformers.models import StaticEmbedding
-
-# Load a Model2Vec model via Sentence Transformers
-static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
-preloaded_model = SentenceTransformer(modules=[static_embedding])
-
-# Initialize the HuggingFaceEmbeddings class and set the client to the preloaded model
-embeddings = HuggingFaceEmbeddings()
-embeddings._client = preloaded_model
-
-# Embed a query
-query_result = embeddings.embed_query("It's dangerous to go alone!")
-```
-
-</details>
-
 
 <details>
 <summary>  Transformers.js </summary>
