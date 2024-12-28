@@ -388,7 +388,7 @@ retrieved_docs = vector_store.similarity_search_by_vector(query_vector, k=1)
 <summary>  Txtai </summary>
 <br>
 
-Model2Vec can be used in [txtai](https://github.com/neuml/txtai) for text embeddings, nearest-neighbors search, and any of the other functionalities that txtai offers. The following code snippet shows how to use Model2Vec in txtai:
+Model2Vec can be used in [txtai](https://github.com/neuml/txtai) for text embeddings, nearest-neighbors search, and any of the other functionalities that txtai offers. The following code snippet shows how to use Model2Vec in txtai after installing the `txtai` package (including the `vectors`) dependency with `pip install txtai[vectors]`:
 
 ```python
 from txtai import Embeddings
