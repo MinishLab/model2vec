@@ -26,13 +26,13 @@ class FinetunableStaticModel(nn.Module):
         self.out_dim = out_dim
         self.embed_dim = vectors.shape[1]
 
-        self.vectors = vectors
+        self.vectors = torch.randn_like(vectors)
         self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
         self.head = self.construct_head()
 
         # Weights for
-        weights = torch.ones(len(vectors))
-        weights[pad_id] = 0
+        weights = torch.zeros(len(vectors))
+        weights[pad_id] = -10_000
         self.w = nn.Parameter(weights)
         self.tokenizer = tokenizer
 
@@ -71,16 +71,18 @@ class FinetunableStaticModel(nn.Module):
         :return: The mean over the input ids, weighted by token weights.
         """
         w = self.w[input_ids]
+        w = torch.softmax(w, dim=1)
         zeros = (input_ids != self.pad_id).float()
-        length = zeros.sum(1)
+        w = w * zeros
+        # Add a small epsilon to avoid division by zero
+        length = zeros.sum(1) + 1e-16
         embedded = self.embeddings(input_ids)
         # Simulate actual mean
         # Zero out the padding
-        embedded = embedded * zeros[:, :, None]
-        embedded = (embedded * w[:, :, None]).sum(1) / w.sum(1)[:, None]
+        embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
         embedded = embedded / length[:, None]
 
-        return torch.nn.functional.normalize(embedded)
+        return nn.functional.normalize(embedded)
 
     def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass through the mean, and a classifier layer after."""
@@ -127,25 +129,18 @@ class FinetunableStaticModel(nn.Module):
 
 
 class TextDataset(Dataset):
-    def __init__(self, texts: list[str], targets: torch.Tensor, tokenizer: Tokenizer) -> None:
+    def __init__(self, tokenized_texts: list[list[int]], targets: torch.Tensor) -> None:
         """
         A dataset of texts.
 
-        This dataset tokenizes the texts and stores them as Tensors, which are then padded in the collation function.
-
-        :param texts: The texts to tokenize.
+        :param tokenized_texts: The tokenized texts. Each text is a list of token ids.
         :param targets: The targets.
-        :param tokenizer: The tokenizer to use.
         :raises ValueError: If the number of labels does not match the number of texts.
         """
-        if len(targets) != len(texts):
+        if len(targets) != len(tokenized_texts):
             raise ValueError("Number of labels does not match number of texts.")
-        self.texts = texts
-        self.tokenized_texts: list[list[int]] = [
-            encoding.ids for encoding in tokenizer.encode_batch_fast(self.texts, add_special_tokens=False)
-        ]
+        self.tokenized_texts = tokenized_texts
         self.targets = targets
-        self.tokenizer = tokenizer
 
     def __len__(self) -> int:
         """Return the length of the dataset."""
