@@ -55,12 +55,6 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
     - [Distillation](#distillation)
     - [Evaluation](#evaluation)
 - [Integrations](#integrations)
-<<<<<<< HEAD
-    - [Sentence Transformers](#sentence-transformers)
-    - [LangChain](#langchain)
-    - [Transformers.js](#transformersjs)
-=======
->>>>>>> 80741826b54d45c37c1f620b06ed251dccf3c465
 - [Model List](#model-list)
 - [Results](#results)
 
