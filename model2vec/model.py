@@ -275,8 +275,6 @@ class StaticModel:
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        ids = self.tokenize(sentences=sentences, max_length=max_length)
-
         # Use joblib for multiprocessing if requested, and if we have enough sentences
         if use_multiprocessing and len(sentences) > multiprocessing_threshold:
             # Disable parallelism for tokenizers
