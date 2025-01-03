@@ -8,6 +8,7 @@ import lightning as pl
 import numpy as np
 import torch
 from lightning.pytorch.callbacks import Callback, EarlyStopping
+from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from sklearn.model_selection import train_test_split
 from tokenizers import Tokenizer
 from torch import nn
@@ -31,8 +32,8 @@ class ClassificationStaticModel(FinetunableStaticModel):
         """Initialize a standard classifier model."""
         self.n_layers = n_layers
         self.hidden_dim = hidden_dim
-        # Alias: Follows scikit-learn.
-        self.classes_: list[str] = []
+        # Alias: Follows scikit-learn. Set to dummy classes
+        self.classes_: list[str] = [str(x) for x in range(out_dim)]
         super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
 
     @property
@@ -45,57 +46,53 @@ class ClassificationStaticModel(FinetunableStaticModel):
         if self.n_layers == 0:
             return nn.Linear(self.embed_dim, self.out_dim)
         modules = [
-            nn.Dropout(0.5),
             nn.Linear(self.embed_dim, self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim),
             nn.ReLU(),
         ]
         for _ in range(self.n_layers - 1):
-            modules.extend(
-                [nn.Dropout(0.5), nn.Linear(self.hidden_dim, self.hidden_dim), nn.LayerNorm(self.hidden_dim), nn.ReLU()]
-            )
+            modules.extend([nn.Linear(self.hidden_dim, self.hidden_dim), nn.ReLU()])
         modules.extend([nn.Linear(self.hidden_dim, self.out_dim)])
 
         for module in modules:
             if isinstance(module, nn.Linear):
-                nn.init.kaiming_normal_(module.weight)
+                nn.init.kaiming_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
 
         return nn.Sequential(*modules)
 
-    def predict(self, texts: list[str]) -> list[str]:
+    def predict(self, X: list[str]) -> list[str]:
         """Predict a class for a set of texts."""
         pred: list[str] = []
-        for batch in range(0, len(texts), 1024):
-            logits = self._predict(texts[batch : batch + 1024])
+        for batch in range(0, len(X), 1024):
+            logits = self._predict(X[batch : batch + 1024])
             pred.extend([self.classes[idx] for idx in logits.argmax(1)])
 
         return pred
 
     @torch.no_grad()
-    def _predict(self, texts: list[str]) -> torch.Tensor:
-        input_ids = self.tokenize(texts)
+    def _predict(self, X: list[str]) -> torch.Tensor:
+        input_ids = self.tokenize(X)
         vectors, _ = self.forward(input_ids)
         return vectors
 
-    def predict_proba(self, texts: list[str]) -> np.ndarray:
+    def predict_proba(self, X: list[str]) -> np.ndarray:
         """Predict the probability of each class."""
         pred: list[np.ndarray] = []
-        for batch in range(0, len(texts), 1024):
-            logits = self._predict(texts[batch : batch + 1024])
+        for batch in range(0, len(X), 1024):
+            logits = self._predict(X[batch : batch + 1024])
             pred.append(torch.softmax(logits, dim=1).numpy())
 
         return np.concatenate(pred)
 
     def fit(
         self,
-        texts: list[str],
-        labels: list[str],
+        X: list[str],
+        y: list[str],
         **kwargs: Any,
     ) -> ClassificationStaticModel:
         """Fit a model."""
         pl.seed_everything(42)
-        classes = sorted(set(labels))
+        classes = sorted(set(y))
         self.classes_ = classes
 
         if len(self.classes) != self.out_dim:
@@ -105,15 +102,15 @@ class ClassificationStaticModel(FinetunableStaticModel):
         self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
 
         label_mapping = {label: idx for idx, label in enumerate(self.classes)}
-        label_counts = Counter(labels)
+        label_counts = Counter(y)
         if min(label_counts.values()) < 2:
             logger.info("Some classes have less than 2 samples. Stratification is disabled.")
             train_texts, validation_texts, train_labels, validation_labels = train_test_split(
-                texts, labels, test_size=0.1, random_state=42, shuffle=True
+                X, y, test_size=0.1, random_state=42, shuffle=True
             )
         else:
             train_texts, validation_texts, train_labels, validation_labels = train_test_split(
-                texts, labels, test_size=0.1, random_state=42, shuffle=True, stratify=labels
+                X, y, test_size=0.1, random_state=42, shuffle=True, stratify=y
             )
 
         # Turn labels into a LongTensor
@@ -190,6 +187,18 @@ class ClassifierLightningModule(pl.LightningModule):
 
         return loss
 
-    def configure_optimizers(self) -> torch.optim.Optimizer:
+    def configure_optimizers(self) -> OptimizerLRScheduler:
         """Simple Adam optimizer."""
-        return torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=0.5,
+            patience=3,
+            verbose=True,
+            min_lr=1e-6,
+            threshold=0.03,
+            threshold_mode="rel",
+        )
+
+        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "monitor": "val_loss"}}

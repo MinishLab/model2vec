@@ -25,12 +25,11 @@ class FinetunableStaticModel(nn.Module):
         self.pad_id = pad_id
         self.out_dim = out_dim
         self.embed_dim = vectors.shape[1]
+        self.vectors = vectors
 
-        self.vectors = torch.randn_like(vectors)
         self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
         self.head = self.construct_head()
 
-        # Weights for
         weights = torch.zeros(len(vectors))
         weights[pad_id] = -10_000
         self.w = nn.Parameter(weights)
@@ -71,7 +70,7 @@ class FinetunableStaticModel(nn.Module):
         :return: The mean over the input ids, weighted by token weights.
         """
         w = self.w[input_ids]
-        w = torch.softmax(w, dim=1)
+        w = torch.sigmoid(w)
         zeros = (input_ids != self.pad_id).float()
         w = w * zeros
         # Add a small epsilon to avoid division by zero
@@ -80,6 +79,7 @@ class FinetunableStaticModel(nn.Module):
         # Simulate actual mean
         # Zero out the padding
         embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
+        # embedded = embedded.sum(1)
         embedded = embedded / length[:, None]
 
         return nn.functional.normalize(embedded)
