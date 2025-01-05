@@ -108,25 +108,6 @@ class FinetunableStaticModel(nn.Module):
         """Get the device of the model."""
         return self.embeddings.weight.device
 
-    def to_static_model(self, config: dict[str, Any] | None = None) -> StaticModel:
-        """
-        Convert the model to a static model.
-
-        This is useful if you want to discard your head, and consolidate the information learned by
-        the model to use it in a downstream task.
-
-        :param config: The config used in the StaticModel. If this is set to None, it will have no config.
-        :return: A static model.
-        """
-        # Perform the forward pass on the selected device.
-        with torch.no_grad():
-            all_indices = torch.arange(len(self.embeddings.weight))[:, None].to(self.device)
-            vectors = self._encode(all_indices).cpu().numpy()
-
-        new_model = StaticModel(vectors=vectors, tokenizer=self.tokenizer, config=config)
-
-        return new_model
-
 
 class TextDataset(Dataset):
     def __init__(self, tokenized_texts: list[list[int]], targets: torch.Tensor) -> None:

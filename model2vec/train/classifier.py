@@ -88,10 +88,62 @@ class ClassificationStaticModel(FinetunableStaticModel):
         self,
         X: list[str],
         y: list[str],
-        **kwargs: Any,
+        learning_rate: float = 1e-3,
+        batch_size: int = 32,
+        early_stopping_patience: int | None = 25,
+        test_size: float = 0.1,
     ) -> ClassificationStaticModel:
         """Fit a model."""
         pl.seed_everything(42)
+        self._initialize(y)
+
+        train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
+            X, y, test_size=test_size
+        )
+
+        train_dataset = self._prepare_dataset(train_texts, train_labels)
+        val_dataset = self._prepare_dataset(validation_texts, validation_labels)
+
+        c = ClassifierLightningModule(self, learning_rate=learning_rate)
+
+        n_train_batches = len(train_dataset) // batch_size
+        callbacks: list[Callback] = []
+        if early_stopping_patience is not None:
+            callback = EarlyStopping(monitor="val_accuracy", mode="max", patience=early_stopping_patience)
+            callbacks.append(callback)
+
+        if n_train_batches < 250:
+            val_check_interval = None
+            check_val_every_epoch = True
+        else:
+            val_check_interval = max(250, 2 * len(val_dataset) // batch_size)
+            check_val_every_epoch = False
+        trainer = pl.Trainer(
+            max_epochs=500,
+            callbacks=callbacks,
+            val_check_interval=val_check_interval,
+            check_val_every_n_epoch=check_val_every_epoch,
+        )
+
+        trainer.fit(
+            c,
+            train_dataloaders=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size),
+            val_dataloaders=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size),
+        )
+        best_model_path = trainer.checkpoint_callback.best_model_path  # type: ignore
+        best_model_weights = torch.load(best_model_path, weights_only=True)
+
+        state_dict = {}
+        for weight_name, weight in best_model_weights["state_dict"].items():
+            state_dict[weight_name.removeprefix("model.")] = weight
+
+        self.load_state_dict(state_dict)
+        self.eval()
+
+        return self
+
+    def _initialize(self, y: list[str]) -> None:
+        """Sets the out dimensionality, the classes and initializes the head."""
         classes = sorted(set(y))
         self.classes_ = classes
 
@@ -101,66 +153,31 @@ class ClassificationStaticModel(FinetunableStaticModel):
         self.head = self.construct_head()
         self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
 
-        label_mapping = {label: idx for idx, label in enumerate(self.classes)}
+    def _prepare_dataset(self, X: list[str], y: list[str]) -> TextDataset:
+        """Prepare a dataset."""
+        tokenized: list[list[int]] = [
+            encoding.ids for encoding in self.tokenizer.encode_batch_fast(X, add_special_tokens=False)
+        ]
+        labels_tensor = torch.Tensor([self.classes.index(label) for label in y]).long()
+        return TextDataset(tokenized, labels_tensor)
+
+    def _train_test_split(
+        self, X: list[str], y: list[str], test_size: float
+    ) -> tuple[list[str], list[str], list[str], list[str]]:
+        """Split the data."""
         label_counts = Counter(y)
         if min(label_counts.values()) < 2:
             logger.info("Some classes have less than 2 samples. Stratification is disabled.")
-            train_texts, validation_texts, train_labels, validation_labels = train_test_split(
-                X, y, test_size=0.1, random_state=42, shuffle=True
-            )
-        else:
-            train_texts, validation_texts, train_labels, validation_labels = train_test_split(
-                X, y, test_size=0.1, random_state=42, shuffle=True, stratify=y
-            )
-
-        # Turn labels into a LongTensor
-        train_tokenized: list[list[int]] = [
-            encoding.ids for encoding in self.tokenizer.encode_batch_fast(train_texts, add_special_tokens=False)
-        ]
-        train_labels_tensor = torch.Tensor([label_mapping[label] for label in train_labels]).long()
-        train_dataset = TextDataset(train_tokenized, train_labels_tensor)
-
-        val_tokenized: list[list[int]] = [
-            encoding.ids for encoding in self.tokenizer.encode_batch_fast(validation_texts, add_special_tokens=False)
-        ]
-        val_labels_tensor = torch.Tensor([label_mapping[label] for label in validation_labels]).long()
-        val_dataset = TextDataset(val_tokenized, val_labels_tensor)
-
-        c = ClassifierLightningModule(self)
-
-        batch_size = 32
-        n_train_batches = len(train_dataset) // batch_size
-        callbacks: list[Callback] = [EarlyStopping(monitor="val_accuracy", mode="max", patience=5)]
-        if n_train_batches < 250:
-            trainer = pl.Trainer(max_epochs=500, callbacks=callbacks, check_val_every_n_epoch=1)
-        else:
-            val_check_interval = max(250, 2 * len(val_dataset) // batch_size)
-            trainer = pl.Trainer(
-                max_epochs=500, callbacks=callbacks, val_check_interval=val_check_interval, check_val_every_n_epoch=None
-            )
-
-        trainer.fit(
-            c,
-            train_dataloaders=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size),
-            val_dataloaders=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size),
-        )
-        best_model_path = trainer.checkpoint_callback.best_model_path  # type: ignore
-
-        state_dict = {
-            k.removeprefix("model."): v for k, v in torch.load(best_model_path, weights_only=True)["state_dict"].items()
-        }
-        self.load_state_dict(state_dict)
-
-        self.eval()
-
-        return self
+            return train_test_split(X, y, test_size=0.1, random_state=42, shuffle=True)
+        return train_test_split(X, y, test_size=0.1, random_state=42, shuffle=True, stratify=y)
 
 
 class ClassifierLightningModule(pl.LightningModule):
-    def __init__(self, model: ClassificationStaticModel) -> None:
+    def __init__(self, model: ClassificationStaticModel, learning_rate: float) -> None:
         """Initialize the lightningmodule."""
         super().__init__()
         self.model = model
+        self.learning_rate = learning_rate
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Simple forward pass."""
