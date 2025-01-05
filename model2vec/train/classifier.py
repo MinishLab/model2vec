@@ -152,6 +152,7 @@ class ClassificationStaticModel(FinetunableStaticModel):
 
         self.head = self.construct_head()
         self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
+        self.train()
 
     def _prepare_dataset(self, X: list[str], y: list[str]) -> TextDataset:
         """Prepare a dataset."""
