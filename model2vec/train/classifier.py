@@ -114,10 +114,10 @@ class ClassificationStaticModel(FinetunableStaticModel):
 
         if n_train_batches < 250:
             val_check_interval = None
-            check_val_every_epoch = True
+            check_val_every_epoch = 1
         else:
             val_check_interval = max(250, 2 * len(val_dataset) // batch_size)
-            check_val_every_epoch = False
+            check_val_every_epoch = None
         trainer = pl.Trainer(
             max_epochs=500,
             callbacks=callbacks,
