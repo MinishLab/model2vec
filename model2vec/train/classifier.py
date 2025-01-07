@@ -11,7 +11,6 @@ from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from sklearn.model_selection import train_test_split
 from tokenizers import Tokenizer
 from torch import nn
-from tqdm import tqdm
 
 from model2vec.train.base import FinetunableStaticModel, TextDataset
 
@@ -95,13 +94,16 @@ class ClassificationStaticModel(FinetunableStaticModel):
     ) -> ClassificationStaticModel:
         """Fit a model."""
         pl.seed_everything(42)
+        logger.info("Re-initializing model.")
         self._initialize(y)
 
         train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
             X, y, test_size=test_size
         )
 
+        logger.info("Prepating train dataset.")
         train_dataset = self._prepare_dataset(train_texts, train_labels)
+        logger.info("Prepating validation dataset.")
         val_dataset = self._prepare_dataset(validation_texts, validation_labels)
 
         c = ClassifierLightningModule(self, learning_rate=learning_rate)
@@ -156,8 +158,10 @@ class ClassificationStaticModel(FinetunableStaticModel):
 
     def _prepare_dataset(self, X: list[str], y: list[str]) -> TextDataset:
         """Prepare a dataset."""
+        # Truncate texts to pre-specified maximum length.
+        X = [x[:3072] for x in X]
         tokenized: list[list[int]] = [
-            encoding.ids[:512] for encoding in tqdm(self.tokenizer.encode_batch_fast(X, add_special_tokens=False))
+            encoding.ids[:512] for encoding in self.tokenizer.encode_batch_fast(X, add_special_tokens=False)
         ]
         labels_tensor = torch.Tensor([self.classes.index(label) for label in y]).long()
         return TextDataset(tokenized, labels_tensor)
