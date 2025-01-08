@@ -26,14 +26,15 @@ classifier = StaticModelForClassification.from_static_model(distilled_model)
 classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-8m")
 ```
 
-This creates a very simple classifier: a StaticModel with a single 512-unit hidden layer on top. You can adjust the number of hidden layers and the number units through some parameters on both functions. Note that the default for `from_pretrained` is [potion-base-8m](https://huggingface.co/minishlab/potion-base-8M), our best model to date. This is our recommended path if you're working on general English data.
+This creates a very simple classifier: a StaticModel with a single 512-unit hidden layer on top. You can adjust the number of hidden layers and the number units through some parameters on both functions. Note that the default for `from_pretrained` is [potion-base-8m](https://huggingface.co/minishlab/potion-base-8M), our best model to date. This is our recommended path if you're working with general English data.
 
-Now that you have created the classifier, let's just train a model. This assumes you have the [`datasets`](https://github.com/huggingface/datasets) library installed.
+Now that you have created the classifier, let's just train a model. The example below assumes you have the [`datasets`](https://github.com/huggingface/datasets) library installed.
 
 ```python
 import numpy as np
 from datasets import load_dataset
 
+# Load the subj dataset
 ds = load_dataset("setfit/subj")
 train = ds["train"]
 test = ds["test"]
@@ -49,9 +50,9 @@ print(f"Achieved {accuracy} test accuracy")
 # Achieved 91.0 test accuracy
 ```
 
-As you can see, we got a pretty nice accuracy.
+As you can see, we got a pretty nice 91% accuracy, with only 81 seconds of training.
 
-The training loop is handled by [`lightning`](https://pypi.org/project/lightning/). It trains on 90% of the data, using a stratified split to create a 10% validation set. By default, it runs with early stopping on the validation set accuracy, with a really high patience.
+The training loop is handled by [`lightning`](https://pypi.org/project/lightning/). By default the training loop splits the data into a train and validation split, with 90% of the data being used for training and 10% for validation. By default, it runs with early stopping on the validation set accuracy, with a patience of 5.
 
 Note that this model is as fast as you're used to from us:
 
@@ -70,7 +71,7 @@ The main results are detailed in our training blogpost, but we'll do a compariso
 
 We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
 
-| dataset_name               |   logreg   |  full finetune |
+| dataset name               |   logistic regression head   |  full finetune |
 |:---------------------------|-----------:|---------------:|
 | 20_newgroups               |   0.545312 |       0.555459 |
 | ade                        |   0.715725 |  0.740307 |
@@ -88,7 +89,11 @@ We use 14 classification datasets, using 1000 examples from the train set, and t
 | subj                       |   0.878394 |  0.88941  |
 | tweet_sentiment_extraction |   0.638664 |  0.632009 |
 
-As you can see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases. Our advice is to test both if you can use `potion-base-8m`, and to use full fine-tuning if you are starting from another base model.
+|                |   logreg   |  full finetune |
+|:---------------------------|-----------:|---------------:|
+| average                    |   0.714    |    0.742       |
+
+As you can see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-8m`, and to use full fine-tuning if you are starting from another base model.
 
 # Bring your own architecture
 
