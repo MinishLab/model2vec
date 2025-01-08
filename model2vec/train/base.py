@@ -12,7 +12,7 @@ from model2vec import StaticModel
 
 
 class FinetunableStaticModel(nn.Module):
-    def __init__(self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int, pad_id: int = 0) -> None:
+    def __init__(self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0) -> None:
         """
         Initialize a trainable StaticModel from a StaticModel.
 
@@ -47,14 +47,14 @@ class FinetunableStaticModel(nn.Module):
 
     @classmethod
     def from_pretrained(
-        cls: type[ModelType], out_dim: int, model_name: str = "minishlab/potion-base-8m", **kwargs: Any
+        cls: type[ModelType], out_dim: int = 2, model_name: str = "minishlab/potion-base-8m", **kwargs: Any
     ) -> ModelType:
         """Load the model from a pretrained model2vec model."""
         model = StaticModel.from_pretrained(model_name)
         return cls.from_static_model(model, out_dim, **kwargs)
 
     @classmethod
-    def from_static_model(cls: type[ModelType], model: StaticModel, out_dim: int, **kwargs: Any) -> ModelType:
+    def from_static_model(cls: type[ModelType], model: StaticModel, out_dim: int = 2, **kwargs: Any) -> ModelType:
         """Load the model from a static model."""
         embeddings_converted = torch.from_numpy(model.embedding)
         return cls(

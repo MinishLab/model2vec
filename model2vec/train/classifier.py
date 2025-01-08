@@ -18,15 +18,15 @@ from model2vec.train.base import FinetunableStaticModel, TextDataset
 logger = logging.getLogger(__name__)
 
 
-class ClassificationStaticModel(FinetunableStaticModel):
+class StaticModelForClassification(FinetunableStaticModel):
     def __init__(
         self,
         *,
         vectors: torch.Tensor,
         tokenizer: Tokenizer,
-        n_layers: int,
-        hidden_dim: int,
-        out_dim: int,
+        n_layers: int = 1,
+        hidden_dim: int = 512,
+        out_dim: int = 2,
         pad_id: int = 0,
     ) -> None:
         """Initialize a standard classifier model."""
@@ -90,9 +90,9 @@ class ClassificationStaticModel(FinetunableStaticModel):
         y: list[str],
         learning_rate: float = 1e-3,
         batch_size: int = 32,
-        early_stopping_patience: int | None = 25,
+        early_stopping_patience: int | None = 5,
         test_size: float = 0.1,
-    ) -> ClassificationStaticModel:
+    ) -> StaticModelForClassification:
         """
         Fit a model.
 
@@ -123,7 +123,7 @@ class ClassificationStaticModel(FinetunableStaticModel):
         logger.info("Preparing validation dataset.")
         val_dataset = self._prepare_dataset(validation_texts, validation_labels)
 
-        c = ClassifierLightningModule(self, learning_rate=learning_rate)
+        c = _ClassifierLightningModule(self, learning_rate=learning_rate)
 
         n_train_batches = len(train_dataset) // batch_size
         callbacks: list[Callback] = []
@@ -198,8 +198,8 @@ class ClassificationStaticModel(FinetunableStaticModel):
         return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=y)
 
 
-class ClassifierLightningModule(pl.LightningModule):
-    def __init__(self, model: ClassificationStaticModel, learning_rate: float) -> None:
+class _ClassifierLightningModule(pl.LightningModule):
+    def __init__(self, model: StaticModelForClassification, learning_rate: float) -> None:
         """Initialize the lightningmodule."""
         super().__init__()
         self.model = model
