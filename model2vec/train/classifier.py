@@ -117,9 +117,9 @@ class ClassificationStaticModel(FinetunableStaticModel):
             X, y, test_size=test_size
         )
 
-        logger.info("Prepating train dataset.")
+        logger.info("Preparing train dataset.")
         train_dataset = self._prepare_dataset(train_texts, train_labels)
-        logger.info("Prepating validation dataset.")
+        logger.info("Preparing validation dataset.")
         val_dataset = self._prepare_dataset(validation_texts, validation_labels)
 
         c = ClassifierLightningModule(self, learning_rate=learning_rate)
