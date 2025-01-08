@@ -32,8 +32,14 @@ class FinetunableStaticModel(nn.Module):
 
         weights = torch.zeros(len(vectors))
         weights[pad_id] = -10_000
-        self.w = nn.Parameter(weights)
+        self.w = self.construct_weights()
         self.tokenizer = tokenizer
+
+    def construct_weights(self) -> nn.Parameter:
+        """Construct the weights for the model."""
+        weights = torch.zeros(len(self.vectors))
+        weights[self.pad_id] = -10_000
+        return nn.Parameter(weights)
 
     def construct_head(self) -> nn.Module:
         """Method should be overridden for various other classes."""

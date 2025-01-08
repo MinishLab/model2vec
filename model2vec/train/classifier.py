@@ -92,7 +92,23 @@ class ClassificationStaticModel(FinetunableStaticModel):
         early_stopping_patience: int | None = 25,
         test_size: float = 0.1,
     ) -> ClassificationStaticModel:
-        """Fit a model."""
+        """
+        Fit a model.
+
+        This function creates a Lightning Trainer object and fits the model to the data.
+        We use early stopping. After training, the weigths of the best model are loaded back into the model.
+
+        This function seeds everything with a seed of 42, so the results are reproducible.
+        It also splits the data into a train and validation set, again with a random seed.
+
+        :param X: The texts to train on.
+        :param y: The labels to train on.
+        :param learning_rate: The learning rate.
+        :param batch_size: The batch size.
+        :param early_stopping_patience: The patience for early stopping.
+        :param test_size: The test size for the train-test split.
+        :return: The fitted model.
+        """
         pl.seed_everything(42)
         logger.info("Re-initializing model.")
         self._initialize(y)
@@ -154,16 +170,20 @@ class ClassificationStaticModel(FinetunableStaticModel):
 
         self.head = self.construct_head()
         self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
+        self.w = self.construct_weights()
         self.train()
 
-    def _prepare_dataset(self, X: list[str], y: list[str]) -> TextDataset:
+    def _prepare_dataset(self, X: list[str], y: list[str], max_length: int = 512) -> TextDataset:
         """Prepare a dataset."""
-        # Truncate texts to pre-specified maximum length.
-        X = [x[:3072] for x in X]
+        # This is a speed optimization.
+        # assumes a mean token length of 10, which is really high, so safe.
+        truncate_length = max_length * 10
+        X = [x[:truncate_length] for x in X]
         tokenized: list[list[int]] = [
-            encoding.ids[:512] for encoding in self.tokenizer.encode_batch_fast(X, add_special_tokens=False)
+            encoding.ids[:max_length] for encoding in self.tokenizer.encode_batch_fast(X, add_special_tokens=False)
         ]
         labels_tensor = torch.Tensor([self.classes.index(label) for label in y]).long()
+
         return TextDataset(tokenized, labels_tensor)
 
     def _train_test_split(
@@ -173,8 +193,8 @@ class ClassificationStaticModel(FinetunableStaticModel):
         label_counts = Counter(y)
         if min(label_counts.values()) < 2:
             logger.info("Some classes have less than 2 samples. Stratification is disabled.")
-            return train_test_split(X, y, test_size=0.1, random_state=42, shuffle=True)
-        return train_test_split(X, y, test_size=0.1, random_state=42, shuffle=True, stratify=y)
+            return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True)
+        return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=y)
 
 
 class ClassifierLightningModule(pl.LightningModule):
