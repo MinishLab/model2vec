@@ -11,6 +11,7 @@ from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from sklearn.model_selection import train_test_split
 from tokenizers import Tokenizer
 from torch import nn
+from tqdm import trange
 
 from model2vec.train.base import FinetunableStaticModel, TextDataset
 
@@ -59,26 +60,26 @@ class ClassificationStaticModel(FinetunableStaticModel):
 
         return nn.Sequential(*modules)
 
-    def predict(self, X: list[str]) -> list[str]:
+    def predict(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> list[str]:
         """Predict a class for a set of texts."""
         pred: list[str] = []
-        for batch in range(0, len(X), 1024):
-            logits = self._predict(X[batch : batch + 1024])
+        for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
+            logits = self._predict_single_batch(X[batch : batch + batch_size])
             pred.extend([self.classes[idx] for idx in logits.argmax(1)])
 
         return pred
 
     @torch.no_grad()
-    def _predict(self, X: list[str]) -> torch.Tensor:
+    def _predict_single_batch(self, X: list[str]) -> torch.Tensor:
         input_ids = self.tokenize(X)
         vectors, _ = self.forward(input_ids)
         return vectors
 
-    def predict_proba(self, X: list[str]) -> np.ndarray:
+    def predict_proba(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
         """Predict the probability of each class."""
         pred: list[np.ndarray] = []
-        for batch in range(0, len(X), 1024):
-            logits = self._predict(X[batch : batch + 1024])
+        for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
+            logits = self._predict_single_batch(X[batch : batch + batch_size])
             pred.append(torch.softmax(logits, dim=1).numpy())
 
         return np.concatenate(pred)
