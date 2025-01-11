@@ -536,7 +536,7 @@ wheels = [
 
 [[package]]
 name = "model2vec"
-version = "0.3.3"
+version = "0.3.4"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
