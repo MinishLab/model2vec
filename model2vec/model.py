@@ -160,7 +160,7 @@ class StaticModel:
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token)
+        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token, from_sentence_transformers=False)
 
         return cls(
             embeddings, tokenizer, config, base_model_name=metadata.get("base_model"), language=metadata.get("language")
@@ -181,9 +181,9 @@ class StaticModel:
         :param token: The huggingface token to use.
         :return: A StaticModel
         """
-        from model2vec.hf_utils import load_from_st
+        from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, metadata = load_from_st(path, token=token)
+        embeddings, tokenizer, config, _ = load_pretrained(path, token=token, from_sentence_transformers=True)
 
         return cls(embeddings, tokenizer, config, base_model_name=None, language=None)
 
