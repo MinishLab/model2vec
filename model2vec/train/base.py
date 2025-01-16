@@ -119,7 +119,7 @@ class FinetunableStaticModel(nn.Module):
         emb = self.embeddings.weight.detach().cpu().numpy()
         w = torch.sigmoid(self.w).detach().cpu().numpy()
 
-        return StaticModel(emb * w[:, None], self.tokenizer)
+        return StaticModel(emb * w[:, None], self.tokenizer, normalize=True)
 
 
 class TextDataset(Dataset):

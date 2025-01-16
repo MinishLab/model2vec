@@ -66,9 +66,10 @@ class StaticModel:
             self._can_encode_fast = False
 
         if normalize is not None:
-            self.normalize = normalize
+            self._normalize = normalize
+            self.config["normalize"] = normalize
         else:
-            self.normalize = self.config.get("normalize", False)
+            self._normalize = self.config.get("normalize", False)
 
     @property
     def dim(self) -> int:
