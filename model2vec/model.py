@@ -69,7 +69,7 @@ class StaticModel:
             self._normalize = normalize
             self.config["normalize"] = normalize
         else:
-            self._normalize = self.config.get("normalize", False)
+            self.normalize = self.config.get("normalize", False)
 
     @property
     def dim(self) -> int:
