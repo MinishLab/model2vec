@@ -9,6 +9,9 @@ import torch
 from lightning.pytorch.callbacks import Callback, EarlyStopping
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import FunctionTransformer
 from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
@@ -41,10 +44,10 @@ class StaticModelForClassification(FinetunableStaticModel):
         """Return all clasess in the correct order."""
         return self.classes_
 
-    def construct_head(self) -> nn.Module:
+    def construct_head(self) -> nn.Sequential:
         """Constructs a simple classifier head."""
         if self.n_layers == 0:
-            return nn.Linear(self.embed_dim, self.out_dim)
+            return nn.Sequential(nn.Linear(self.embed_dim, self.out_dim))
         modules = [
             nn.Linear(self.embed_dim, self.hidden_dim),
             nn.ReLU(),
@@ -196,6 +199,25 @@ class StaticModelForClassification(FinetunableStaticModel):
             logger.info("Some classes have less than 2 samples. Stratification is disabled.")
             return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True)
         return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=y)
+
+    def to_pipeline(self) -> Pipeline:
+        """Convert the model to an sklearn pipeline."""
+        static_model = self.to_static_model()
+        encoding_step = FunctionTransformer(static_model.encode)
+
+        random_state = np.random.RandomState(42)
+        n_items = len(self.classes)
+        X = random_state.randn(n_items, static_model.dim)
+        y = np.arange(n_items)
+
+        converted = MLPClassifier(hidden_layer_sizes=(self.hidden_dim,) * self.n_layers)
+        converted.fit(X, y)
+
+        for index, layer in enumerate([module for module in self.head if isinstance(module, nn.Linear)]):
+            converted.coefs_[index] = layer.weight.detach().cpu().numpy().T
+            converted.intercepts_[index] = layer.bias.detach().cpu().numpy()
+
+        return Pipeline([("model2vec", encoding_step), ("head", converted)])
 
 
 class _ClassifierLightningModule(pl.LightningModule):

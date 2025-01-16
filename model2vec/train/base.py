@@ -41,9 +41,9 @@ class FinetunableStaticModel(nn.Module):
         weights[self.pad_id] = -10_000
         return nn.Parameter(weights)
 
-    def construct_head(self) -> nn.Module:
+    def construct_head(self) -> nn.Sequential:
         """Method should be overridden for various other classes."""
-        return nn.Linear(self.embed_dim, self.out_dim)
+        return nn.Sequential(nn.Linear(self.embed_dim, self.out_dim))
 
     @classmethod
     def from_pretrained(
@@ -113,6 +113,13 @@ class FinetunableStaticModel(nn.Module):
     def device(self) -> str:
         """Get the device of the model."""
         return self.embeddings.weight.device
+
+    def to_static_model(self) -> StaticModel:
+        """Convert the model to a static model."""
+        emb = self.embeddings.weight.detach().cpu().numpy()
+        w = torch.sigmoid(self.w).detach().cpu().numpy()
+
+        return StaticModel(emb * w[:, None], self.tokenizer)
 
 
 class TextDataset(Dataset):
