@@ -160,11 +160,32 @@ class StaticModel:
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token)
+        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token, from_sentence_transformers=False)
 
         return cls(
             embeddings, tokenizer, config, base_model_name=metadata.get("base_model"), language=metadata.get("language")
         )
+
+    @classmethod
+    def from_sentence_transformers(
+        cls: type[StaticModel],
+        path: PathLike,
+        token: str | None = None,
+    ) -> StaticModel:
+        """
+        Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
+
+        NOTE: if you load a private model from the huggingface hub, you need to pass a token.
+
+        :param path: The path to load your static model from.
+        :param token: The huggingface token to use.
+        :return: A StaticModel
+        """
+        from model2vec.hf_utils import load_pretrained
+
+        embeddings, tokenizer, config, _ = load_pretrained(path, token=token, from_sentence_transformers=True)
+
+        return cls(embeddings, tokenizer, config, base_model_name=None, language=None)
 
     def encode_as_sequence(
         self,
@@ -274,8 +295,6 @@ class StaticModel:
         # Prepare all batches
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
-
-        ids = self.tokenize(sentences=sentences, max_length=max_length)
 
         # Use joblib for multiprocessing if requested, and if we have enough sentences
         if use_multiprocessing and len(sentences) > multiprocessing_threshold:
