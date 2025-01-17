@@ -92,7 +92,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         X: list[str],
         y: list[str],
         learning_rate: float = 1e-3,
-        batch_size: int = 32,
+        batch_size: int = 512,
         early_stopping_patience: int | None = 5,
         test_size: float = 0.1,
     ) -> StaticModelForClassification:
