@@ -58,6 +58,7 @@ dev = [
 distill = ["torch", "transformers", "scikit-learn"]
 onnx = ["onnx", "torch"]
 train = ["torch", "lightning"]
+trained_model = ["scikit-learn", "skops"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"

@@ -10,13 +10,12 @@ from lightning.pytorch.callbacks import Callback, EarlyStopping
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer
 from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
 
 from model2vec.train.base import FinetunableStaticModel, TextDataset
+from model2vec.trained_model import StaticModelPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -200,15 +199,14 @@ class StaticModelForClassification(FinetunableStaticModel):
             return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True)
         return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=y)
 
-    def to_pipeline(self) -> Pipeline:
+    def to_pipeline(self) -> StaticModelPipeline:
         """Convert the model to an sklearn pipeline."""
         static_model = self.to_static_model()
-        encoding_step = FunctionTransformer(static_model.encode)
 
         random_state = np.random.RandomState(42)
         n_items = len(self.classes)
         X = random_state.randn(n_items, static_model.dim)
-        y = np.arange(n_items)
+        y = self.classes
 
         converted = MLPClassifier(hidden_layer_sizes=(self.hidden_dim,) * self.n_layers)
         converted.fit(X, y)
@@ -217,7 +215,7 @@ class StaticModelForClassification(FinetunableStaticModel):
             converted.coefs_[index] = layer.weight.detach().cpu().numpy().T
             converted.intercepts_[index] = layer.bias.detach().cpu().numpy()
 
-        return Pipeline([("model2vec", encoding_step), ("head", converted)])
+        return StaticModelPipeline(static_model, converted)
 
 
 class _ClassifierLightningModule(pl.LightningModule):

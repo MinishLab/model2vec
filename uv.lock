@@ -791,7 +791,7 @@ wheels = [
 
 [[package]]
 name = "model2vec"
-version = "0.3.5"
+version = "0.3.6"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
@@ -829,14 +829,18 @@ train = [
     { name = "lightning" },
     { name = "torch" },
 ]
+trained-model = [
+    { name = "scikit-learn" },
+    { name = "skops" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "ipython", marker = "extra == 'dev'" },
     { name = "jinja2" },
-    { name = "lightning", marker = "extra == 'train'" },
     { name = "joblib" },
+    { name = "lightning", marker = "extra == 'train'" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numpy" },
     { name = "onnx", marker = "extra == 'onnx'" },
@@ -847,7 +851,9 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "safetensors" },
     { name = "scikit-learn", marker = "extra == 'distill'" },
+    { name = "scikit-learn", marker = "extra == 'trained-model'" },
     { name = "setuptools" },
+    { name = "skops", marker = "extra == 'trained-model'" },
     { name = "tokenizers", specifier = ">=0.20" },
     { name = "torch", marker = "extra == 'distill'" },
     { name = "torch", marker = "extra == 'onnx'" },
@@ -1975,6 +1981,21 @@ wheels = [
 ]
 
 [[package]]
+name = "skops"
+version = "0.11.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "packaging" },
+    { name = "scikit-learn" },
+    { name = "tabulate" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/15/5718ee04c70425b083e070aa4da651292e1527144ea87b3ed07591d729a9/skops-0.11.0.tar.gz", hash = "sha256:229c867fbc5e669a1c6a88661c3883a14f3591abd9bfa6073df308d63ae1fa3a", size = 610701 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/5f/a3ec074e67b5dcce2de290bb5b2edb60f78c9304d86485dc1570bca22c2d/skops-0.11.0-py3-none-any.whl", hash = "sha256:8c6109e27e4d762948cad7d21de008034bd14e15f111e9405c7930e74a7fe8c1", size = 146956 },
+]
+
+[[package]]
 name = "stack-data"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1998,6 +2019,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ca/99/5a5b6f19ff9f083671ddf7b9632028436167cd3d33e11015754e41b249a4/sympy-1.13.1.tar.gz", hash = "sha256:9cebf7e04ff162015ce31c9c6c9144daa34a93bd082f54fd8f12deca4f47515f", size = 7533040 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b2/fe/81695a1aa331a842b582453b605175f419fe8540355886031328089d840a/sympy-1.13.1-py3-none-any.whl", hash = "sha256:db36cdc64bf61b9b24578b6f7bab1ecdd2452cf008f34faa33776680c26d66f8", size = 6189177 },
+]
+
+[[package]]
+name = "tabulate"
+version = "0.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ec/fe/802052aecb21e3797b8f7902564ab6ea0d60ff8ca23952079064155d1ae1/tabulate-0.9.0.tar.gz", hash = "sha256:0095b12bf5966de529c0feb1fa08671671b3368eec77d7ef7ab114be2c068b3c", size = 81090 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/40/44/4a5f08c96eb108af5cb50b41f76142f0afa346dfa99d5296fe7202a11854/tabulate-0.9.0-py3-none-any.whl", hash = "sha256:024ca478df22e9340661486f85298cff5f6dcdba14f3813e8830015b9ed1948f", size = 35252 },
 ]
 
 [[package]]
