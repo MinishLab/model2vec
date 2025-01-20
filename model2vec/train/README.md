@@ -65,6 +65,33 @@ print(f"Took {int((perf_counter() - s) * 1000)} milliseconds for {len(test)} ins
 # Took 67 milliseconds for 2000 instances on CPU.
 ```
 
+# Persistence
+
+You can turn a classifier into a scikit-learn compatible pipeline, as follows:
+
+```python
+pipeline = classifier.to_pipeline()
+```
+
+This pipeline object can be persisted using standard pickle-based methods, such as [joblib](https://joblib.readthedocs.io/en/stable/). This makes it easy to use your model in inferene pipelines (no installing torch!).
+
+If you want to persist your pipeline to the Hugging Face hub, you can use our built-in functions:
+
+```python
+pipeline.save_pretrained(path)
+pipeline.push_to_hub("my_cool/project")
+```
+
+Later, you can load these as follows:
+
+```python
+from model2vec.trained_model import StaticModelPipeline
+
+pipeline = StaticModelPipeline.from_pretrained("my_cool/project")
+```
+
+Loading pipelines in this way is _extremely_ fast. It takes only 30ms to load a pipeline from disk.
+
 # Results
 
 The main results are detailed in our training blogpost, but we'll do a comparison with vanilla model2vec here. In a vanilla model2vec classifier, you just put a scikit-learn `LogisticRegressionCV` on top of the model encoder. In contrast, training a `StaticModelForClassification` fine-tunes the full model, including the `StaticModel` weights.
