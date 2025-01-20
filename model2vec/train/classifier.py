@@ -91,9 +91,10 @@ class StaticModelForClassification(FinetunableStaticModel):
         X: list[str],
         y: list[str],
         learning_rate: float = 1e-3,
-        batch_size: int = 512,
+        batch_size: int | None = None,
         early_stopping_patience: int | None = 5,
         test_size: float = 0.1,
+        device: str = "auto",
     ) -> StaticModelForClassification:
         """
         Fit a model.
@@ -108,8 +109,11 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param y: The labels to train on.
         :param learning_rate: The learning rate.
         :param batch_size: The batch size.
+            If this is None, a good batch size is chosen automatically.
         :param early_stopping_patience: The patience for early stopping.
+            If this is None, early stopping is disabled.
         :param test_size: The test size for the train-test split.
+        :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :return: The fitted model.
         """
         pl.seed_everything(42)
@@ -119,6 +123,10 @@ class StaticModelForClassification(FinetunableStaticModel):
         train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
             X, y, test_size=test_size
         )
+
+        if batch_size is None:
+            batch_size = max(min(32, len(train_texts) // 10), 512)
+            logger.info("Batch size automatically set to %d.", batch_size)
 
         logger.info("Preparing train dataset.")
         train_dataset = self._prepare_dataset(train_texts, train_labels)
@@ -133,6 +141,8 @@ class StaticModelForClassification(FinetunableStaticModel):
             callback = EarlyStopping(monitor="val_accuracy", mode="max", patience=early_stopping_patience)
             callbacks.append(callback)
 
+        # If the dataset is small, we check the validation set every epoch.
+        # If the dataset is large, we check the validation set every 250 batches.
         if n_train_batches < 250:
             val_check_interval = None
             check_val_every_epoch = 1
@@ -144,6 +154,7 @@ class StaticModelForClassification(FinetunableStaticModel):
             callbacks=callbacks,
             val_check_interval=val_check_interval,
             check_val_every_n_epoch=check_val_every_epoch,
+            accelerator=device,
         )
 
         trainer.fit(
