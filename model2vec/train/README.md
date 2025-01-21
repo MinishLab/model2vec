@@ -85,7 +85,7 @@ pipeline.push_to_hub("my_cool/project")
 Later, you can load these as follows:
 
 ```python
-from model2vec.trained_model import StaticModelPipeline
+from model2vec.inference import StaticModelPipeline
 
 pipeline = StaticModelPipeline.from_pretrained("my_cool/project")
 ```

@@ -14,8 +14,8 @@ from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
 
+from model2vec.inference import StaticModelPipeline
 from model2vec.train.base import FinetunableStaticModel, TextDataset
-from model2vec.trained_model import StaticModelPipeline
 
 logger = logging.getLogger(__name__)
 

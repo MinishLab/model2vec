@@ -33,6 +33,7 @@ class StaticModelPipeline:
         :return: The loaded pipeline.
         """
         model, head = _load_pipeline(path, token)
+        model.embedding = np.nan_to_num(model.embedding)
 
         return cls(model, head)
 
@@ -78,9 +79,9 @@ class StaticModelPipeline:
 
 def _load_pipeline(
     folder_or_repo_path: PathLike, token: str | None = None, trust_remote_code: bool = False
-) -> Pipeline:
+) -> tuple[StaticModel, Pipeline]:
     """
-    Load the pipeline from the trained model.
+    Load a model and an sklearn pipeline.
 
     This assumes the following files are present in the repo:
     - `pipeline.skops`: The head of the pipeline.
@@ -95,7 +96,7 @@ def _load_pipeline(
     :param trust_remote_code: Whether to trust the remote code. If this is False,
         we will only load components coming from `sklearn`. If this is True, we will load all components.
         If you set this to True, you are responsible for whatever happens.
-    :return: The loaded pipeline.
+    :return: The encoder model and the loaded head
     :raises FileNotFoundError: If the pipeline file does not exist in the folder.
     :raises ValueError: If an untrusted type is found in the pipeline, and `trust_remote_code` is False.
     """

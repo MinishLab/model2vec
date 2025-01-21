@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, TypeVar
 
+import numpy as np
 import torch
 from tokenizers import Encoding, Tokenizer
 from torch import nn
@@ -56,6 +57,7 @@ class FinetunableStaticModel(nn.Module):
     @classmethod
     def from_static_model(cls: type[ModelType], model: StaticModel, out_dim: int = 2, **kwargs: Any) -> ModelType:
         """Load the model from a static model."""
+        model.embedding = np.nan_to_num(model.embedding)
         embeddings_converted = torch.from_numpy(model.embedding)
         return cls(
             vectors=embeddings_converted,
