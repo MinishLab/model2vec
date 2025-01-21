@@ -46,7 +46,6 @@ def save_pretrained(
     if config.get("normalize") is True:
         # If normalize=True, add the second entry for sentence_transformers.models.Normalize
         modules.append({"idx": 1, "name": "1", "path": "1_Normalize", "type": "sentence_transformers.models.Normalize"})
-
     json.dump(modules, open(folder_path / "modules.json", "w"))
 
     logger.info(f"Saved model to {folder_path}")
