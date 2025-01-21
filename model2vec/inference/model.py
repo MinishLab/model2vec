@@ -41,7 +41,7 @@ class StaticModelPipeline:
         """Save the model to a folder."""
         save_pipeline(self, path)
 
-    def push_to_hub(self, repo_id: str, token: str, private: bool = False) -> None:
+    def push_to_hub(self, repo_id: str, token: str | None = None, private: bool = False) -> None:
         """
         Save a model to a folder, and then push that folder to the hf hub.
 
