@@ -41,6 +41,15 @@ def save_pretrained(
     tokenizer.save(str(folder_path / "tokenizer.json"))
     json.dump(config, open(folder_path / "config.json", "w"))
 
+    # Create modules.json
+    modules = [{"idx": 0, "name": "0", "path": ".", "type": "sentence_transformers.models.StaticEmbedding"}]
+    if config.get("normalize") is True:
+        # If normalize=True, add the second entry for sentence_transformers.models.Normalize
+        modules.append({"idx": 1, "name": "1", "path": "1_Normalize", "type": "sentence_transformers.models.Normalize"})
+
+    with open(folder_path / "modules.json", "w", encoding="utf-8") as f:
+        json.dump(modules, f, indent=4)
+
     logger.info(f"Saved model to {folder_path}")
 
     # Optionally create the model card
@@ -75,7 +84,7 @@ def _create_model_card(
         base_model=base_model_name,
         license=license,
         language=language,
-        tags=["embeddings", "static-embeddings"],
+        tags=["embeddings", "static-embeddings", "sentence-transformers"],
         library_name="model2vec",
         **kwargs,
     )

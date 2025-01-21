@@ -161,6 +161,7 @@ def test_save_pretrained(
     assert (save_path / "model.safetensors").exists()
     assert (save_path / "tokenizer.json").exists()
     assert (save_path / "config.json").exists()
+    assert (save_path / "modules.json").exists()
 
 
 def test_load_pretrained(
