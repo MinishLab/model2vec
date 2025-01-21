@@ -39,7 +39,14 @@ def save_pretrained(
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"))
-    json.dump(config, open(folder_path / "config.json", "w"))
+    json.dump(config, open(folder_path / "config.json", "w"), indent=4)
+
+    # Create modules.json
+    modules = [{"idx": 0, "name": "0", "path": ".", "type": "sentence_transformers.models.StaticEmbedding"}]
+    if config.get("normalize"):
+        # If normalize=True, add sentence_transformers.models.Normalize
+        modules.append({"idx": 1, "name": "1", "path": "1_Normalize", "type": "sentence_transformers.models.Normalize"})
+    json.dump(modules, open(folder_path / "modules.json", "w"), indent=4)
 
     logger.info(f"Saved model to {folder_path}")
 
@@ -75,7 +82,7 @@ def _create_model_card(
         base_model=base_model_name,
         license=license,
         language=language,
-        tags=["embeddings", "static-embeddings"],
+        tags=["embeddings", "static-embeddings", "sentence-transformers"],
         library_name="model2vec",
         **kwargs,
     )
