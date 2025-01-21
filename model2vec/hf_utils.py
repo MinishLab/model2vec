@@ -44,7 +44,7 @@ def save_pretrained(
     # Create modules.json
     modules = [{"idx": 0, "name": "0", "path": ".", "type": "sentence_transformers.models.StaticEmbedding"}]
     if config.get("normalize") is True:
-        # If normalize=True, add the second entry for sentence_transformers.models.Normalize
+        # If normalize=True, add sentence_transformers.models.Normalize
         modules.append({"idx": 1, "name": "1", "path": "1_Normalize", "type": "sentence_transformers.models.Normalize"})
     json.dump(modules, open(folder_path / "modules.json", "w"), indent=4)
 
