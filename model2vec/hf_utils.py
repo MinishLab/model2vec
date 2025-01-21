@@ -39,7 +39,7 @@ def save_pretrained(
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"))
-    json.dump(config, open(folder_path / "config.json", "w"))
+    json.dump(config, open(folder_path / "config.json", "w"), indent=4)
 
     # Create modules.json
     modules = [{"idx": 0, "name": "0", "path": ".", "type": "sentence_transformers.models.StaticEmbedding"}]
