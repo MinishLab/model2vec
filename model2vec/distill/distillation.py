@@ -13,8 +13,8 @@ from tokenizers.models import BPE, Unigram
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import (
-    create_output_embeddings_from_model_name,
-    create_output_embeddings_from_model_name_and_tokens,
+    create_output_embeddings_from_model,
+    create_output_embeddings_from_model_and_tokens,
 )
 from model2vec.distill.tokenizer import add_tokens, preprocess_vocabulary, remove_tokens
 from model2vec.distill.utils import select_optimal_device
@@ -88,7 +88,7 @@ def distill_from_model(
     tokens: list[str] = []
     if use_subword:
         # Create the subword embeddings.
-        tokens, embeddings = create_output_embeddings_from_model_name(model=model, tokenizer=tokenizer, device=device)
+        tokens, embeddings = create_output_embeddings_from_model(model=model, tokenizer=tokenizer, device=device)
         new_tokenizer, embeddings = _remove_tokens_and_embeddings(tokenizer, token_remove_pattern, tokens, embeddings)
     else:
         # We need to keep the unk token in the tokenizer.
@@ -111,7 +111,7 @@ def distill_from_model(
         # Only create embeddings if we have tokens to add.
         if cleaned_vocabulary:
             # Create the embeddings.
-            _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
+            _, token_embeddings = create_output_embeddings_from_model_and_tokens(
                 model=model,
                 tokenizer=tokenizer,
                 tokens=cleaned_vocabulary,
