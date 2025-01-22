@@ -24,18 +24,19 @@ class ModulewithWeights(Protocol):
     weight: torch.nn.Parameter
 
 
-def create_output_embeddings_from_model_name_and_tokens(
+def create_output_embeddings_from_model_and_tokens(
     model: PreTrainedModel,
     tokenizer: PreTrainedTokenizer,
     tokens: list[str],
     device: str,
 ) -> tuple[list[str], np.ndarray]:
     """
-    Create output embeddings for a bunch of tokens from a model name.
+    Create output embeddings for a bunch of tokens using a pretrained model.
 
-    It does a forward pass for all tokens passed in tokens.
+    It does a forward pass for all tokens passed in `tokens`.
 
-    :param model: The model name to use.
+    :param model: The model to use.
+        This should be a transformers model.
     :param tokenizer: The tokenizer to use.
     :param tokens: The tokens to use.
     :param device: The torch device to use.
@@ -99,17 +100,18 @@ def _encode_mean_using_model(model: PreTrainedModel, tokenizer: PreTrainedTokeni
     return result / divisor[:, None]
 
 
-def create_output_embeddings_from_model_name(
+def create_output_embeddings_from_model(
     model: PreTrainedModel,
     tokenizer: PreTrainedTokenizer,
     device: str,
 ) -> tuple[list[str], np.ndarray]:
     """
-    Create output embeddings for a bunch of tokens from a model name.
+    Create output embeddings for a bunch of tokens using a pretrained model.
 
-    It does a forward pass for all ids in the tokenizer.
+    It does a forward pass for all tokens passed in the tokenizer vocabulary.
 
-    :param model: The model name to use.
+    :param model: The model to use.
+        This should be a transformers model.
     :param tokenizer: The tokenizer to use.
     :param device: The torch device to use.
     :return: The tokens and output embeddings.
