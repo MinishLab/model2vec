@@ -114,13 +114,14 @@ class StaticModel:
             model_name=model_name,
         )
 
-    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[int]:
+    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[list[int]]:
         """
-        Tokenize a sentence.
+        Tokenize a list of sentences.
 
-        :param sentences: The sentence to tokenize.
-        :param max_length: The maximum length of the sentence.
-        :return: The tokens.
+        :param sentences: The sentences to tokenize.
+        :param max_length: The maximum length of the sentences in tokens. If this is None, sequences
+            are not truncated.
+        :return: A list of list of tokens.
         """
         if max_length is not None:
             m = max_length * self.median_token_length
