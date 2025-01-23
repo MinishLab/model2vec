@@ -264,7 +264,7 @@ def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCADimType, apply
                 logger.info(f"Applying PCA with n_components {pca_dims}")
 
             orig_dims = embeddings.shape[1]
-            p = PCA(n_components=pca_dims, whiten=False)
+            p = PCA(n_components=pca_dims, svd_solver="full")
             embeddings = p.fit_transform(embeddings)
 
             if embeddings.shape[1] < orig_dims:
