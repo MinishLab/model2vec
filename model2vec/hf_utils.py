@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import huggingface_hub
-import huggingface_hub.errors
 import numpy as np
 import safetensors
 from huggingface_hub import ModelCard, ModelCardData
