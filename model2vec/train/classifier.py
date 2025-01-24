@@ -10,6 +10,7 @@ from lightning.pytorch.callbacks import Callback, EarlyStopping
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import make_pipeline
 from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
@@ -62,14 +63,14 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         return nn.Sequential(*modules)
 
-    def predict(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> list[str]:
+    def predict(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
         """Predict a class for a set of texts."""
         pred: list[str] = []
         for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
             logits = self._predict_single_batch(X[batch : batch + batch_size])
             pred.extend([self.classes[idx] for idx in logits.argmax(1)])
 
-        return pred
+        return np.asarray(pred)
 
     @torch.no_grad()
     def _predict_single_batch(self, X: list[str]) -> torch.Tensor:
@@ -200,8 +201,9 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         return TextDataset(tokenized, labels_tensor)
 
+    @staticmethod
     def _train_test_split(
-        self, X: list[str], y: list[str], test_size: float
+        X: list[str], y: list[str], test_size: float
     ) -> tuple[list[str], list[str], list[str], list[str]]:
         """Split the data."""
         label_counts = Counter(y)
@@ -219,12 +221,14 @@ class StaticModelForClassification(FinetunableStaticModel):
         X = random_state.randn(n_items, static_model.dim)
         y = self.classes
 
-        converted = MLPClassifier(hidden_layer_sizes=(self.hidden_dim,) * self.n_layers)
+        converted = make_pipeline(MLPClassifier(hidden_layer_sizes=(self.hidden_dim,) * self.n_layers))
         converted.fit(X, y)
+        mlp_head: MLPClassifier = converted[-1]
 
         for index, layer in enumerate([module for module in self.head if isinstance(module, nn.Linear)]):
-            converted.coefs_[index] = layer.weight.detach().cpu().numpy().T
-            converted.intercepts_[index] = layer.bias.detach().cpu().numpy()
+            mlp_head.coefs_[index] = layer.weight.detach().cpu().numpy().T
+            mlp_head.intercepts_[index] = layer.bias.detach().cpu().numpy()
+        mlp_head.n_outputs_ = self.out_dim
 
         return StaticModelPipeline(static_model, converted)
 

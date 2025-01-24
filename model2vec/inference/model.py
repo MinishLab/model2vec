@@ -7,11 +7,12 @@ from tempfile import TemporaryDirectory
 import huggingface_hub
 import numpy as np
 import skops.io
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 
 from model2vec.model import PathLike, StaticModel
 
-_DEFAULT_TRUST_PATTERN = re.compile("sklearn\..+")
+_DEFAULT_TRUST_PATTERN = re.compile(r"sklearn\..+")
 _DEFAULT_MODEL_FILENAME = "pipeline.skops"
 
 
@@ -64,7 +65,7 @@ class StaticModelPipeline:
 
         return encoded
 
-    def predict(self, X: list[str] | str) -> list[str]:
+    def predict(self, X: list[str] | str) -> np.ndarray:
         """Predict the labels of the input."""
         encoded = self._predict_and_coerce_to_2d(X)
 

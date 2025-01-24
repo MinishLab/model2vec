@@ -28,11 +28,8 @@ class FinetunableStaticModel(nn.Module):
         self.embed_dim = vectors.shape[1]
         self.vectors = vectors
 
-        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
+        self.embeddings = nn.Embedding.from_pretrained(vectors.clone().float(), freeze=False, padding_idx=pad_id)
         self.head = self.construct_head()
-
-        weights = torch.zeros(len(vectors))
-        weights[pad_id] = -10_000
         self.w = self.construct_weights()
         self.tokenizer = tokenizer
 

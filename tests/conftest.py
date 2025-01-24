@@ -5,13 +5,19 @@ from typing import Any
 import numpy as np
 import pytest
 import torch
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import make_pipeline
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
 from transformers import AutoModel, AutoTokenizer
 
+from model2vec.inference import StaticModelPipeline
+from model2vec.model import StaticModel
+from model2vec.train import StaticModelForClassification
 
-@pytest.fixture
+
+@pytest.fixture(scope="session")
 def mock_tokenizer() -> Tokenizer:
     """Create a mock tokenizer."""
     vocab = ["word1", "word2", "word3", "[UNK]", "[PAD]"]
@@ -62,7 +68,7 @@ def mock_transformer() -> AutoModel:
     return MockPreTrainedModel()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def mock_vectors() -> np.ndarray:
     """Create mock vectors."""
     return np.array([[0.1, 0.2], [0.2, 0.3], [0.3, 0.4], [0.0, 0.0], [0.0, 0.0]])
@@ -72,3 +78,24 @@ def mock_vectors() -> np.ndarray:
 def mock_config() -> dict[str, str]:
     """Create a mock config."""
     return {"some_config": "value"}
+
+
+@pytest.fixture(scope="session")
+def mock_inference_pipeline(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> StaticModelPipeline:
+    """Mock pipeline."""
+    encoder = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config={})
+    encoded = encoder.encode(["dog", "cat"])
+    labels = ["a", "b"]
+    head = make_pipeline(MLPClassifier(random_state=12)).fit(encoded, labels)
+
+    return StaticModelPipeline(encoder, head=head)
+
+
+@pytest.fixture(scope="session")
+def mock_trained_pipeline(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> StaticModelForClassification:
+    """Mock staticmodelforclassification."""
+    vectors_torched = torch.from_numpy(mock_vectors).float()
+    s = StaticModelForClassification(vectors=vectors_torched, tokenizer=mock_tokenizer).to("cpu")
+    s.fit(["dog", "cat"], ["a", "b"], device="cpu")
+
+    return s
