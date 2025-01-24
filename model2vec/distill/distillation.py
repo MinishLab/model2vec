@@ -13,8 +13,8 @@ from tokenizers.models import BPE, Unigram
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import (
-    create_output_embeddings_from_model_name,
-    create_output_embeddings_from_model_name_and_tokens,
+    create_output_embeddings_from_model,
+    create_output_embeddings_from_model_and_tokens,
 )
 from model2vec.distill.tokenizer import add_tokens, preprocess_vocabulary, remove_tokens
 from model2vec.distill.utils import select_optimal_device
@@ -31,7 +31,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-PCADimType = Union[int, None, Literal["auto"]]
+PCADimType = Union[int, None, float, Literal["auto"]]
 
 
 def distill_from_model(
@@ -88,7 +88,7 @@ def distill_from_model(
     tokens: list[str] = []
     if use_subword:
         # Create the subword embeddings.
-        tokens, embeddings = create_output_embeddings_from_model_name(model=model, tokenizer=tokenizer, device=device)
+        tokens, embeddings = create_output_embeddings_from_model(model=model, tokenizer=tokenizer, device=device)
         new_tokenizer, embeddings = _remove_tokens_and_embeddings(tokenizer, token_remove_pattern, tokens, embeddings)
     else:
         # We need to keep the unk token in the tokenizer.
@@ -111,7 +111,7 @@ def distill_from_model(
         # Only create embeddings if we have tokens to add.
         if cleaned_vocabulary:
             # Create the embeddings.
-            _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
+            _, token_embeddings = create_output_embeddings_from_model_and_tokens(
                 model=model,
                 tokenizer=tokenizer,
                 tokens=cleaned_vocabulary,
@@ -185,6 +185,10 @@ def _remove_tokens_and_embeddings(
 
         # Remove the unused tokens from the tokenizer.
     new_tokenizer = remove_tokens(tokenizer.backend_tokenizer, wrong_tokens)
+    if new_tokenizer.get_vocab_size() == tokenizer.backend_tokenizer.get_vocab_size():
+        # This happens if we didn't remove any tokens.
+        return new_tokenizer, embeddings
+
     # Remove the embeddings of the unused tokens.
     embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
     logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
@@ -199,6 +203,7 @@ def distill(
     pca_dims: PCADimType = 256,
     apply_zipf: bool = True,
     use_subword: bool = True,
+    token_remove_pattern: str | None = r"\[unused\d+\]",
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -217,6 +222,7 @@ def distill(
         If this is 'auto', we don't reduce dimenionality, but still apply PCA.
     :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
+    :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
     :return: A StaticModel
 
     """
@@ -231,6 +237,7 @@ def distill(
         pca_dims=pca_dims,
         apply_zipf=apply_zipf,
         use_subword=use_subword,
+        token_remove_pattern=token_remove_pattern,
     )
 
 
@@ -251,10 +258,13 @@ def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCADimType, apply
                 f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
             )
         elif pca_dims <= embeddings.shape[1]:
-            logger.info(f"Applying PCA with n_components {pca_dims}")
+            if isinstance(pca_dims, float):
+                logger.info(f"Applying PCA with {pca_dims} explained variance.")
+            else:
+                logger.info(f"Applying PCA with n_components {pca_dims}")
 
             orig_dims = embeddings.shape[1]
-            p = PCA(n_components=pca_dims, whiten=False)
+            p = PCA(n_components=pca_dims, svd_solver="full")
             embeddings = p.fit_transform(embeddings)
 
             if embeddings.shape[1] < orig_dims:
