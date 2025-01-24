@@ -37,6 +37,7 @@ rng = np.random.default_rng()
         (None, True, "auto", False),  # Subword, PCA set to 'auto'
         (None, True, 1024, False),  # Subword, PCA set to high number.
         (None, True, None, True),  # No PCA applied
+        (None, True, 0.9, True),  # PCA as float applied
         (["wordA", "wordB"], False, 4, True),  # Custom vocab without subwords PCA and Zipf applied
         (None, False, 256, True),  # use_subword = False without passing a vocabulary should raise an error
     ],

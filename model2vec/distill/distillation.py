@@ -31,7 +31,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-PCADimType = Union[int, None, Literal["auto"]]
+PCADimType = Union[int, None, float, Literal["auto"]]
 
 
 def distill_from_model(
@@ -258,10 +258,13 @@ def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCADimType, apply
                 f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
             )
         elif pca_dims <= embeddings.shape[1]:
-            logger.info(f"Applying PCA with n_components {pca_dims}")
+            if isinstance(pca_dims, float):
+                logger.info(f"Applying PCA with {pca_dims} explained variance.")
+            else:
+                logger.info(f"Applying PCA with n_components {pca_dims}")
 
             orig_dims = embeddings.shape[1]
-            p = PCA(n_components=pca_dims, whiten=False)
+            p = PCA(n_components=pca_dims, svd_solver="full")
             embeddings = p.fit_transform(embeddings)
 
             if embeddings.shape[1] < orig_dims:
