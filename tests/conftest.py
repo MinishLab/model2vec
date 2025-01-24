@@ -20,7 +20,7 @@ from model2vec.train import StaticModelForClassification
 @pytest.fixture(scope="session")
 def mock_tokenizer() -> Tokenizer:
     """Create a mock tokenizer."""
-    vocab = ["word1", "word2", "word3", "[UNK]", "[PAD]"]
+    vocab = ["[PAD]", "word1", "word2", "word3", "[UNK]"]
     unk_token = "[UNK]"
 
     model = WordLevel(vocab={word: idx for idx, word in enumerate(vocab)}, unk_token=unk_token)
@@ -81,21 +81,18 @@ def mock_config() -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-def mock_inference_pipeline(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> StaticModelPipeline:
+def mock_inference_pipeline(mock_trained_pipeline: StaticModelForClassification) -> StaticModelPipeline:
     """Mock pipeline."""
-    encoder = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config={})
-    encoded = encoder.encode(["dog", "cat"])
-    labels = ["a", "b"]
-    head = make_pipeline(MLPClassifier(random_state=12)).fit(encoded, labels)
-
-    return StaticModelPipeline(encoder, head=head)
+    return mock_trained_pipeline.to_pipeline()
 
 
 @pytest.fixture(scope="session")
-def mock_trained_pipeline(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> StaticModelForClassification:
+def mock_trained_pipeline() -> StaticModelForClassification:
     """Mock staticmodelforclassification."""
-    vectors_torched = torch.from_numpy(mock_vectors).float()
-    s = StaticModelForClassification(vectors=vectors_torched, tokenizer=mock_tokenizer).to("cpu")
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    torch.random.manual_seed(42)
+    vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
+    s = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
     s.fit(["dog", "cat"], ["a", "b"], device="cpu")
 
     return s

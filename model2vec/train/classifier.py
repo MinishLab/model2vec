@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from tempfile import TemporaryDirectory
 
 import lightning as pl
 import numpy as np
@@ -150,21 +151,24 @@ class StaticModelForClassification(FinetunableStaticModel):
         else:
             val_check_interval = max(250, 2 * len(val_dataset) // batch_size)
             check_val_every_epoch = None
-        trainer = pl.Trainer(
-            max_epochs=500,
-            callbacks=callbacks,
-            val_check_interval=val_check_interval,
-            check_val_every_n_epoch=check_val_every_epoch,
-            accelerator=device,
-        )
 
-        trainer.fit(
-            c,
-            train_dataloaders=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size),
-            val_dataloaders=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size),
-        )
-        best_model_path = trainer.checkpoint_callback.best_model_path  # type: ignore
-        best_model_weights = torch.load(best_model_path, weights_only=True)
+        with TemporaryDirectory() as tempdir:
+            trainer = pl.Trainer(
+                max_epochs=500,
+                callbacks=callbacks,
+                val_check_interval=val_check_interval,
+                check_val_every_n_epoch=check_val_every_epoch,
+                accelerator=device,
+                default_root_dir=tempdir,
+            )
+
+            trainer.fit(
+                c,
+                train_dataloaders=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size),
+                val_dataloaders=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size),
+            )
+            best_model_path = trainer.checkpoint_callback.best_model_path  # type: ignore
+            best_model_weights = torch.load(best_model_path, weights_only=True)
 
         state_dict = {}
         for weight_name, weight in best_model_weights["state_dict"].items():
@@ -228,7 +232,14 @@ class StaticModelForClassification(FinetunableStaticModel):
         for index, layer in enumerate([module for module in self.head if isinstance(module, nn.Linear)]):
             mlp_head.coefs_[index] = layer.weight.detach().cpu().numpy().T
             mlp_head.intercepts_[index] = layer.bias.detach().cpu().numpy()
+        # Below is necessary to ensure that the converted model works correctly.
+        # In scikit-learn, a binary classifier only has a single vector of output coefficients
+        # and a single intercept. We use two output vectors.
+        # To convert correctly, we need to set the outputs correctly, and fix the activation function.
+        # Make sure n_outputs is set to > 1.
         mlp_head.n_outputs_ = self.out_dim
+        # Set to softmax
+        mlp_head.out_activation_ = "softmax"
 
         return StaticModelPipeline(static_model, converted)
 

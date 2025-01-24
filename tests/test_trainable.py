@@ -69,7 +69,7 @@ def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: To
 def test_encode(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the encode function."""
     result = mock_trained_pipeline._encode(torch.tensor([[0, 1], [1, 0]]).long())
-    assert result.shape == (2, 2)
+    assert result.shape == (2, 12)
     assert torch.allclose(result[0], result[1])
 
 
@@ -111,13 +111,13 @@ def test_textdataset_init_incorrect() -> None:
 
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
-    result = mock_trained_pipeline.predict(["dog dog", "cat"]).tolist()
-    assert result == ["a", "a"]
+    result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
+    assert result == ["b", "b"]
 
 
 def test_predict_proba(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
-    result = mock_trained_pipeline.predict_proba(["dog dog", "cat"])
+    result = mock_trained_pipeline.predict_proba(["dog cat", "dog"])
     assert result.shape == (2, 2)
 
 
@@ -125,9 +125,15 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
     """Convert a model to a pipeline."""
     mock_trained_pipeline.eval()
     pipeline = mock_trained_pipeline.to_pipeline()
-    a = pipeline.predict(["dog dog", "cat"]).tolist()
-    b = mock_trained_pipeline.predict(["dog dog", "cat"]).tolist()
+    encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
+    encoded_model = mock_trained_pipeline(mock_trained_pipeline.tokenize(["dog cat", "dog"]))[1].detach().numpy()
+    assert np.allclose(encoded_pipeline, encoded_model)
+    a = pipeline.predict(["dog cat", "dog"]).tolist()
+    b = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
     assert a == b
+    p1 = pipeline.predict_proba(["dog cat", "dog"])
+    p2 = mock_trained_pipeline.predict_proba(["dog cat", "dog"])
+    assert np.allclose(p1, p2)
 
 
 def test_train_test_split() -> None:
