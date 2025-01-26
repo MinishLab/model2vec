@@ -27,9 +27,11 @@ class StaticModelPipeline:
         cls: type[StaticModelPipeline], path: PathLike, token: str | None = None
     ) -> StaticModelPipeline:
         """
-        Load the pipeline from the trained model.
+        Load a StaticModel from a local path or huggingface hub path.
 
-        :param path: The path to the folder containing the pipeline.
+        NOTE: if you load a private model from the huggingface hub, you need to pass a token.
+
+        :param path: The path to the folder containing the pipeline, or a repository on the Hugging Face Hub
         :param token: The token to use to download the pipeline from the hub.
         :return: The loaded pipeline.
         """

@@ -21,6 +21,8 @@ from model2vec.train.base import FinetunableStaticModel, TextDataset
 
 logger = logging.getLogger(__name__)
 
+_RANDOM_SEED = 42
+
 
 class StaticModelForClassification(FinetunableStaticModel):
     def __init__(
@@ -118,7 +120,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :return: The fitted model.
         """
-        pl.seed_everything(42)
+        pl.seed_everything(_RANDOM_SEED)
         logger.info("Re-initializing model.")
         self._initialize(y)
 
@@ -220,7 +222,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         """Convert the model to an sklearn pipeline."""
         static_model = self.to_static_model()
 
-        random_state = np.random.RandomState(42)
+        random_state = np.random.RandomState(_RANDOM_SEED)
         n_items = len(self.classes)
         X = random_state.randn(n_items, static_model.dim)
         y = self.classes

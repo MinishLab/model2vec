@@ -1,6 +1,6 @@
 # Training
 
-Aside from [distillation](../../README.md#distillation), `model2vec` also supports training simple classifiers on top of static models, using [pytorch](https://pytorch.org/) and [lightning](https://lightning.ai/).
+Aside from [distillation](../../README.md#distillation), `model2vec` also supports training simple classifiers on top of static models, using [pytorch](https://pytorch.org/), [lightning](https://lightning.ai/) and [scikit-learn](https://scikit-learn.org/stable/index.html).
 
 # Installation
 
@@ -73,7 +73,7 @@ You can turn a classifier into a scikit-learn compatible pipeline, as follows:
 pipeline = classifier.to_pipeline()
 ```
 
-This pipeline object can be persisted using standard pickle-based methods, such as [joblib](https://joblib.readthedocs.io/en/stable/). This makes it easy to use your model in inferene pipelines (no installing torch!).
+This pipeline object can be persisted using standard pickle-based methods, such as [joblib](https://joblib.readthedocs.io/en/stable/). This makes it easy to use your model in inferene pipelines (no installing torch!), although `joblib` and `pickle` should not be used to share models outside of your organization.
 
 If you want to persist your pipeline to the Hugging Face hub, you can use our built-in functions:
 
@@ -98,23 +98,23 @@ The main results are detailed in our training blogpost, but we'll do a compariso
 
 We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
 
-| dataset name               |   logistic regression head   |  full finetune |
-|:---------------------------|-----------:|---------------:|
-| 20_newgroups               |   0.545312 |       0.555459 |
-| ade                        |   0.715725 |  0.740307 |
-| ag_news                    |   0.860154 |  0.858304 |
-| amazon_counterfactual      |   0.637754 |  0.744288 |
-| bbc                        |   0.955719 |  0.965018 |
-| emotion                    |   0.516267 |  0.586328 |
-| enron_spam                 |   0.951975 |  0.964994 |
-| hatespeech_offensive       |   0.543758 |  0.592587 |
-| imdb                       |   0.839002 |  0.846198 |
-| massive_scenario           |   0.797779 |  0.822825 |
-| senteval_cr                |   0.743436 |  0.745863 |
-| sst5                       |   0.290249 |  0.363071 |
-| student                    |   0.806069 |  0.837581 |
-| subj                       |   0.878394 |  0.88941  |
-| tweet_sentiment_extraction |   0.638664 |  0.632009 |
+| dataset_name               |   model2vec logreg |   setfit |  model2vec full finetune |
+|:---------------------------|---------------------------------------------:|-------------------------------------------------:|--------------------------------------:|
+| 20_newgroups               |                                     0.545312 |                                         0.595426 |                              0.555459 |
+| ade                        |                                     0.715725 |                                         0.788789 |                              0.740307 |
+| ag_news                    |                                     0.860154 |                                         0.880142 |                              0.858304 |
+| amazon_counterfactual      |                                     0.637754 |                                         0.873249 |                              0.744288 |
+| bbc                        |                                     0.955719 |                                         0.965823 |                              0.965018 |
+| emotion                    |                                     0.516267 |                                         0.598852 |                              0.586328 |
+| enron_spam                 |                                     0.951975 |                                         0.974498 |                              0.964994 |
+| hatespeech_offensive       |                                     0.543758 |                                         0.659873 |                              0.592587 |
+| imdb                       |                                     0.839002 |                                         0.860037 |                              0.846198 |
+| massive_scenario           |                                     0.797779 |                                         0.814601 |                              0.822825 |
+| senteval_cr                |                                     0.743436 |                                         0.8526   |                              0.745863 |
+| sst5                       |                                     0.290249 |                                         0.393179 |                              0.363071 |
+| student                    |                                     0.806069 |                                         0.889399 |                              0.837581 |
+| subj                       |                                     0.878394 |                                         0.937955 |                              0.88941  |
+| tweet_sentiment_extraction |                                     0.638664 |                                         0.755296 |                              0.632009 |
 
 |                |   logreg   |  full finetune |
 |:---------------------------|-----------:|---------------:|
