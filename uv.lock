@@ -831,6 +831,8 @@ onnx = [
 ]
 train = [
     { name = "lightning" },
+    { name = "scikit-learn" },
+    { name = "skops" },
     { name = "torch" },
 ]
 
@@ -852,8 +854,10 @@ requires-dist = [
     { name = "safetensors" },
     { name = "scikit-learn", marker = "extra == 'distill'" },
     { name = "scikit-learn", marker = "extra == 'inference'" },
+    { name = "scikit-learn", marker = "extra == 'train'" },
     { name = "setuptools" },
     { name = "skops", marker = "extra == 'inference'" },
+    { name = "skops", marker = "extra == 'train'" },
     { name = "tokenizers", specifier = ">=0.20" },
     { name = "torch", marker = "extra == 'distill'" },
     { name = "torch", marker = "extra == 'onnx'" },
