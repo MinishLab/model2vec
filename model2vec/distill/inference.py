@@ -159,7 +159,7 @@ def create_output_embeddings_from_model(
                 out = out.float()
 
         # Add the output to the intermediate weights
-        intermediate_weights.append(out[:, 1].detach().cpu().numpy())
+        intermediate_weights.append(out.mean(1).detach().cpu().numpy())
 
     # Concatenate the intermediate weights
     out_weights = np.concatenate(intermediate_weights)
