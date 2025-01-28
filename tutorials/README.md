@@ -1,11 +1,9 @@
 <div align="center">
     <picture>
-      <img width="75%", alt="Tutorials" src="../assets/images/tutorial_ezlo.png">
+      <img width="75%", alt="Tutorials" src="../assets/images/tutorials.png">
     </picture>
   </a>
 </div>
-
-# Tutorials
 
 This is a list of all our tutorials. They are all self-contained ipython notebooks.
 
