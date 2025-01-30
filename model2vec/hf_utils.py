@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import huggingface_hub
-import huggingface_hub.errors
 import numpy as np
 import safetensors
 from huggingface_hub import ModelCard, ModelCardData
@@ -39,7 +38,14 @@ def save_pretrained(
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"))
-    json.dump(config, open(folder_path / "config.json", "w"))
+    json.dump(config, open(folder_path / "config.json", "w"), indent=4)
+
+    # Create modules.json
+    modules = [{"idx": 0, "name": "0", "path": ".", "type": "sentence_transformers.models.StaticEmbedding"}]
+    if config.get("normalize"):
+        # If normalize=True, add sentence_transformers.models.Normalize
+        modules.append({"idx": 1, "name": "1", "path": "1_Normalize", "type": "sentence_transformers.models.Normalize"})
+    json.dump(modules, open(folder_path / "modules.json", "w"), indent=4)
 
     logger.info(f"Saved model to {folder_path}")
 
@@ -75,7 +81,7 @@ def _create_model_card(
         base_model=base_model_name,
         license=license,
         language=language,
-        tags=["embeddings", "static-embeddings"],
+        tags=["embeddings", "static-embeddings", "sentence-transformers"],
         library_name="model2vec",
         **kwargs,
     )
@@ -84,7 +90,7 @@ def _create_model_card(
 
 
 def load_pretrained(
-    folder_or_repo_path: str | Path, token: str | None = None
+    folder_or_repo_path: str | Path, token: str | None = None, from_sentence_transformers: bool = False
 ) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any]]:
     """
     Loads a pretrained model from a folder.
@@ -93,26 +99,31 @@ def load_pretrained(
         - If this is a local path, we will load from the local path.
         - If the local path is not found, we will attempt to load from the huggingface hub.
     :param token: The huggingface token to use.
+    :param from_sentence_transformers: Whether to load the model from a sentence transformers model.
     :raises: FileNotFoundError if the folder exists, but the file does not exist locally.
     :return: The embeddings, tokenizer, config, and metadata.
 
     """
+    if from_sentence_transformers:
+        model_file = "0_StaticEmbedding/model.safetensors"
+        tokenizer_file = "0_StaticEmbedding/tokenizer.json"
+        config_name = "config_sentence_transformers.json"
+    else:
+        model_file = "model.safetensors"
+        tokenizer_file = "tokenizer.json"
+        config_name = "config.json"
+
     folder_or_repo_path = Path(folder_or_repo_path)
     if folder_or_repo_path.exists():
-        embeddings_path = folder_or_repo_path / "model.safetensors"
+        embeddings_path = folder_or_repo_path / model_file
         if not embeddings_path.exists():
-            old_embeddings_path = folder_or_repo_path / "embeddings.safetensors"
-            if old_embeddings_path.exists():
-                logger.warning("Old embeddings file found. Please rename to `model.safetensors` and re-save.")
-                embeddings_path = old_embeddings_path
-            else:
-                raise FileNotFoundError(f"Embeddings file does not exist in {folder_or_repo_path}")
+            raise FileNotFoundError(f"Embeddings file does not exist in {folder_or_repo_path}")
 
-        config_path = folder_or_repo_path / "config.json"
+        config_path = folder_or_repo_path / config_name
         if not config_path.exists():
             raise FileNotFoundError(f"Config file does not exist in {folder_or_repo_path}")
 
-        tokenizer_path = folder_or_repo_path / "tokenizer.json"
+        tokenizer_path = folder_or_repo_path / tokenizer_file
         if not tokenizer_path.exists():
             raise FileNotFoundError(f"Tokenizer file does not exist in {folder_or_repo_path}")
 
@@ -122,18 +133,7 @@ def load_pretrained(
 
     else:
         logger.info("Folder does not exist locally, attempting to use huggingface hub.")
-        try:
-            embeddings_path = huggingface_hub.hf_hub_download(
-                folder_or_repo_path.as_posix(), "model.safetensors", token=token
-            )
-        except huggingface_hub.utils.EntryNotFoundError as e:
-            try:
-                embeddings_path = huggingface_hub.hf_hub_download(
-                    folder_or_repo_path.as_posix(), "embeddings.safetensors", token=token
-                )
-            except huggingface_hub.utils.EntryNotFoundError:
-                # Raise original exception.
-                raise e
+        embeddings_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), model_file, token=token)
 
         try:
             readme_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), "README.md", token=token)
@@ -142,11 +142,14 @@ def load_pretrained(
             logger.info("No README found in the model folder. No model card loaded.")
             metadata = {}
 
-        config_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), "config.json", token=token)
-        tokenizer_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), "tokenizer.json", token=token)
+        config_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), config_name, token=token)
+        tokenizer_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), tokenizer_file, token=token)
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
-    embeddings = opened_tensor_file.get_tensor("embeddings")
+    if from_sentence_transformers:
+        embeddings = opened_tensor_file.get_tensor("embedding.weight")
+    else:
+        embeddings = opened_tensor_file.get_tensor("embeddings")
 
     tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
     config = json.load(open(config_path))

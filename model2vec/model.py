@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import math
+import os
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Iterator, Union
 
 import numpy as np
+from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.utils import load_local_model
+from model2vec.utils import ProgressParallel, load_local_model
 
 PathLike = Union[Path, str]
-
 
 logger = getLogger(__name__)
 
@@ -34,7 +35,7 @@ class StaticModel:
         :param vectors: The vectors to use.
         :param tokenizer: The Transformers tokenizer to use.
         :param config: Any metadata config.
-        :param normalize: Whether to normalize.
+        :param normalize: Whether to normalize the embeddings.
         :param base_model_name: The used base model name. Used for creating a model card.
         :param language: The language of the model. Used for creating a model card.
         :raises: ValueError if the number of tokens does not match the number of vectors.
@@ -113,13 +114,14 @@ class StaticModel:
             model_name=model_name,
         )
 
-    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[int]:
+    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[list[int]]:
         """
-        Tokenize a sentence.
+        Tokenize a list of sentences.
 
-        :param sentences: The sentence to tokenize.
-        :param max_length: The maximum length of the sentence.
-        :return: The tokens.
+        :param sentences: The sentences to tokenize.
+        :param max_length: The maximum length of the sentences in tokens. If this is None, sequences
+            are not truncated.
+        :return: A list of list of tokens.
         """
         if max_length is not None:
             m = max_length * self.median_token_length
@@ -147,6 +149,7 @@ class StaticModel:
         cls: type[StaticModel],
         path: PathLike,
         token: str | None = None,
+        normalize: bool | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -155,15 +158,44 @@ class StaticModel:
 
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
+        :param normalize: Whether to normalize the embeddings.
         :return: A StaticModel
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token)
+        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token, from_sentence_transformers=False)
 
         return cls(
-            embeddings, tokenizer, config, base_model_name=metadata.get("base_model"), language=metadata.get("language")
+            embeddings,
+            tokenizer,
+            config,
+            normalize=normalize,
+            base_model_name=metadata.get("base_model"),
+            language=metadata.get("language"),
         )
+
+    @classmethod
+    def from_sentence_transformers(
+        cls: type[StaticModel],
+        path: PathLike,
+        token: str | None = None,
+        normalize: bool | None = None,
+    ) -> StaticModel:
+        """
+        Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
+
+        NOTE: if you load a private model from the huggingface hub, you need to pass a token.
+
+        :param path: The path to load your static model from.
+        :param token: The huggingface token to use.
+        :param normalize: Whether to normalize the embeddings.
+        :return: A StaticModel
+        """
+        from model2vec.hf_utils import load_pretrained
+
+        embeddings, tokenizer, config, _ = load_pretrained(path, token=token, from_sentence_transformers=True)
+
+        return cls(embeddings, tokenizer, config, normalize=normalize, base_model_name=None, language=None)
 
     def encode_as_sequence(
         self,
@@ -171,6 +203,8 @@ class StaticModel:
         max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
+        use_multiprocessing: bool = True,
+        multiprocessing_threshold: int = 10_000,
     ) -> list[np.ndarray] | np.ndarray:
         """
         Encode a list of sentences as a list of numpy arrays of tokens.
@@ -186,6 +220,9 @@ class StaticModel:
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
         :param show_progress_bar: Whether to show the progress bar.
+        :param use_multiprocessing: Whether to use multiprocessing.
+            By default, this is enabled for inputs > multiprocessing_threshold sentences and disabled otherwise.
+        :param multiprocessing_threshold: The threshold in number of sentences for using multiprocessing.
         :return: The encoded sentences with an embedding per token.
         """
         was_single = False
@@ -193,17 +230,32 @@ class StaticModel:
             sentences = [sentences]
             was_single = True
 
-        out_array: list[np.ndarray] = []
-        for batch in tqdm(
-            self._batch(sentences, batch_size),
-            total=math.ceil(len(sentences) / batch_size),
-            disable=not show_progress_bar,
-        ):
-            out_array.extend(self._encode_batch_as_sequence(batch, max_length))
+        # Prepare all batches
+        sentence_batches = list(self._batch(sentences, batch_size))
+        total_batches = math.ceil(len(sentences) / batch_size)
+
+        # Use joblib for multiprocessing if requested, and if we have enough sentences
+        if use_multiprocessing and len(sentences) > multiprocessing_threshold:
+            # Disable parallelism for tokenizers
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
+                delayed(self._encode_batch_as_sequence)(batch, max_length) for batch in sentence_batches
+            )
+            out_array: list[np.ndarray] = []
+            for r in results:
+                out_array.extend(r)
+        else:
+            out_array = []
+            for batch in tqdm(
+                sentence_batches,
+                total=total_batches,
+                disable=not show_progress_bar,
+            ):
+                out_array.extend(self._encode_batch_as_sequence(batch, max_length))
 
         if was_single:
             return out_array[0]
-
         return out_array
 
     def _encode_batch_as_sequence(self, sentences: list[str], max_length: int | None) -> list[np.ndarray]:
@@ -224,6 +276,8 @@ class StaticModel:
         show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
+        use_multiprocessing: bool = True,
+        multiprocessing_threshold: int = 10_000,
         **kwargs: Any,
     ) -> np.ndarray:
         """
@@ -237,6 +291,9 @@ class StaticModel:
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done.
         :param batch_size: The batch size to use.
+        :param use_multiprocessing: Whether to use multiprocessing.
+            By default, this is enabled for inputs > multiprocessing_threshold sentences and disabled otherwise.
+        :param multiprocessing_threshold: The threshold in number of sentences for using multiprocessing.
         :param **kwargs: Any additional arguments. These are ignored.
         :return: The encoded sentences. If a single sentence was passed, a vector is returned.
         """
@@ -245,19 +302,32 @@ class StaticModel:
             sentences = [sentences]
             was_single = True
 
-        out_arrays: list[np.ndarray] = []
-        for batch in tqdm(
-            self._batch(sentences, batch_size),
-            total=math.ceil(len(sentences) / batch_size),
-            disable=not show_progress_bar,
-        ):
-            out_arrays.append(self._encode_batch(batch, max_length))
+        # Prepare all batches
+        sentence_batches = list(self._batch(sentences, batch_size))
+        total_batches = math.ceil(len(sentences) / batch_size)
 
-        out_array = np.concatenate(out_arrays, axis=0)
+        # Use joblib for multiprocessing if requested, and if we have enough sentences
+        if use_multiprocessing and len(sentences) > multiprocessing_threshold:
+            # Disable parallelism for tokenizers
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
+                delayed(self._encode_batch)(batch, max_length) for batch in sentence_batches
+            )
+            out_array = np.concatenate(results, axis=0)
+        else:
+            # Don't use multiprocessing
+            out_arrays: list[np.ndarray] = []
+            for batch in tqdm(
+                sentence_batches,
+                total=total_batches,
+                disable=not show_progress_bar,
+            ):
+                out_arrays.append(self._encode_batch(batch, max_length))
+            out_array = np.concatenate(out_arrays, axis=0)
 
         if was_single:
             return out_array[0]
-
         return out_array
 
     def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:

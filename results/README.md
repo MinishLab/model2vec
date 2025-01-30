@@ -8,18 +8,21 @@ This page contains the experiments results of the Model2Vec project. The results
 
 Model2Vec is evaluated on MTEB, as well as two additional tasks: [PEARL](https://github.com/tigerchen52/PEARL) (a phrase representation task) and WordSim (a collection of _word_ similarity tasks). The results are shown in the table below.
 
+Note: The `potion` and `M2V` models are our static models.
 
 | Model                  |   Avg (All) |   Avg (MTEB) |   Class |   Clust |   PairClass |   Rank |    Ret |    STS |    Sum |   Pearl |   WordSim |
 |:-----------------------|------------:|-------------:|--------:|--------:|------------:|-------:|-------:|-------:|-------:|--------:|----------:|
-| all-MiniLM-L6-v2        | 56.08     | 56.09      | 62.62  | 41.94  | 82.37     | 58.04  | 41.95  | 78.90  | 30.81  | 60.83  | 49.91   |
-| potion-base-8M         |       50.54 |        50.03 |   64.44 |   32.93 |       76.62 |  49.73 |  31.71 |  73.24 |  29.28 |   53.54 |     50.75 |
-| M2V_base_glove_subword |       49.06 |        46.69 |   61.27 |   30.03 |       74.71 |  49.15 |  27.16 |  69.09 |  30.08 |   56.82 |     57.99 |
-| potion-base-4M         |       48.87 |        48.23 |   62.19 |   31.47 |       75.37 |  48.75 |  29.11 |  72.19 |  28.89 |   52.55 |     49.21 |
-| M2V_base_glove         |       48.58 |        47.6  |   61.35 |   30.52 |       75.34 |  48.5  |  29.26 |  70.31 |  31.5  |   50.28 |     54.29 |
-| M2V_base_output        |       46.79 |        45.34 |   61.25 |   25.58 |       74.9  |  47.63 |  26.14 |  68.58 |  29.2  |   54.02 |     49.18 |
-| potion-base-2M         |       45.52 |        44.77 |   58.45 |   27.5  |       73.72 |  46.82 |  24.13 |  70.14 |  31.51 |   50.82 |     44.72 |
-| GloVe_300d             |       42.84 |        42.36 |   57.31 |   27.66 |       72.48 |  43.3  |  22.78 |  61.9  |  28.81 |   45.65 |     43.05 |
-| BPEmb_50k_300d         |       39.34 |        37.78 |   55.76 |   23.35 |       57.86 |  43.21 |  17.5  |  55.1  |  29.74 |   47.56 |     41.28 |
+| [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)        | 56.08     | 56.09      | 62.62  | 41.94  | 82.37     | 58.04  | 41.95  | 78.90  | 30.81  | 60.83  | 49.91   |
+| [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M)                     | 52.46     | 51.66      | 65.97  | 35.29  | 78.17     | 50.92  | 33.52  | 74.22  | 29.78  | 55.37  | 55.15   |
+| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)                       | 50.54     | 50.03      | 64.44  | 32.93  | 76.62     | 49.73  | 31.71  | 73.24  | 29.28  | 53.54  | 50.75   |
+| [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M)           | 49.73     | 49.76      | 59.56  | 30.55  | 76.38     | 50.05  | 36.35  | 73.22  | 28.85  | 49.31  | 50.02   |
+| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)                       | 48.87     | 48.23      | 62.19  | 31.47  | 75.37     | 48.75  | 29.11  | 72.19  | 28.89  | 52.55  | 49.21   |
+| [static-retrieval-mrl-en-v1](https://huggingface.co/minishlab/static-retrieval-mrl-en-v1) | 48.18     | 48.36      | 57.39  | 28.32  | 75.63     | 49.16  | 35.61  | 72.18  | 28.64  | 49.68  | 44.76   |
+| [static-similarity-mrl-multilingual-v1](https://huggingface.co/minishlab/static-similarity-mrl-multilingual-v1) | 48.15     | 47.15      | 59.96  | 24.40  | 79.02     | 48.25  | 29.54  | 74.88  | 30.28  | 51.66  | 51.66   |
+| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)                     | 46.79     | 45.34      | 61.25  | 25.58  | 74.9      | 47.63  | 26.14  | 68.58  | 29.2   | 54.02  | 49.18   |
+| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)                       | 45.52     | 44.77      | 58.45  | 27.5   | 73.72     | 46.82  | 24.13  | 70.14  | 31.51  | 50.82  | 44.72   |
+| [GloVe_300d](https://huggingface.co/sentence-transformers/average_word_embeddings_glove.6B.300d)             | 42.84     | 42.36      | 57.31  | 27.66  | 72.48     | 43.3   | 22.78  | 61.9   | 28.81  | 45.65  | 43.05   |
+| [BPEmb_50k_300d](https://github.com/bheinzerling/bpemb)                                  | 39.34     | 37.78      | 55.76  | 23.35  | 57.86     | 43.21  | 17.5   | 55.1   | 29.74  | 47.56  | 41.28   |
 
 
 <details>
@@ -35,13 +38,36 @@ For readability, the MTEB task names are abbreviated as follows:
 - Sum: Summarization
 </details>
 
-The figure below shows the relationship between the number of sentences per second and the average MTEB score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
-This plot shows that the Model2Vec models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
+The results show that [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model. It reaches 92.11% of the performance of [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) with an average MTEB score of 51.66 while being orders of magnitude faster.
 
+<<<<<<< HEAD
 | ![Description](../assets/images/speed_vs_mteb_score_v2.png) |
+=======
+Note: the [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M), [static-retrieval-mrl-en-v1](https://huggingface.co/minishlab/static-retrieval-mrl-en-v1), and [static-similarity-mrl-multilingual-v1](https://huggingface.co/minishlab/static-similarity-mrl-multilingual-v1) models are task-specific models. We've included them for completeness, but they should not be compared directly to the other models for tasks that they are not designed for.
+
+The figure below shows the relationship between the number of sentences per second and the average MTEB score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
+This plot shows that the potion and M2V models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
+NOTE: for fairness of comparison, we disabled multiprocessing for Model2Vec for this benchmark. All sentence-transformers models are run with the [sentence-transformers](https://github.com/UKPLab/sentence-transformers) library's default settings for `encode`.
+
+| ![Description](../assets/images/speed_vs_mteb_score_v3.png) |
+>>>>>>> a7ef098f4e94e861a690b42dc2a067b042e7a4a6
 |:--:|
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
+
+## Retrieval Results
+
+A subset of models we created and compare against are specifically designed for retrieval tasks. The results are shown in the table below, including two general-purpose models for comparison and a transformer.
+
+| Model                  |   Retrieval Score |
+|:-----------------------|------------------:|
+| [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)        | 41.95              |
+| [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M)           | 36.35              |
+| [static-retrieval-mrl-en-v1](https://huggingface.co/minishlab/static-retrieval-mrl-en-v1) | 35.61     |
+| [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M)                     | 33.52              |
+| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)                       | 31.71              |
+
+As can be seen, [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) model is the most performant static retrieval model, reaching 86.65%% of the performance of [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) with a retrieval score of 36.35.
 
 ## Ablations
 
