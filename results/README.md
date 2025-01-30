@@ -40,9 +40,6 @@ For readability, the MTEB task names are abbreviated as follows:
 
 The results show that [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model. It reaches 92.11% of the performance of [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) with an average MTEB score of 51.66 while being orders of magnitude faster.
 
-<<<<<<< HEAD
-| ![Description](../assets/images/speed_vs_mteb_score_v2.png) |
-=======
 Note: the [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M), [static-retrieval-mrl-en-v1](https://huggingface.co/minishlab/static-retrieval-mrl-en-v1), and [static-similarity-mrl-multilingual-v1](https://huggingface.co/minishlab/static-similarity-mrl-multilingual-v1) models are task-specific models. We've included them for completeness, but they should not be compared directly to the other models for tasks that they are not designed for.
 
 The figure below shows the relationship between the number of sentences per second and the average MTEB score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
@@ -50,7 +47,6 @@ This plot shows that the potion and M2V models are much faster than the other mo
 NOTE: for fairness of comparison, we disabled multiprocessing for Model2Vec for this benchmark. All sentence-transformers models are run with the [sentence-transformers](https://github.com/UKPLab/sentence-transformers) library's default settings for `encode`.
 
 | ![Description](../assets/images/speed_vs_mteb_score_v3.png) |
->>>>>>> a7ef098f4e94e861a690b42dc2a067b042e7a4a6
 |:--:|
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
