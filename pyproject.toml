@@ -54,8 +54,12 @@ dev = [
     "pytest-cov",
     "ruff",
 ]
+
 distill = ["torch", "transformers", "scikit-learn"]
 onnx = ["onnx", "torch"]
+# train also installs inference
+train = ["torch", "lightning", "scikit-learn", "skops"]
+inference = ["scikit-learn", "skops"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"
