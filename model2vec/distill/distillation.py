@@ -188,7 +188,7 @@ def validate_parameters(
             sif_coefficient = None
 
     if sif_coefficient is not None:
-        if 0 < sif_coefficient < 1.0:
+        if not 0 < sif_coefficient < 1.0:
             raise ValueError("SIF coefficient must be a value > 0 and <= 1.0.")
 
     if not use_subword and vocabulary is None:
