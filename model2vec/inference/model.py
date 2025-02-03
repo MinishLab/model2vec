@@ -7,9 +7,9 @@ from tempfile import TemporaryDirectory
 import huggingface_hub
 import numpy as np
 import skops.io
-from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 
+from model2vec.hf_utils import _create_model_card
 from model2vec.model import PathLike, StaticModel
 
 _DEFAULT_TRUST_PATTERN = re.compile(r"sklearn\..+")
@@ -141,3 +141,16 @@ def save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> Non
     head_pipeline_path = folder_path / model_filename
     skops.io.dump(pipeline.head, head_pipeline_path)
     pipeline.model.save_pretrained(folder_path)
+    base_model_name = pipeline.model.base_model_name
+    if isinstance(base_model_name, list) and base_model_name:
+        name = base_model_name[0]
+    elif isinstance(base_model_name, str):
+        name = base_model_name
+    else:
+        name = "unknown"
+    _create_model_card(
+        folder_path,
+        base_model_name=name,
+        language=pipeline.model.language,
+        template_path="modelcards/classifier_template.md",
+    )

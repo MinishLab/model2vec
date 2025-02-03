@@ -42,7 +42,7 @@ packages = ["model2vec"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-model2vec = ["assets/model_card_template.md"]
+model2vec = ["assets/modelcards/model_card_template.md", "assets/modelcards/classifier_template.md"]
 
 [project.optional-dependencies]
 dev = [
