@@ -129,7 +129,9 @@ class StaticModelForClassification(FinetunableStaticModel):
         )
 
         if batch_size is None:
-            batch_size = max(min(32, len(train_texts) // 10), 512)
+            # Set to a multiple of 32
+            base_number = int(min(max(1, (len(train_texts) / 30) // 32), 16))
+            batch_size = int(base_number * 32)
             logger.info("Batch size automatically set to %d.", batch_size)
 
         logger.info("Preparing train dataset.")
