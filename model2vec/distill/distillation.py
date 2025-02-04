@@ -71,7 +71,7 @@ def distill_from_model(
     :return: A StaticModel
 
     """
-    sif_coefficient = validate_parameters(tokenizer, vocabulary, apply_zipf, sif_coefficient, use_subword)
+    sif_coefficient = _validate_parameters(tokenizer, vocabulary, apply_zipf, sif_coefficient, use_subword)
 
     device = select_optimal_device(device)
     # Make a base list of tokens.
@@ -151,7 +151,7 @@ def distill_from_model(
     )
 
 
-def validate_parameters(
+def _validate_parameters(
     tokenizer: PreTrainedTokenizerFast,
     vocabulary: list[str] | None,
     apply_zipf: bool | None,
