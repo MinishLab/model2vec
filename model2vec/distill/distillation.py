@@ -129,6 +129,7 @@ def distill_from_model(
         "tokenizer_name": model_name,
         "apply_pca": pca_dims,
         "apply_zipf": apply_zipf,
+        "sif_coefficient": sif_coefficient,
         "hidden_dim": embeddings.shape[1],
         "seq_length": 1000000,  # Set this to a high value since we don't have a sequence length limit.
     }
