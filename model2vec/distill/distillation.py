@@ -64,7 +64,7 @@ def distill_from_model(
     :param apply_zipf: DEPRECATED: This parameter used to control whether Zipf is applied.
         Zipf weighting is now controlled by the sif_coefficient parameter. If this is set to None, no weighting is applied.
     :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
-        Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
+        Should be a value > 0 and < 1.0. A value of 1e-4 is a good default.
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
@@ -330,9 +330,7 @@ def _post_process_embeddings(
                 logger.info(f"Explained variance: {explained_variance:.3f}.")
 
     if sif_coefficient is not None:
-        logger.info("Applying SIF and Zipf weighting")
-        if sif_coefficient <= 0:
-            raise ValueError("SIF coefficient must be positive.")
+        logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
         inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
         proba = inv_rank / np.sum(inv_rank)
         embeddings *= (sif_coefficient / (sif_coefficient + proba))[:, None]
