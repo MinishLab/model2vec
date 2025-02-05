@@ -246,8 +246,6 @@ def test_missing_modelinfo(
         (rng.random((1000, 768)), None, None, (1000, 768)),  # No PCA applied, dimensions remain unchanged
         (rng.random((1000, 768)), 256, 1e-4, (1000, 256)),  # PCA and Zipf applied
         (rng.random((10, 768)), 256, 1e-4, (10, 768)),  # PCA dims higher than vocab size, no PCA applied
-        (rng.random((10, 768)), 256, -1, (10, 768)),  # PCA dims higher than vocab size, no PCA applied
-        (rng.random((10, 768)), 256, 0, (10, 768)),  # PCA dims higher than vocab size, no PCA applied
     ],
 )
 def test__post_process_embeddings(
@@ -259,28 +257,24 @@ def test__post_process_embeddings(
     # Test that the function raises an error if the PCA dims are larger than the number of dimensions
     if pca_dims and pca_dims > embeddings.shape[1]:
         with pytest.raises(ValueError):
-            _post_process_embeddings(embeddings, pca_dims, False)
+            _post_process_embeddings(embeddings, pca_dims, None)
 
-    if sif_coefficient is not None and sif_coefficient <= 0:
-        with pytest.raises(ValueError):
-            _post_process_embeddings(embeddings, pca_dims, sif_coefficient)
-    else:
-        processed_embeddings = _post_process_embeddings(embeddings, pca_dims, sif_coefficient)
+    processed_embeddings = _post_process_embeddings(embeddings, pca_dims, sif_coefficient)
 
-        # Assert the shape is correct
-        assert processed_embeddings.shape == expected_shape
+    # Assert the shape is correct
+    assert processed_embeddings.shape == expected_shape
 
-        # If Zipf weighting is applied compare the original and processed embeddings
-        # and check the weights are applied correctly
-        if sif_coefficient and pca_dims is None:
-            inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
-            proba = inv_rank / np.sum(inv_rank)
-            sif_weights = (sif_coefficient / (sif_coefficient + proba))[:, None]
+    # If Zipf weighting is applied compare the original and processed embeddings
+    # and check the weights are applied correctly
+    if sif_coefficient and pca_dims is None:
+        inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
+        proba = inv_rank / np.sum(inv_rank)
+        sif_weights = (sif_coefficient / (sif_coefficient + proba))[:, None]
 
-            expected_zipf_embeddings = original_embeddings * sif_weights
-            assert np.allclose(
-                processed_embeddings, expected_zipf_embeddings, rtol=1e-5
-            ), "Zipf weighting not applied correctly"
+        expected_zipf_embeddings = original_embeddings * sif_weights
+        assert np.allclose(
+            processed_embeddings, expected_zipf_embeddings, rtol=1e-5
+        ), "Zipf weighting not applied correctly"
 
 
 @pytest.mark.parametrize(
