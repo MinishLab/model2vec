@@ -132,6 +132,7 @@ def distill_from_model(
         "sif_coefficient": sif_coefficient,
         "hidden_dim": embeddings.shape[1],
         "seq_length": 1000000,  # Set this to a high value since we don't have a sequence length limit.
+        "normalize": True,
     }
 
     if os.path.exists(model_name):
@@ -148,7 +149,12 @@ def distill_from_model(
             language = None
 
     return StaticModel(
-        vectors=embeddings, tokenizer=new_tokenizer, config=config, base_model_name=model_name, language=language
+        vectors=embeddings,
+        tokenizer=new_tokenizer,
+        config=config,
+        base_model_name=model_name,
+        language=language,
+        normalize=True,
     )
 
 
