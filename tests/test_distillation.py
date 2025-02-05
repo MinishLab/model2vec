@@ -160,22 +160,29 @@ def test_distill_removal_pattern(
 
 
 @pytest.mark.parametrize(
-    "vocabulary, use_subword, pca_dims, apply_zipf, expected_shape",
+    "vocabulary, use_subword, pca_dims, apply_zipf, sif_coefficient, expected_shape",
     [
-        (None, True, 256, True, (29528, 256)),  # Output vocab with subwords, PCA applied
+        (None, True, 256, True, None, (29528, 256)),  # Output vocab with subwords, PCA applied
         (
             ["wordA", "wordB"],
             False,
             4,
             False,
+            None,
             (7, 4),
         ),  # Custom vocab without subword , PCA applied
-        (None, True, "auto", False, (29528, 768)),  # Subword, PCA set to 'auto'
-        (None, True, 1024, False, (29528, 768)),  # Subword, PCA set to high number.
-        (["wordA", "wordB"], True, 4, False, (29530, 4)),  # Custom vocab with subword, PCA applied
-        (None, True, None, True, (29528, 768)),  # No PCA applied
-        (["wordA", "wordB"], False, 4, True, (7, 4)),  # Custom vocab without subwords PCA and Zipf applied
-        (None, False, 256, True, None),  # use_subword = False without passing a vocabulary should raise an error
+        (None, True, "auto", False, None, (29528, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", True, 1e-4, (29528, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", False, 1e-4, (29528, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", True, 0, None),  # Sif too low
+        (None, True, "auto", True, 1, None),  # Sif too high
+        (None, True, "auto", False, 0, (29528, 768)),  # Sif too low, but apply_zipf is False
+        (None, True, "auto", False, 1, (29528, 768)),  # Sif too high, but apply_zipf is False
+        (None, True, 1024, False, None, (29528, 768)),  # Subword, PCA set to high number.
+        (["wordA", "wordB"], True, 4, False, None, (29530, 4)),  # Custom vocab with subword, PCA applied
+        (None, True, None, True, None, (29528, 768)),  # No PCA applied
+        (["wordA", "wordB"], False, 4, True, None, (7, 4)),  # Custom vocab without subwords PCA and Zipf applied
+        (None, False, 256, True, None, None),  # use_subword = False without passing a vocabulary should raise an error
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -188,6 +195,7 @@ def test_distill(
     use_subword: bool,
     pca_dims: int | None,
     apply_zipf: bool,
+    sif_coefficient: float | None,
     expected_shape: tuple[int, int],
 ) -> None:
     """Test distill function with different parameters."""
@@ -208,7 +216,25 @@ def test_distill(
                 pca_dims=pca_dims,
                 apply_zipf=apply_zipf,
                 use_subword=use_subword,
+                sif_coefficient=sif_coefficient,
             )
+    elif (
+        apply_zipf is not None
+        and apply_zipf
+        and sif_coefficient is not None
+        and (sif_coefficient <= 0 or sif_coefficient >= 1)
+    ):
+        with pytest.raises(ValueError):
+            static_model = distill(
+                model_name=model_name,
+                vocabulary=vocabulary,
+                device="cpu",
+                pca_dims=pca_dims,
+                apply_zipf=apply_zipf,
+                use_subword=use_subword,
+                sif_coefficient=sif_coefficient,
+            )
+
     else:
         # Call the distill function with the parametrized inputs
         static_model = distill(
@@ -218,6 +244,7 @@ def test_distill(
             pca_dims=pca_dims,
             apply_zipf=apply_zipf,
             use_subword=use_subword,
+            sif_coefficient=sif_coefficient,
         )
 
         # Assert the model is correctly generated

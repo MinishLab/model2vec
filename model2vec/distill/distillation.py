@@ -188,15 +188,16 @@ def _validate_parameters(
             "Zipf weighting is applied based on the sif_coefficient parameter. If this is set to None, "
             "no weighting is applied."
         )
-        if apply_zipf and not sif_coefficient:
+        if apply_zipf and sif_coefficient is None:
             logger.warning("You set apply_zipf to True, but sif_coefficient is None. Setting sif_coefficient to 1e-4.")
             sif_coefficient = 1e-4
-        else:
+        elif not apply_zipf:
+            logger.warning("Because you set apply_zipf to False, we ignore the sif_coefficient parameter.")
             sif_coefficient = None
 
     if sif_coefficient is not None:
         if not 0 < sif_coefficient < 1.0:
-            raise ValueError("SIF coefficient must be a value > 0 and <= 1.0.")
+            raise ValueError("SIF coefficient must be a value > 0 and < 1.0.")
 
     if not use_subword and vocabulary is None:
         raise ValueError(
