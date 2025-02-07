@@ -282,7 +282,7 @@ class _ClassifierLightningModule(pl.LightningModule):
 
     def configure_optimizers(self) -> OptimizerLRScheduler:
         """Simple Adam optimizer."""
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
