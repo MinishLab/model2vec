@@ -11,7 +11,7 @@ Let's assume you're using our [potion-edu classifier](https://huggingface.co/min
 ```python
 from model2vec.inference import StaticModelPipeline
 
-s = StaticModelPipeline.from_pretrained("minishlab/potion-8m-edu-classifier")
+classifier = StaticModelPipeline.from_pretrained("minishlab/potion-8m-edu-classifier")
 label = s.predict("Attitudes towards cattle in the Alps: a study in letting go.")
 ```
 
