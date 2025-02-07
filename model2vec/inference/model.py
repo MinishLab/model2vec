@@ -59,23 +59,68 @@ class StaticModelPipeline:
             self.model.save_pretrained(temp_dir)
             push_folder_to_hub(Path(temp_dir), repo_id, private, token)
 
-    def _predict_and_coerce_to_2d(self, X: list[str] | str) -> np.ndarray:
+    def _predict_and_coerce_to_2d(
+        self,
+        X: list[str] | str,
+        show_progress_bar: bool,
+        max_length: int | None,
+        batch_size: int,
+        use_multiprocessing: bool,
+        multiprocessing_threshold: int,
+    ) -> np.ndarray:
         """Predict the labels of the input and coerce the output to a matrix."""
-        encoded = self.model.encode(X)
+        encoded = self.model.encode(
+            X,
+            show_progress_bar=show_progress_bar,
+            max_length=max_length,
+            batch_size=batch_size,
+            use_multiprocessing=use_multiprocessing,
+            multiprocessing_threshold=multiprocessing_threshold,
+        )
         if np.ndim(encoded) == 1:
             encoded = encoded[None, :]
 
         return encoded
 
-    def predict(self, X: list[str] | str) -> np.ndarray:
+    def predict(
+        self,
+        X: list[str] | str,
+        show_progress_bar: bool = False,
+        max_length: int | None = 512,
+        batch_size: int = 1024,
+        use_multiprocessing: bool = True,
+        multiprocessing_threshold: int = 10_000,
+    ) -> np.ndarray:
         """Predict the labels of the input."""
-        encoded = self._predict_and_coerce_to_2d(X)
+        encoded = self._predict_and_coerce_to_2d(
+            X,
+            show_progress_bar=show_progress_bar,
+            max_length=max_length,
+            batch_size=batch_size,
+            use_multiprocessing=use_multiprocessing,
+            multiprocessing_threshold=multiprocessing_threshold,
+        )
 
         return self.head.predict(encoded)
 
-    def predict_proba(self, X: list[str] | str) -> np.ndarray:
+    def predict_proba(
+        self,
+        X: list[str] | str,
+        show_progress_bar: bool = False,
+        max_length: int | None = 512,
+        batch_size: int = 1024,
+        use_multiprocessing: bool = True,
+        multiprocessing_threshold: int = 10_000,
+    ) -> np.ndarray:
         """Predict the probabilities of the labels of the input."""
-        encoded = self._predict_and_coerce_to_2d(X)
+        encoded = self._predict_and_coerce_to_2d(
+            X,
+            show_progress_bar=show_progress_bar,
+            max_length=max_length,
+            batch_size=batch_size,
+            use_multiprocessing=use_multiprocessing,
+            multiprocessing_threshold=multiprocessing_threshold,
+        )
 
         return self.head.predict_proba(encoded)
 
