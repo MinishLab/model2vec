@@ -87,7 +87,7 @@ class StaticModel:
     @normalize.setter
     def normalize(self, value: bool) -> None:
         """Update the config if the value of normalize changes."""
-        config_normalize = self.config.get("normalize", False)
+        config_normalize = self.config.get("normalize")
         self._normalize = value
         if config_normalize is not None and value != config_normalize:
             logger.warning(

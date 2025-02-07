@@ -88,7 +88,7 @@ def importable(module: str, extra: str) -> None:
         import_module(module)
     except ImportError:
         raise ImportError(
-            f"`{module}`, is required. Please reinstall model2vec with the `distill` extra. `pip install model2vec[{extra}]`"
+            f"`{module}`, is required. Please reinstall model2vec with the `{extra}` extra. `pip install model2vec[{extra}]`"
         )
 
 

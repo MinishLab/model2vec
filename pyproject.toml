@@ -42,7 +42,7 @@ packages = ["model2vec"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-model2vec = ["assets/model_card_template.md"]
+model2vec = ["assets/modelcards/model_card_template.md", "assets/modelcards/classifier_template.md"]
 
 [project.optional-dependencies]
 dev = [
@@ -54,8 +54,12 @@ dev = [
     "pytest-cov",
     "ruff",
 ]
+
 distill = ["torch", "transformers", "scikit-learn"]
 onnx = ["onnx", "torch"]
+# train also installs inference
+train = ["torch", "lightning", "scikit-learn", "skops"]
+inference = ["scikit-learn", "skops"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"
