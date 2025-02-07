@@ -24,7 +24,7 @@ class StaticModelPipeline:
 
     @classmethod
     def from_pretrained(
-        cls: type[StaticModelPipeline], path: PathLike, token: str | None = None
+        cls: type[StaticModelPipeline], path: PathLike, token: str | None = None, trust_remote_code: bool = False
     ) -> StaticModelPipeline:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -33,9 +33,10 @@ class StaticModelPipeline:
 
         :param path: The path to the folder containing the pipeline, or a repository on the Hugging Face Hub
         :param token: The token to use to download the pipeline from the hub.
+        :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming from `sklearn`.
         :return: The loaded pipeline.
         """
-        model, head = _load_pipeline(path, token)
+        model, head = _load_pipeline(path, token, trust_remote_code)
         model.embedding = np.nan_to_num(model.embedding)
 
         return cls(model, head)
