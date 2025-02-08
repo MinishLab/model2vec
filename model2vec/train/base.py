@@ -13,7 +13,9 @@ from model2vec import StaticModel
 
 
 class FinetunableStaticModel(nn.Module):
-    def __init__(self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0) -> None:
+    def __init__(
+        self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0, **kwargs: Any
+    ) -> None:
         """
         Initialize a trainable StaticModel from a StaticModel.
 
@@ -21,6 +23,7 @@ class FinetunableStaticModel(nn.Module):
         :param tokenizer: The tokenizer.
         :param out_dim: The output dimension of the head.
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models
+        :param **kwargs: Additional keyword arguments.
         """
         super().__init__()
         self.pad_id = pad_id
@@ -109,7 +112,7 @@ class FinetunableStaticModel(nn.Module):
         return pad_sequence(encoded_ids, batch_first=True)
 
     @property
-    def device(self) -> str:
+    def device(self) -> torch.device:
         """Get the device of the model."""
         return self.embeddings.weight.device
 
