@@ -9,7 +9,6 @@ import torch.nn.functional as F
 from lightning.pytorch.callbacks import EarlyStopping
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
-from torch import nn
 
 from model2vec import StaticModel
 from model2vec.train.base import FinetunableStaticModel, ModelType, TextDataset
@@ -65,7 +64,7 @@ class TokenlearnModel(FinetunableStaticModel, pl.LightningModule):
     def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         """The training step for the model."""
         input_ids, target_vectors = batch
-        y_hat, mean_emb = self.forward(input_ids)  # calls FinetunableStaticModel.forward
+        y_hat, mean_emb = self.forward(input_ids)
         cos_loss = 1.0 - F.cosine_similarity(y_hat, target_vectors, dim=1).mean()
         mse_loss = (mean_emb**2).mean()
         loss = self.cosine_weight * cos_loss + self.mse_weight * mse_loss
@@ -131,12 +130,6 @@ class TokenlearnModel(FinetunableStaticModel, pl.LightningModule):
         """
         Post-training step to apply SIF weighting + PCA to the embeddings.
 
-        Does the following:
-        1) Counts token frequencies across `texts`.
-        2) PCA transforms embeddings to `pca_dims`.
-        3) Weights each token by alpha / (alpha + p(token)).
-        4) Returns a new StaticModel with the modified embeddings.
-
         :param texts: The corpus on which to compute frequencies.
         :param alpha: The SIF alpha.
         :param pca_dims: The dimensionality to keep after PCA.
@@ -154,9 +147,9 @@ class TokenlearnModel(FinetunableStaticModel, pl.LightningModule):
 
             # Apply PCA
             p = PCA(n_components=pca_dims)
-            emb_pca = p.fit_transform(embeddings_weight)  # shape: [vocab_size, pca_dims]
+            emb_pca = p.fit_transform(embeddings_weight)
 
-            # Apply SIF weighting: alpha / (alpha + freq)
+            # Apply SIF weighting
             sif_weights = alpha / (alpha + probas)
             emb_pca *= sif_weights[:, None]
 
@@ -172,7 +165,7 @@ class TokenlearnModel(FinetunableStaticModel, pl.LightningModule):
         logger.info(f"Saved TokenlearnModel as a static model to '{save_directory}'")
 
 
-def run() -> None:
+def main() -> None:
     """Run the tokenlearn training script."""
     # Initialize a StaticModel
     model = StaticModel.from_pretrained("minishlab/M2V_base_output")
@@ -190,12 +183,14 @@ def run() -> None:
     # Convert to TokenlearnDataset
     dataset = TokenlearnDataset(X, y_tensor, tokenizer=model.tokenizer)
 
-    # Wrap it in our TokenlearnModel and move it to device
+    # Create a TokenlearnModel from the StaticModel
     tokenlearn_model = TokenlearnModel.from_static_model(model, out_dim=y_tensor.shape[1])
     tokenlearn_model.to(device)
 
     # Fit the model
-    tokenlearn_model.fit(dataset, batch_size=256, max_epochs=20, device=device)
+    tokenlearn_model.fit(dataset, batch_size=256, max_epochs=50, device=device)
+
+    # Apply SIF weighting + PCA to the embeddings
     tokenlearn_model.apply_weighting(X, alpha=1e-3, pca_dims=256)
 
     # Save the final static model
@@ -203,4 +198,4 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    main()
