@@ -34,7 +34,7 @@ class TokenlearnModel(FinetunableStaticModel, pl.LightningModule):
         *,
         vectors: torch.Tensor,
         tokenizer: Tokenizer,
-        out_dim: int = 2,
+        out_dim: int,
         pad_id: int = 0,
         lr_model: float = 3e-3,
         lr_linear: float = 1e-2,
