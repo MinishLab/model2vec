@@ -78,7 +78,7 @@ class TokenlearnModel(FinetunableStaticModel, pl.LightningModule):
 
         # Zero out the padding
         embedded = embedded * zeros[:, :, None]
-        embedded = (embedded * w[:, :, None]).sum(1) / (w.sum(1)[:, None] + 1e-16)
+        embedded = (embedded * w[:, :, None]).sum(1) / (w.sum(1)[:, None])
 
         embedded = embedded / length[:, None]
 
