@@ -98,27 +98,27 @@ The main results are detailed in our training blogpost, but we'll do a compariso
 
 We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
 
-| dataset_name               |   model2vec logreg |   setfit |  model2vec full finetune |
-|:---------------------------|---------------------------------------------:|-------------------------------------------------:|--------------------------------------:|
-| 20_newgroups               |                                     0.545312 |                                         0.595426 |                              0.555459 |
-| ade                        |                                     0.715725 |                                         0.788789 |                              0.740307 |
-| ag_news                    |                                     0.860154 |                                         0.880142 |                              0.858304 |
-| amazon_counterfactual      |                                     0.637754 |                                         0.873249 |                              0.744288 |
-| bbc                        |                                     0.955719 |                                         0.965823 |                              0.965018 |
-| emotion                    |                                     0.516267 |                                         0.598852 |                              0.586328 |
-| enron_spam                 |                                     0.951975 |                                         0.974498 |                              0.964994 |
-| hatespeech_offensive       |                                     0.543758 |                                         0.659873 |                              0.592587 |
-| imdb                       |                                     0.839002 |                                         0.860037 |                              0.846198 |
-| massive_scenario           |                                     0.797779 |                                         0.814601 |                              0.822825 |
-| senteval_cr                |                                     0.743436 |                                         0.8526   |                              0.745863 |
-| sst5                       |                                     0.290249 |                                         0.393179 |                              0.363071 |
-| student                    |                                     0.806069 |                                         0.889399 |                              0.837581 |
-| subj                       |                                     0.878394 |                                         0.937955 |                              0.88941  |
-| tweet_sentiment_extraction |                                     0.638664 |                                         0.755296 |                              0.632009 |
+|  dataset name                  |      model2vec logreg  |     model2vec full finetune  |      setfit  |
+|:-------------------------------|-----------------------:|-----------------------------:|-------------:|
+| 20_newgroups                   |                  54.53 |                        55.55 |        59.54 |
+| ade                            |                  71.57 |                        74.03 |        78.88 |
+| ag_news                        |                  86.02 |                        85.83 |        88.01 |
+| amazon_counterfactual          |                  63.78 |                        74.43 |        87.32 |
+| bbc                            |                  95.57 |                        96.5  |        96.58 |
+| emotion                        |                  51.63 |                        58.63 |        59.89 |
+| enron_spam                     |                  95.2  |                        96.5  |        97.45 |
+| hatespeech_offensive           |                  54.38 |                        59.26 |        65.99 |
+| imdb                           |                  83.9  |                        84.62 |        86    |
+| massive_scenario               |                  79.78 |                        82.28 |        81.46 |
+| senteval_cr                    |                  74.34 |                        74.59 |        85.26 |
+| sst5                           |                  29.02 |                        36.31 |        39.32 |
+| student                        |                  80.61 |                        83.76 |        88.94 |
+| subj                           |                  87.84 |                        88.94 |        93.8  |
+| tweet_sentiment_extraction     |                  63.87 |                        63.2  |        75.53 |
 
-|                |   logreg   |  full finetune |
-|:---------------------------|-----------:|---------------:|
-| average                    |   0.714    |    0.742       |
+|                |   logreg   |  full finetune | setfit
+|:---------------------------|-----------:|---------------:|-------:|
+| average                    |   71.47    |    74.29       |   78.93 |
 
 As you can see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-8m`, and to use full fine-tuning if you are starting from another base model.
 
