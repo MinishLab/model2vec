@@ -20,7 +20,7 @@
 </div>
 
 <div align="center">
-  <h2>
+  <h4>
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/v/model2vec?color=%23007ec6&label=pypi%20package" alt="Package version"></a>
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/pyversions/model2vec" alt="Supported Python versions"></a>
     <a href="https://pepy.tech/project/model2vec">
@@ -31,7 +31,7 @@
     </a>
   </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
-  </h2>
+
 
 [Quickstart](#quickstart) •
 [Main Features](#main-features) •
@@ -39,7 +39,7 @@
 [Documentation](#documentation) •
 [Model List](#model-list) •
 [Results](#results)
-
+  </h4>
 </div>
 
 
