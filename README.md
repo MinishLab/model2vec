@@ -117,11 +117,12 @@ classifer = StaticModelForClassification.from_pretrained("minishlab/potion-base-
 # Load a dataset
 ds = load_dataset("setfit/subj")
 
-# Train the classifier
+# Train the classifier on text (X) and labels (y)
 classifier.fit(ds["train"]["text"], ds["train"]["label"])
 
 # Evaluate the classifier
-accuracy = np.mean(classifier.predict(ds["test"]["text"]) == ds["test"]["label"]) * 100
+predictions = classifier.predict(ds["test"]["text"])
+accuracy = np.mean(np.array(predictions) == np.array(ds["test"]["label"])) * 100
 ```
 
 
