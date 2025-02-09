@@ -44,7 +44,10 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 
 ## Updates & Announcements
 
+- **12/02/2024**: We released **Model2Vec training**, allowing you to fine-tune your own classification models on top of Model2Vec models. Find out more in our [documentation](https://github.com/MinishLab/model2vec/blob/main/model2vec/train/README.md) and in our [blog post](LINK).
+
 - **30/01/2024**: We released two new models: [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) and [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M). [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) is our most performant model to date, using a larger vocabulary and higher dimensions. [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) is a finetune of [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) that is optimized for retrieval tasks, and is the best performing static retrieval model currently available.
+
 - **30/10/2024**: We released three new models: [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M), [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M), and [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M). These models are trained using [Tokenlearn](https://github.com/MinishLab/tokenlearn). Find out more in our [blog post](https://minishlab.github.io/tokenlearn_blogpost/). NOTE: for users of any of our old English M2V models, we recommend switching to these new models as they [perform better on all tasks](https://github.com/MinishLab/model2vec/tree/main/results).
 
 ## Table of Contents
@@ -54,6 +57,7 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 - [Usage](#usage)
     - [Inference](#inference)
     - [Distillation](#distillation)
+    - [Training](#training)
     - [Evaluation](#evaluation)
 - [Integrations](#integrations)
 - [Model List](#model-list)
@@ -113,7 +117,7 @@ For advanced usage, such as using Model2Vec in the [Sentence Transformers librar
 - **Lightning-fast Inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset. All you need is a model and (optionally) a custom vocabulary.
 - **Integrated in many popular libraries**: Model2Vec can be used directly in popular libraries such as [Sentence Transformers](https://github.com/UKPLab/sentence-transformers), [LangChain](https://github.com/langchain-ai/langchain), [txtai](https://github.com/neuml/txtai), and [Chonkie](https://github.com/bhavnicksm/chonkie). See the [Integrations](#integrations) section for more information.
-- **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab). Feel free to share your own.
+- **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab).
 
 ## What is Model2Vec?
 
@@ -264,6 +268,41 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 
 </details>
 
+
+### Training
+
+<details>
+<summary>  Training a classifier </summary>
+<br>
+
+Model2Vec can be used to train a classifier on top of a distilled model. The following code snippet shows how to train a classifier on top of a distilled model:
+
+```python
+from model2vec.train import StaticModelForClassification
+
+# Load a distilled model
+distilled_model = StaticModelForClassification.from_pretrained("minishlab/potion-base-8M")
+
+# Load a dataset
+from datasets import load_dataset
+
+ds = load_dataset("setfit/subj")
+train = ds["train"]
+test = ds["test"]
+
+X_train, y_train = train["text"], train["label"]
+X_test, y_test = test["text"], test["label"]
+
+# Train the classifier
+classifier = StaticModelForClassification.from_static_model(distilled_model)
+classifier.fit(X_train, y_train)
+
+# Evaluate the classifier
+y_hat = classifier.predict(X_test)
+accuracy = np.mean(np.array(y_hat) == np.array(y_test)) * 100
+```
+
+</details>
 
 ### Evaluation
 
