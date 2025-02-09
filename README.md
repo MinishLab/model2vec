@@ -72,7 +72,7 @@ This will install the base inference package, which only depends on `numpy` and 
 pip install model2vec[distill]
 ```
 
-You can start using Model2Vec immediately by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
+You can start using Model2Vec immediately by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings, which you can use to classify texts, cluster, or build a RAG system:
 ```python
 from model2vec import StaticModel
 
@@ -86,9 +86,8 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
-And that's it. You can use the model to classify texts, to cluster, or to build a RAG system.
+Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. The following code snippet shows how to distill a model in ~30 seconds on a CPU:
 
-Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. The following code snippet shows how to distill a model:
 ```python
 from model2vec.distill import distill
 
@@ -99,9 +98,40 @@ m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 ```
 
-Distillation is really fast and only takes 30 seconds on CPU. Best of all, distillation requires no training data.
+After distillation, you can also fine-tune your own classification models on top of the distilled model. First, make sure you install the `training` extras with:
 
-For advanced usage, such as using Model2Vec in the [Sentence Transformers library](https://github.com/UKPLab/sentence-transformers), please refer to the [Usage](#usage) sections.
+```bash
+pip install model2vec[training]
+```
+
+Then, you can fine-tune a model as follows:
+
+```python
+from datasets import load_dataset
+from model2vec.train import StaticModelForClassification
+
+# Load a distilled model
+distilled_model = StaticModelForClassification.from_pretrained("minishlab/potion-base-8M")
+
+# Load a dataset
+ds = load_dataset("setfit/subj")
+train = ds["train"]
+test = ds["test"]
+
+X_train, y_train = train["text"], train["label"]
+X_test, y_test = test["text"], test["label"]
+
+# Train the classifier
+classifier = StaticModelForClassification.from_static_model(distilled_model)
+classifier.fit(X_train, y_train)
+
+# Evaluate the classifier
+y_hat = classifier.predict(X_test)
+accuracy = np.mean(np.array(y_hat) == np.array(y_test)) * 100
+```
+
+
+For advanced usage, please refer to our [usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md).
 
 
 ## Main Features
@@ -126,9 +156,9 @@ The core idea is to forward pass a vocabulary through a sentence transformer mod
 ## Documentation
 
 Our official documentation can be found [here](https://github.com/MinishLab/model2vec/blob/main/docs/README.md). This includes:
-- [Usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md): Provides a technical overview of how to use Model2Vec.
-- [Integrations documentation](https://github.com/MinishLab/model2vec/blob/main/docs/integrations.md): Provides examples of how to use Model2Vec in various downstream libraries.
-- [Model2Vec technical documentation](https://github.com/MinishLab/model2vec/blob/main/docs/what_is_model2vec.md): Provides a high-level overview of how Model2Vec works.
+- [Usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md): provides a technical overview of how to use Model2Vec.
+- [Integrations documentation](https://github.com/MinishLab/model2vec/blob/main/docs/integrations.md): provides examples of how to use Model2Vec in various downstream libraries.
+- [Model2Vec technical documentation](https://github.com/MinishLab/model2vec/blob/main/docs/what_is_model2vec.md): provides a high-level overview of how Model2Vec works.
 
 
 ## Model List
