@@ -50,14 +50,11 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 
 ## Quickstart
 
-Install the package with:
+Install the lightweight base package with:
 
 ```bash
 pip install model2vec
 ```
-
-This will install the base inference package, which only depends on `numpy` and a few other minor dependencies. If you want to distill your own models, you can install the distillation extras with:
-
 
 You can start using Model2Vec immediately by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings, which you can use to classify texts, cluster, or build a RAG system:
 ```python
