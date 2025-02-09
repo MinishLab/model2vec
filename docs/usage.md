@@ -134,11 +134,12 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 Model2Vec can be used to train a classifier on top of a distilled model. The following code snippet shows how to train a classifier on top of a distilled model. For more advanced usage, as well as results, please refer to the [training documentation](https://github.com/MinishLab/model2vec/blob/main/model2vec/train/README.md).
 
 ```python
+import numpy as np
 from datasets import load_dataset
 from model2vec.train import StaticModelForClassification
 
 # Load a distilled model
-distilled_model = StaticModelForClassification.from_pretrained("minishlab/potion-base-8M")
+classifer = StaticModelForClassification.from_pretrained("minishlab/potion-base-8M")
 
 # Load a dataset
 ds = load_dataset("setfit/subj")
@@ -149,7 +150,6 @@ X_train, y_train = train["text"], train["label"]
 X_test, y_test = test["text"], test["label"]
 
 # Train the classifier
-classifier = StaticModelForClassification.from_static_model(distilled_model)
 classifier.fit(X_train, y_train)
 
 # Evaluate the classifier

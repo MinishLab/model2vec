@@ -98,7 +98,7 @@ m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 ```
 
-After distillation, you can also fine-tune your own classification models on top of the distilled model. First, make sure you install the `training` extras with:
+After distillation, you can also fine-tune your own classification models on top of the distilled model, or on a pre-trained model. First, make sure you install the `training` extras with:
 
 ```bash
 pip install model2vec[training]
@@ -107,27 +107,21 @@ pip install model2vec[training]
 Then, you can fine-tune a model as follows:
 
 ```python
+import numpy as np
 from datasets import load_dataset
 from model2vec.train import StaticModelForClassification
 
-# Load a distilled model
-distilled_model = StaticModelForClassification.from_pretrained("minishlab/potion-base-8M")
+# Initialize a classifier from a pre-trained model
+classifer = StaticModelForClassification.from_pretrained("minishlab/potion-base-8M")
 
 # Load a dataset
 ds = load_dataset("setfit/subj")
-train = ds["train"]
-test = ds["test"]
-
-X_train, y_train = train["text"], train["label"]
-X_test, y_test = test["text"], test["label"]
 
 # Train the classifier
-classifier = StaticModelForClassification.from_static_model(distilled_model)
-classifier.fit(X_train, y_train)
+classifier.fit(ds["train"]["text"], ds["train"]["label"])
 
 # Evaluate the classifier
-y_hat = classifier.predict(X_test)
-accuracy = np.mean(np.array(y_hat) == np.array(y_test)) * 100
+accuracy = np.mean(classifier.predict(ds["test"]["text"]) == ds["test"]["label"]) * 100
 ```
 
 
