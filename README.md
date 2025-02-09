@@ -360,16 +360,15 @@ print(make_leaderboard(task_scores))
 <a name="sentence-transformers"></a>
 <br>
 
-Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) using the `StaticEmbedding` module.
+Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers):
 
 The following code snippet shows how to load a Model2Vec model into a Sentence Transformer model:
 ```python
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.models import StaticEmbedding
 
-# Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
-model = SentenceTransformer(modules=[static_embedding])
+# Load a Model2Vec model from the Hub
+model = SentenceTransformer("minishlab/potion-base-8M")
+# Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
