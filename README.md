@@ -127,7 +127,7 @@ The core idea is to forward pass a vocabulary through a sentence transformer mod
 
 Our official documentation can be found [here](https://github.com/MinishLab/model2vec/blob/main/docs/README.md). This includes:
 - [Usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md): Provides a technical overview of how to use Model2Vec.
-- [Integrations documentation](https://github.com/MinishLab/model2vec/blob/main/docs/integrations.md):Provides examples of how to use Model2Vec in various downstream libraries.
+- [Integrations documentation](https://github.com/MinishLab/model2vec/blob/main/docs/integrations.md): Provides examples of how to use Model2Vec in various downstream libraries.
 - [Model2Vec technical documentation](https://github.com/MinishLab/model2vec/blob/main/docs/what_is_model2vec.md): Provides a high-level overview of how Model2Vec works.
 
 
@@ -136,14 +136,14 @@ Our official documentation can be found [here](https://github.com/MinishLab/mode
 We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e) and can be loaded using the `from_pretrained` method. The models are listed below.
 
 
-| Model                                                                 | Language    | Vocab            | Sentence Transformer                                            | Tokenizer Type | Params  | Tokenlearn        |
-|-----------------------------------------------------------------------|-------------|------------------|-----------------------------------------------------------------|----------------|---------|-------------------|
-| [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M)     | English     | Output + Frequent C4 tokens          | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 32.3M    | <div align="center">✅</div> |
-| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 7.5M    | <div align="center">✅</div> |
-| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 3.7M    | <div align="center">✅</div> |
-| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)     | English     | Output           | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 1.8M    | <div align="center">✅</div> |
-| [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M)     | English     | Output + Frequent C4 tokens          | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | Subword        | 32.3M    | <div align="center">✅</div> |
-| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output) | Multilingual | Output           | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)      | Subword        | 471M    | <div align="center">❌</div> |
+| Model                                                                 | Language    | Sentence Transformer                                            | Params  |
+|-----------------------------------------------------------------------|------------|-----------------------------------------------------------------|---------|
+| [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M)     | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 32.3M   |
+| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)      | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 7.5M    |
+| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)      | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 3.7M    |
+| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)      | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 1.8M    |
+| [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 32.3M   |
+| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output) | Multilingual | [LaBSE](https://huggingface.co/sentence-transformers/LaBSE)      | 471M    |
 
 
 ## Results
@@ -161,9 +161,9 @@ MIT
 If you use Model2Vec in your research, please cite the following:
 ```bibtex
 @software{minishlab2024model2vec,
-  authors = {Stephan Tulkens, Thomas van Dongen},
+  authors = {Stephan Tulkens and Thomas van Dongen},
   title = {Model2Vec: The Fastest State-of-the-Art Static Embeddings in the World},
   year = {2024},
-  url = {https://github.com/MinishLab/model2vec},
+  url = {https://github.com/MinishLab/model2vec}
 }
 ```
