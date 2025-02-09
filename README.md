@@ -39,7 +39,7 @@
     <img src="assets/images/model2vec_model_diagram_transparant_light.png#gh-light-mode-only" width="90%">
 </div>
 
-Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by a factor up to 50 and making the models up to 500 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model in the world. See our results [here](results/README.md), or dive in to see how it works.
+Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by a factor up to 50 and making the models up to 500 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is the most performant static embedding model in the world. See our results [here](results/README.md), or dive in to see how it works.
 
 
 ## Updates & Announcements
@@ -72,7 +72,7 @@ This will install the base inference package, which only depends on `numpy` and 
 pip install model2vec[distill]
 ```
 
-The easiest way to get started with Model2Vec is to load one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
+You can start using Model2Vec immediately by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings:
 ```python
 from model2vec import StaticModel
 
@@ -107,7 +107,7 @@ For advanced usage, such as using Model2Vec in the [Sentence Transformers librar
 ## Main Features
 
 - **State-of-the-Art Performance**: Model2Vec models outperform any other static embeddings (such as GLoVe and BPEmb) by a large margin, as can be seen in our [results](results/README.md).
-- **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of 15, from 120M params, down to 7.5M (30 MB on disk, making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
+- **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of up to 50. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is just ~30 MB on disk, and our smallest model ~8 MB (making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
 - **Lightning-fast Inference**: up to 500 times faster on CPU than the original model. Go green or go home.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset. All you need is a model and (optionally) a custom vocabulary.
