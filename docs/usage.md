@@ -3,9 +3,7 @@
 
 ## Inference
 
-<details>
-<summary>  Inference with a pretrained model </summary>
-<br>
+### Inference with a pretrained model
 
 Inference works as follows. The example shows one of our own models, but you can also just load a local one, or another one from the hub.
 ```python
@@ -20,12 +18,9 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 # Make sequences of token embeddings
 token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
-</details>
 
+### Inference with the Sentence Transformers library
 
-<details>
-<summary>  Inference with the Sentence Transformers library </summary>
-<br>
 
 The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
@@ -39,13 +34,9 @@ model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
-</details>
-
 ## Distillation
 
-<details>
-<summary>  Distilling from a Sentence Transformer </summary>
-<br>
+### Distilling from a Sentence Transformer
 
 The following code can be used to distill a model from a Sentence Transformer. As mentioned above, this leads to really small model that might be less performant.
 ```python
@@ -58,11 +49,8 @@ m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 
 ```
-</details>
 
-<details>
-<summary>  Distilling from a loaded model </summary>
-<br>
+### Distilling from a loaded model
 
 If you already have a model loaded, or need to load a model in some special way, we also offer an interface to distill models in memory.
 
@@ -82,11 +70,7 @@ m2v_model.save_pretrained("m2v_model")
 
 ```
 
-</details>
-
-<details>
-<summary>  Distilling with the Sentence Transformers library </summary>
-<br>
+### Distilling with the Sentence Transformers library
 
 The following code snippet shows how to distill a model using the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
@@ -99,12 +83,7 @@ model = SentenceTransformer(modules=[static_embedding])
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
-</details>
-
-
-<details>
-<summary>  Distilling with a custom vocabulary </summary>
-<br>
+### Distilling with a custom vocabulary
 
 If you pass a vocabulary, you get a set of static word embeddings, together with a custom tokenizer for exactly that vocabulary. This is comparable to how you would use GLoVe or traditional word2vec, but doesn't actually require a corpus or data.
 ```python
@@ -131,14 +110,10 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 
 **Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
 
-</details>
-
 
 ## Training
 
-<details>
-<summary>  Training a classifier </summary>
-<br>
+### Training a classifier
 
 Model2Vec can be used to train a classifier on top of a distilled model. The following code snippet shows how to train a classifier on top of a distilled model. For more advanced usage, as well as results, please refer to the [training documentation](https://github.com/MinishLab/model2vec/blob/main/model2vec/train/README.md).
 
@@ -166,25 +141,18 @@ y_hat = classifier.predict(X_test)
 accuracy = np.mean(np.array(y_hat) == np.array(y_test)) * 100
 ```
 
-</details>
-
 ## Evaluation
 
 
-<details>
-<summary>  Installation </summary>
-<br>
+### Installation
 
 Our models can be evaluated using our [evaluation package](https://github.com/MinishLab/evaluation). Install the evaluation package with:
 
 ```bash
 pip install git+https://github.com/MinishLab/evaluation.git@main
 ```
-</details>
 
-<details>
-  <summary>  Evaluation Code </summary>
-<br>
+### Evaluation Code
 
 The following code snippet shows how to evaluate a Model2Vec model:
 ```python
@@ -217,4 +185,3 @@ task_scores = summarize_results(parsed_results)
 # Print the results in a leaderboard format
 print(make_leaderboard(task_scores))
 ```
-</details>
