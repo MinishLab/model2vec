@@ -125,9 +125,7 @@ predictions = classifier.predict(ds["test"]["text"])
 accuracy = np.mean(np.array(predictions) == np.array(ds["test"]["label"])) * 100
 ```
 
-
 For advanced usage, please refer to our [usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md).
-
 
 ## Main Features
 
