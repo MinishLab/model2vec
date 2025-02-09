@@ -15,7 +15,8 @@
     <a href="https://huggingface.co/minishlab"><strong>🤗 Models</strong></a> |
     <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>📚 Tutorials</strong></a> |
     <a href="https://minishlab.github.io/"><strong>🌐 Website</strong></a> |
-    <a href="https://github.com/MinishLab/model2vec/blob/main/results/README.md"><strong>🏆 Results</strong></a>
+    <a href="https://github.com/MinishLab/model2vec/blob/main/results/README.md"><strong>🏆 Results</strong></a> |
+    <a href="https://github.com/MinishLab/model2vec/blob/main/docs"><strong>📖 Docs</strong></a>
   </h2>
 </div>
 
@@ -32,6 +33,7 @@
   </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
 
+<br>
 
 [Quickstart](#quickstart) •
 [Main Features](#main-features) •
