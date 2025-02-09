@@ -138,7 +138,7 @@ import numpy as np
 from datasets import load_dataset
 from model2vec.train import StaticModelForClassification
 
-# Load a distilled model
+# Initialize a classifier from a pre-trained model
 classifer = StaticModelForClassification.from_pretrained("minishlab/potion-base-8M")
 
 # Load a dataset
