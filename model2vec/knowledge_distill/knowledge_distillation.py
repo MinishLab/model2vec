@@ -6,29 +6,29 @@ import lightning as pl
 import numpy as np
 import torch
 import torch.nn.functional as F
-from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
 from torch import nn
 
 from model2vec import StaticModel
+from model2vec.knowledge_distill.utils import calculate_token_probabilities, collect_means_and_texts
 from model2vec.train.base import FinetunableStaticModel, ModelType, TextDataset
-from model2vec.train.utils import calculate_token_probabilities, collect_means_and_texts
 
 logger = logging.getLogger(__name__)
 
 
-class TokenlearnDataset(TextDataset):
-    """Dataset class for Tokenlearn training."""
+class KnowledgeDistillationDataset(TextDataset):
+    """Dataset class for Knowledge Distillation training."""
 
     def __init__(self, texts: list[str], targets: torch.Tensor, tokenizer: Tokenizer) -> None:
-        """Initialize a TokenlearnDataset."""
+        """Initialize a Knowledge Distillation dataset."""
         tokenized_texts = [encoding.ids for encoding in tokenizer.encode_batch_fast(texts, add_special_tokens=False)]
         super().__init__(tokenized_texts, targets)
 
 
-class TokenlearnModel(FinetunableStaticModel, pl.LightningModule):
-    """A TokenLearn model that learns to map token embeddings to target vectors."""
+class KnowledgeDistillationModel(FinetunableStaticModel, pl.LightningModule):
+    """A knowledge distillation model that learns to map token embeddings to target vectors."""
 
     def __init__(
         self,
@@ -141,18 +141,34 @@ class TokenlearnModel(FinetunableStaticModel, pl.LightningModule):
     def fit(
         self,
         dataset: TextDataset,
-        batch_size: int = 32,
-        max_epochs: int = 5,
+        batch_size: int = 256,
+        max_epochs: int = 50,
         device: str = "cpu",
-        patience: Optional[int] = None,
+        patience: int | None = 5,
     ) -> None:
         """Fit the model."""
         callbacks: list[pl.Callback] = []
         if patience is not None:
             callbacks.append(EarlyStopping(monitor="train_loss", mode="min", patience=patience))
+
+        checkpoint_callback = ModelCheckpoint(
+            monitor="train_loss",
+            mode="min",
+            save_top_k=1,
+            dirpath="checkpoints/",
+            filename="best_model",
+        )
+        callbacks.append(checkpoint_callback)
+
         train_loader = dataset.to_dataloader(batch_size=batch_size, shuffle=True)
         trainer = pl.Trainer(max_epochs=max_epochs, accelerator=device, callbacks=callbacks)
         trainer.fit(self, train_loader)
+
+        # Load the best checkpoint after training
+        best_model_path = checkpoint_callback.best_model_path
+        if best_model_path:
+            logger.info(f"Loading best model from {best_model_path}")
+            self.load_state_dict(torch.load(best_model_path)["state_dict"])
 
     def apply_weighting(self, texts: list[str], alpha: float = 1e-3, pca_dims: int = 256) -> StaticModel:
         """
@@ -210,10 +226,10 @@ def main() -> None:
     y_tensor = torch.tensor(y, dtype=torch.float32, device=device)
 
     # Convert to TokenlearnDataset
-    dataset = TokenlearnDataset(X, y_tensor, tokenizer=model.tokenizer)
+    dataset = KnowledgeDistillationDataset(X, y_tensor, tokenizer=model.tokenizer)
 
     # Create a TokenlearnModel from the StaticModel
-    tokenlearn_model = TokenlearnModel.from_static_model(model, out_dim=y_tensor.shape[1])
+    tokenlearn_model = KnowledgeDistillationModel.from_static_model(model, out_dim=y_tensor.shape[1])
     tokenlearn_model.to(device)
 
     # Fit the model

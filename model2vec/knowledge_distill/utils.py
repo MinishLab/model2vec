@@ -2,6 +2,7 @@ import json
 import logging
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import regex
@@ -90,3 +91,11 @@ def calculate_token_probabilities(tokenizer: Tokenizer, txt: list[str]) -> np.nd
     x /= sum_id
 
     return x
+
+
+# def load_dataset(path: str):
+#     """Load a dataset from a file."""
+#     # Collect paths for training data
+#     paths = sorted(Path(path).glob("*.json"))
+#     X, y = collect_means_and_texts(paths)
+#     return X, y
