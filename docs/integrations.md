@@ -1,10 +1,16 @@
 
 # Integrations
 
-<details>
-<summary>  Sentence Transformers </summary>
-<a name="sentence-transformers"></a>
-<br>
+Model2Vec can be used in a variety of downstream libraries. This document provides examples of how to use Model2Vec in some of these libraries.
+
+## Table of Contents
+- [Sentence Transformers](#sentence-transformers)
+- [LangChain](#langchain)
+- [Txtai](#txtai)
+- [Chonkie](#chonkie)
+- [Transformers.js](#transformersjs)
+
+## Sentence Transformers
 
 Model2Vec can be used directly in [Sentence Transformers](https://github.com/UKPLab/sentence-transformers):
 
@@ -31,11 +37,8 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 
 For more documentation, please refer to the [Sentence Transformers documentation](https://sbert.net/docs/package_reference/sentence_transformer/models.html#sentence_transformers.models.StaticEmbedding).
 
-</details>
 
-<details>
-<summary>  LangChain </summary>
-<br>
+## LangChain
 
 Model2Vec can be used in [LangChain](https://github.com/langchain-ai/langchain) using the `langchain-community` package. For more information, see the [LangChain Model2Vec docs](https://python.langchain.com/docs/integrations/text_embedding/model2vec/). The following code snippet shows how to use Model2Vec in LangChain after installing the `langchain-community` package with `pip install langchain-community`:
 
@@ -66,11 +69,8 @@ query = "Risotto"
 query_vector = embedder.embed_query(query)
 retrieved_docs = vector_store.similarity_search_by_vector(query_vector, k=1)
 ```
-</details>
 
-<details>
-<summary>  Txtai </summary>
-<br>
+## Txtai
 
 Model2Vec can be used in [txtai](https://github.com/neuml/txtai) for text embeddings, nearest-neighbors search, and any of the other functionalities that txtai offers. The following code snippet shows how to use Model2Vec in txtai after installing the `txtai` package (including the `vectors` dependency) with `pip install txtai[vectors]`:
 
@@ -91,11 +91,7 @@ embeddings.index(texts)
 result = embeddings.search("Risotto", 1)
 ```
 
-</details>
-
-<details>
-<summary>  Chonkie </summary>
-<br>
+## Chonkie
 
 Model2Vec is the default model for semantic chunking in [Chonkie](https://github.com/bhavnicksm/chonkie). To use Model2Vec for semantic chunking in Chonkie, simply install Chonkie with `pip install chonkie[semantic]` and use one of the `potion` models in the `SemanticChunker` class. The following code snippet shows how to use Model2Vec in Chonkie:
 
@@ -115,12 +111,7 @@ chunker = SDPMChunker(
 chunks = chunker.chunk(text)
 ```
 
-</details>
-
-
-<details>
-<summary>  Transformers.js </summary>
-<br>
+## Transformers.js
 
 To use a Model2Vec model in [transformers.js](https://github.com/huggingface/transformers.js), the following code snippet can be used as a starting point:
 
@@ -162,7 +153,3 @@ Note that this requires that the Model2Vec has a `model.onnx` file and several r
 ```bash
 python scripts/export_to_onnx.py --model_path <path-to-a-model2vec-model> --save_path "<path-to-save-the-onnx-model>"
 ```
-
-
-<br>
-</details>

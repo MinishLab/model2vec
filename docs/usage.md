@@ -18,8 +18,6 @@ This document provides an overview of how to use Model2Vec for inference, distil
     - [Installation](#installation)
     - [Evaluation Code](#evaluation-code)
 
-
-
 ## Inference
 
 ### Inference with a pretrained model
@@ -40,16 +38,15 @@ token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It'
 
 ### Inference with the Sentence Transformers library
 
-
 The following code snippet shows how to use a Model2Vec model in the [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) library. This is useful if you want to use the model in a Sentence Transformers pipeline.
 
 ```python
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.models import StaticEmbedding
 
-# Initialize a StaticEmbedding module
-static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
-model = SentenceTransformer(modules=[static_embedding])
+# Load a Model2Vec model from the Hub
+model = SentenceTransformer("minishlab/potion-base-8M")
+
+# Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
@@ -161,7 +158,6 @@ accuracy = np.mean(np.array(y_hat) == np.array(y_test)) * 100
 ```
 
 ## Evaluation
-
 
 ### Installation
 
