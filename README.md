@@ -41,8 +41,10 @@
 
 Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by a factor up to 50 and making the models up to 500 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is the most performant static embedding model in the world. See our results [here](results/README.md), or dive in to see how it works.
 
-## Table of Contents
+<div align="center">
+
 [Quickstart](#quickstart) • [Updates & Announcements](#updates--announcements) • [Main Features](#main-features) • [Model List](#model-list)
+</div>
 
 <!-- ## Table of Contents
 - [Quickstart](#quickstart)
