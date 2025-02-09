@@ -1,6 +1,25 @@
 
 # Usage
 
+This document provides an overview of how to use Model2Vec for inference, distillation, training, and evaluation.
+
+## Table of Contents
+- [Inference](#inference)
+  - [Inference with a pretrained model](#inference-with-a-pretrained-model)
+  - [Inference with the Sentence Transformers library](#inference-with-the-sentence-transformers-library)
+- [Distillation](#distillation)
+    - [Distilling from a Sentence Transformer](#distilling-from-a-sentence-transformer)
+    - [Distilling from a loaded model](#distilling-from-a-loaded-model)
+    - [Distilling with the Sentence Transformers library](#distilling-with-the-sentence-transformers-library)
+    - [Distilling with a custom vocabulary](#distilling-with-a-custom-vocabulary)
+- [Training](#training)
+    - [Training a classifier](#training-a-classifier)
+- [Evaluation](#evaluation)
+    - [Installation](#installation)
+    - [Evaluation Code](#evaluation-code)
+
+
+
 ## Inference
 
 ### Inference with a pretrained model
