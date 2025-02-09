@@ -2,7 +2,7 @@
 
 This document provides a high-level overview of how Model2Vec works.
 
-The base model2vec technique works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using zipf weighting. During inference, we simply take the mean of all token embeddings occurring in a sentence.
+The base model2vec technique works by passing a vocabulary through a sentence transformer model, then reducing the dimensionality of the resulting embeddings using PCA, and finally weighting the embeddings using SIF weighting (previously zipf weighting). During inference, we simply take the mean of all token embeddings occurring in a sentence.
 
 Our [potion models](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062) are pre-trained using [tokenlearn](https://github.com/MinishLab/tokenlearn), a technique to pre-train model2vec distillation models. These models are created with the following steps:
 - **Distillation**: We distill a Model2Vec model from a Sentence Transformer model, using the method described above.

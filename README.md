@@ -123,6 +123,13 @@ The core idea is to forward pass a vocabulary through a sentence transformer mod
 - Our [Tokenlearn blog post](https://minishlab.github.io/tokenlearn_blogpost/). This post describes the Tokenlearn method we used to train our [potion models](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062).
 - Our official [documentation](https://github.com/MinishLab/model2vec/blob/main/docs/what_is_model2vec.md). This document provides a high-level overview of how Model2Vec works.
 
+## Documentation
+
+Our official documentation can be found [here](https://github.com/MinishLab/model2vec/blob/main/docs/README.md). This includes:
+- [Usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md): Provides a technical overview of how to use Model2Vec.
+- [Integrations documentation](https://github.com/MinishLab/model2vec/blob/main/docs/integrations.md):Provides examples of how to use Model2Vec in various downstream libraries.
+- [Model2Vec technical documentation](https://github.com/MinishLab/model2vec/blob/main/docs/what_is_model2vec.md): Provides a high-level overview of how Model2Vec works.
+
 
 ## Model List
 
