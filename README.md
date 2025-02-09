@@ -48,15 +48,6 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 </h3>
 </div>
 
-<!-- ## Table of Contents
-- [Quickstart](#quickstart)
-- [Updates & Announcements](#updates--announcements)
-- [Main Features](#main-features)
-- [What is Model2Vec?](#what-is-model2vec)
-- [Documentation](#documentation)
-- [Model List](#model-list)
-- [Results](#results) -->
-
 ## Quickstart
 
 Install the package with:
@@ -67,9 +58,6 @@ pip install model2vec
 
 This will install the base inference package, which only depends on `numpy` and a few other minor dependencies. If you want to distill your own models, you can install the distillation extras with:
 
-```bash
-pip install model2vec[distill]
-```
 
 You can start using Model2Vec immediately by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings, which you can use to classify texts, cluster, or build a RAG system:
 ```python
@@ -85,7 +73,14 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
 
-Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. The following code snippet shows how to distill a model in ~30 seconds on a CPU:
+Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. First, install the `distillation` extras with:
+
+```bash
+pip install model2vec[distill]
+```
+
+
+ Then, you can distill a model in ~30 seconds on a CPU with the following code snippet:
 
 ```python
 from model2vec.distill import distill
