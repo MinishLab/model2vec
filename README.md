@@ -56,7 +56,7 @@ Install the lightweight base package with:
 pip install model2vec
 ```
 
-You can start using Model2Vec immediately by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings, which you can use to classify texts, cluster, or build a RAG system:
+You can start using Model2Vec by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings, which you can use for any task, such as  text classification, retrieval, clustering, or building a RAG system:
 ```python
 from model2vec import StaticModel
 
