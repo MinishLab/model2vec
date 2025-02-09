@@ -107,11 +107,11 @@ For advanced usage, such as using Model2Vec in the [Sentence Transformers librar
 ## Main Features
 
 - **State-of-the-Art Performance**: Model2Vec models outperform any other static embeddings (such as GLoVe and BPEmb) by a large margin, as can be seen in our [results](results/README.md).
-- **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of up to 50. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is just ~30 MB on disk, and our smallest model ~8 MB (making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
+- **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of up to 50. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is just ~30 MB on disk, and our smallest model just ~8 MB (making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
-- **Lightning-fast Inference**: up to 500 times faster on CPU than the original model. Go green or go home.
-- **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset. All you need is a model and (optionally) a custom vocabulary.
-- **Integrated in many popular libraries**: Model2Vec can be used directly in popular libraries such as [Sentence Transformers](https://github.com/UKPLab/sentence-transformers), [LangChain](https://github.com/langchain-ai/langchain), [txtai](https://github.com/neuml/txtai), and [Chonkie](https://github.com/bhavnicksm/chonkie). See the [Integrations](#integrations) section for more information.
+- **Lightning-fast Inference**: up to 500 times faster on CPU than the original model.
+- **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset.
+- **Integrated in many popular libraries**: Model2Vec is integrated direclty into popular libraries such as [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [LangChain](https://github.com/langchain-ai/langchain). For more information, see our [integrations documentation](https://github.com/MinishLab/model2vec/blob/main/docs/integrations.md).
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab).
 
 ## What is Model2Vec?
