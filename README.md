@@ -14,7 +14,7 @@
   <h2>
     <a href="https://huggingface.co/minishlab"><strong>🤗 Models</strong></a> |
     <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>📚 Tutorials</strong></a> |
-    <a href="https://minishlab.github.io/"><strong>🌐 Website</strong></a> |
+    <a href="https://minishlab.github.io/"><strong>🌐 Blog</strong></a> |
     <a href="https://github.com/MinishLab/model2vec/blob/main/results/README.md"><strong>🏆 Results</strong></a> |
     <a href="https://github.com/MinishLab/model2vec/blob/main/docs"><strong>📖 Docs</strong></a>
   </h2>
@@ -30,7 +30,7 @@
     <a href="https://app.codecov.io/gh/MinishLab/model2vec">
     <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Codecov">
     </a>
-  </a>
+    </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
 
   </h2>
