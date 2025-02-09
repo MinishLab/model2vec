@@ -32,7 +32,6 @@
   </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
   </h2>
-</div>
 
 [Quickstart](#quickstart) •
 [Main Features](#main-features) •
@@ -40,6 +39,10 @@
 [Documentation](#documentation) •
 [Model List](#model-list) •
 [Results](#results)
+
+</div>
+
+
 
 
 Model2Vec is a technique to turn any sentence transformer into a really small static model, reducing model size by a factor up to 50 and making the models up to 500 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is the most performant static embedding model in the world. See our results [here](results/README.md), or dive in to see how it works.
