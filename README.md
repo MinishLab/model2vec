@@ -21,7 +21,7 @@
 </div>
 
 <div align="center">
-  <h4>
+  <h2>
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/v/model2vec?color=%23007ec6&label=pypi%20package" alt="Package version"></a>
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/pyversions/model2vec" alt="Supported Python versions"></a>
     <a href="https://pepy.tech/project/model2vec">
@@ -33,15 +33,7 @@
   </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
 
-<br>
-
-[Quickstart](#quickstart) •
-[Main Features](#main-features) •
-[What is Model2Vec?](#what-is-model2vec) •
-[Documentation](#documentation) •
-[Model List](#model-list) •
-[Results](#results)
-  </h4>
+  </h2>
 </div>
 
 
@@ -58,13 +50,13 @@ Model2Vec is a technique to turn any sentence transformer into a really small st
 
 - **30/10/2024**: We released three new models: [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M), [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M), and [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M). These models are trained using [Tokenlearn](https://github.com/MinishLab/tokenlearn). Find out more in our [blog post](https://minishlab.github.io/tokenlearn_blogpost/). NOTE: for users of any of our old English M2V models, we recommend switching to these new models as they [perform better on all tasks](https://github.com/MinishLab/model2vec/tree/main/results).
 
-<!-- ## Table of Contents
+## Table of Contents
 - [Quickstart](#quickstart)
 - [Main Features](#main-features)
 - [What is Model2Vec?](#what-is-model2vec)
 - [Documentation](#documentation)
 - [Model List](#model-list)
-- [Results](#results) -->
+- [Results](#results)
 
 ## Quickstart
 
