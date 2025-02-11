@@ -45,7 +45,7 @@ class FinetunableStaticModel(nn.Module):
 
     @classmethod
     def from_pretrained(
-        cls: type[ModelType], out_dim: int = 2, model_name: str = "minishlab/potion-base-8m", **kwargs: Any
+        cls: type[ModelType], out_dim: int = 2, model_name: str = "minishlab/potion-base-32m", **kwargs: Any
     ) -> ModelType:
         """Load the model from a pretrained model2vec model."""
         model = StaticModel.from_pretrained(model_name)
