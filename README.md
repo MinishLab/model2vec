@@ -103,7 +103,7 @@ from datasets import load_dataset
 from model2vec.train import StaticModelForClassification
 
 # Initialize a classifier from a pre-trained model
-classifier = StaticModelForClassification.from_pretrained("minishlab/potion-base-8M")
+classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-8M")
 
 # Load a dataset
 ds = load_dataset("setfit/subj")
