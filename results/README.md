@@ -1,6 +1,6 @@
 # Results
 
-This document contains the experiments results of the Model2Vec project. The results are presented in the following sections:
+This document contains the results of the Model2Vec project. The results are presented in the following sections:
 - [MTEB Results](#mteb-results)
 - [Training Results](#training-results)
 - [Ablations](#ablations)
@@ -68,7 +68,12 @@ As can be seen, [potion-retrieval-32M](https://huggingface.co/minishlab/potion-r
 
 ## Training Results
 
-The main results are detailed in our training blogpost, but we'll do a comparison with vanilla model2vec here. In a vanilla model2vec classifier, you just put a scikit-learn `LogisticRegressionCV` on top of the model encoder. In contrast, training a `StaticModelForClassification` fine-tunes the full model, including the `StaticModel` weights. The Setfit model is trained on using [all-minilm-l6-v2](sentence-transformers/all-MiniLM-L6-v2) as a base model.
+The main results for Model2Vec training are outlined in this section.
+
+We compare three different architectures:
+- `model2vec + logreg`: A model2vec model with a scikit-learn `LogisticRegressionCV` on top.
+- `model2vec full finetune`: A model2vec classifier with the full model finetuned. This uses our `StaticModelForClassification`.
+- `setfit`: A [SetFit](https://github.com/huggingface/setfit/tree/main) model trained using [all-minilm-l6-v2](sentence-transformers/all-MiniLM-L6-v2) as a base model.
 
 We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
 
@@ -94,7 +99,7 @@ We use 14 classification datasets, using 1000 examples from the train set, and t
 |:---------------------------|-----------:|---------------:|-------:|
 | average                    |   77.9    |    79.2       |   82.6 |
 
-As you can see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-32m`, and to use full fine-tuning if you are starting from another base model.
+As can be seen see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-32m`, and to use full fine-tuning if you are starting from another base model.
 
 The speed difference between model2vec and setfit is immense, with the full finetune being 35x faster than a setfit based on `all-minilm-l6-v2` on CPU.
 
