@@ -23,10 +23,10 @@ distilled_model = distill("baai/bge-base-en-v1.5")
 classifier = StaticModelForClassification.from_static_model(distilled_model)
 
 # From a pre-trained model: potion is the default
-classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-8m")
+classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32m")
 ```
 
-This creates a very simple classifier: a StaticModel with a single 512-unit hidden layer on top. You can adjust the number of hidden layers and the number units through some parameters on both functions. Note that the default for `from_pretrained` is [potion-base-8m](https://huggingface.co/minishlab/potion-base-8M), our best model to date. This is our recommended path if you're working with general English data.
+This creates a very simple classifier: a StaticModel with a single 512-unit hidden layer on top. You can adjust the number of hidden layers and the number units through some parameters on both functions. Note that the default for `from_pretrained` is [potion-base-32m](https://huggingface.co/minishlab/potion-base-32M), our best model to date. This is our recommended path if you're working with general English data.
 
 Now that you have created the classifier, let's just train a model. The example below assumes you have the [`datasets`](https://github.com/huggingface/datasets) library installed.
 
@@ -94,33 +94,40 @@ Loading pipelines in this way is _extremely_ fast. It takes only 30ms to load a 
 
 # Results
 
-The main results are detailed in our training blogpost, but we'll do a comparison with vanilla model2vec here. In a vanilla model2vec classifier, you just put a scikit-learn `LogisticRegressionCV` on top of the model encoder. In contrast, training a `StaticModelForClassification` fine-tunes the full model, including the `StaticModel` weights.
+The main results are detailed in our training blogpost, but we'll do a comparison with vanilla model2vec here. In a vanilla model2vec classifier, you just put a scikit-learn `LogisticRegressionCV` on top of the model encoder. In contrast, training a `StaticModelForClassification` fine-tunes the full model, including the `StaticModel` weights. The Setfit model is trained on using [all-minilm-l6-v2](sentence-transformers/all-MiniLM-L6-v2) as a base model.
 
 We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
 
-|  dataset name                  |      model2vec logreg  |     model2vec full finetune  |      setfit  |
-|:-------------------------------|-----------------------:|-----------------------------:|-------------:|
-| 20_newgroups                   |                  54.53 |                        55.55 |        59.54 |
-| ade                            |                  71.57 |                        74.03 |        78.88 |
-| ag_news                        |                  86.02 |                        85.83 |        88.01 |
-| amazon_counterfactual          |                  63.78 |                        74.43 |        87.32 |
-| bbc                            |                  95.57 |                        96.5  |        96.58 |
-| emotion                        |                  51.63 |                        58.63 |        59.89 |
-| enron_spam                     |                  95.2  |                        96.5  |        97.45 |
-| hatespeech_offensive           |                  54.38 |                        59.26 |        65.99 |
-| imdb                           |                  83.9  |                        84.62 |        86    |
-| massive_scenario               |                  79.78 |                        82.28 |        81.46 |
-| senteval_cr                    |                  74.34 |                        74.59 |        85.26 |
-| sst5                           |                  29.02 |                        36.31 |        39.32 |
-| student                        |                  80.61 |                        83.76 |        88.94 |
-| subj                           |                  87.84 |                        88.94 |        93.8  |
-| tweet_sentiment_extraction     |                  63.87 |                        63.2  |        75.53 |
+| dataset               |   model2vec + logreg |   model2vec full finetune |   setfit |
+|:---------------------------|----------------------------------------------:|---------------------------------------:|-------------------------------------------------:|
+| 20_newgroups               |                                         56.24 |                                  57.94 |                                            61.29 |
+| ade                        |                                         79.2  |                                  79.68 |                                            83.05 |
+| ag_news                    |                                         86.7  |                                  87.2  |                                            88.01 |
+| amazon_counterfactual      |                                         90.96 |                                  91.93 |                                            95.51 |
+| bbc                        |                                         95.8  |                                  97.21 |                                            96.6  |
+| emotion                    |                                         65.57 |                                  67.11 |                                            72.86 |
+| enron_spam                 |                                         96.4  |                                  96.85 |                                            97.45 |
+| hatespeech_offensive       |                                         83.54 |                                  85.61 |                                            87.69 |
+| imdb                       |                                         85.34 |                                  85.59 |                                            86    |
+| massive_scenario           |                                         82.86 |                                  84.42 |                                            83.54 |
+| senteval_cr                |                                         77.03 |                                  79.47 |                                            86.15 |
+| sst5                       |                                         32.34 |                                  37.95 |                                            42.31 |
+| student                    |                                         83.2  |                                  85.02 |                                            89.62 |
+| subj                       |                                         89.2  |                                  89.85 |                                            93.8  |
+| tweet_sentiment_extraction |                                         64.96 |                                  62.65 |                                            75.15 |
 
 |                |   logreg   |  full finetune | setfit
 |:---------------------------|-----------:|---------------:|-------:|
-| average                    |   71.47    |    74.29       |   78.93 |
+| average                    |   77.9    |    79.2       |   82.6 |
 
-As you can see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-8m`, and to use full fine-tuning if you are starting from another base model.
+As you can see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-32m`, and to use full fine-tuning if you are starting from another base model.
+
+The speed difference between model2vec and setfit is immense, with the full finetune being 50x faster than a setfit based on `all-minilm-l6-v2`.
+
+|                |   logreg   |  full finetune | setfit
+|:---------------------------|-----------:|---------------:|-------:|
+| samples / second                    |   17925    |    24744       |   716 |
+
 
 # Bring your own architecture
 
