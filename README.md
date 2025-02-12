@@ -7,7 +7,7 @@
 </div>
 
 <div align="center">
-  <h2>The Fastest State-of-the-Art Static Embeddings in the World</h2>
+  <h2>Fast State-of-the-Art Static Embeddings</h2>
 </div>
 
 <div align="center">
@@ -187,7 +187,7 @@ If you use Model2Vec in your research, please cite the following:
 ```bibtex
 @software{minishlab2024model2vec,
   authors = {Stephan Tulkens and Thomas van Dongen},
-  title = {Model2Vec: The Fastest State-of-the-Art Static Embeddings in the World},
+  title = {Model2Vec: Fast State-of-the-Art Static Embeddings},
   year = {2024},
   url = {https://github.com/MinishLab/model2vec}
 }
