@@ -81,10 +81,9 @@ class FinetunableStaticModel(nn.Module):
         # Add a small epsilon to avoid division by zero
         length = zeros.sum(1) + 1e-16
         embedded = self.embeddings(input_ids)
-        # Simulate actual mean
-        # Zero out the padding
+        # Weigh each token
         embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
-        # embedded = embedded.sum(1)
+        # Mean pooling by dividing by the length
         embedded = embedded / length[:, None]
 
         return nn.functional.normalize(embedded)
@@ -106,7 +105,7 @@ class FinetunableStaticModel(nn.Module):
         """
         encoded: list[Encoding] = self.tokenizer.encode_batch_fast(texts, add_special_tokens=False)
         encoded_ids: list[torch.Tensor] = [torch.Tensor(encoding.ids[:max_length]).long() for encoding in encoded]
-        return pad_sequence(encoded_ids, batch_first=True)
+        return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
 
     @property
     def device(self) -> str:
