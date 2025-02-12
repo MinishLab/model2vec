@@ -1,7 +1,8 @@
 # Results
 
-This page contains the experiments results of the Model2Vec project. The results are presented in the following sections:
+This document contains the experiments results of the Model2Vec project. The results are presented in the following sections:
 - [MTEB Results](#mteb-results)
+- [Training Results](#training-results)
 - [Ablations](#ablations)
 
 ## MTEB Results
@@ -51,7 +52,7 @@ NOTE: for fairness of comparison, we disabled multiprocessing for Model2Vec for 
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
 
-## Retrieval Results
+### Retrieval Results
 
 A subset of models we created and compare against are specifically designed for retrieval tasks. The results are shown in the table below, including two general-purpose models for comparison and a transformer.
 
@@ -64,6 +65,44 @@ A subset of models we created and compare against are specifically designed for 
 | [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)                       | 31.71              |
 
 As can be seen, [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) model is the most performant static retrieval model, reaching 86.65%% of the performance of [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) with a retrieval score of 36.35.
+
+## Training Results
+
+The main results are detailed in our training blogpost, but we'll do a comparison with vanilla model2vec here. In a vanilla model2vec classifier, you just put a scikit-learn `LogisticRegressionCV` on top of the model encoder. In contrast, training a `StaticModelForClassification` fine-tunes the full model, including the `StaticModel` weights. The Setfit model is trained on using [all-minilm-l6-v2](sentence-transformers/all-MiniLM-L6-v2) as a base model.
+
+We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
+
+| dataset               |   model2vec + logreg |   model2vec full finetune |   setfit |
+|:---------------------------|----------------------------------------------:|---------------------------------------:|-------------------------------------------------:|
+| 20_newgroups               |                                         56.24 |                                  57.94 |                                            61.29 |
+| ade                        |                                         79.2  |                                  79.68 |                                            83.05 |
+| ag_news                    |                                         86.7  |                                  87.2  |                                            88.01 |
+| amazon_counterfactual      |                                         90.96 |                                  91.93 |                                            95.51 |
+| bbc                        |                                         95.8  |                                  97.21 |                                            96.6  |
+| emotion                    |                                         65.57 |                                  67.11 |                                            72.86 |
+| enron_spam                 |                                         96.4  |                                  96.85 |                                            97.45 |
+| hatespeech_offensive       |                                         83.54 |                                  85.61 |                                            87.69 |
+| imdb                       |                                         85.34 |                                  85.59 |                                            86    |
+| massive_scenario           |                                         82.86 |                                  84.42 |                                            83.54 |
+| senteval_cr                |                                         77.03 |                                  79.47 |                                            86.15 |
+| sst5                       |                                         32.34 |                                  37.95 |                                            42.31 |
+| student                    |                                         83.2  |                                  85.02 |                                            89.62 |
+| subj                       |                                         89.2  |                                  89.85 |                                            93.8  |
+| tweet_sentiment_extraction |                                         64.96 |                                  62.65 |                                            75.15 |
+
+|                |   logreg   |  full finetune | setfit
+|:---------------------------|-----------:|---------------:|-------:|
+| average                    |   77.9    |    79.2       |   82.6 |
+
+As you can see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-32m`, and to use full fine-tuning if you are starting from another base model.
+
+The speed difference between model2vec and setfit is immense, with the full finetune being 35x faster than a setfit based on `all-minilm-l6-v2` on CPU.
+
+|                |   logreg   |  full finetune | setfit
+|:---------------------------|-----------:|---------------:|-------:|
+| samples / second                    |   17925    |    24744       |   716 |
+
+
 
 ## Ablations
 
