@@ -133,6 +133,7 @@ For advanced usage, please refer to our [usage documentation](https://github.com
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
 - **Lightning-fast Inference**: up to 500 times faster on CPU than the original model.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset.
+- **Fine-tuning**: fine-tune your own classification models on top of Model2Vec models.
 - **Integrated in many popular libraries**: Model2Vec is integrated direclty into popular libraries such as [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [LangChain](https://github.com/langchain-ai/langchain). For more information, see our [integrations documentation](https://github.com/MinishLab/model2vec/blob/main/docs/integrations.md).
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab).
 
