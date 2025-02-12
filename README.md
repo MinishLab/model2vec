@@ -103,7 +103,7 @@ from datasets import load_dataset
 from model2vec.train import StaticModelForClassification
 
 # Initialize a classifier from a pre-trained model
-classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-8M")
+classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32M")
 
 # Load a dataset
 ds = load_dataset("setfit/subj")
@@ -120,7 +120,7 @@ For advanced usage, please refer to our [usage documentation](https://github.com
 
 ## Updates & Announcements
 
-- **12/02/2024**: We released **Model2Vec training**, allowing you to fine-tune your own classification models on top of Model2Vec models. Find out more in our [documentation](https://github.com/MinishLab/model2vec/blob/main/model2vec/train/README.md) and in our [blog post](LINK).
+- **12/02/2024**: We released **Model2Vec training**, allowing you to fine-tune your own classification models on top of Model2Vec models. Find out more in our [training documentation](https://github.com/MinishLab/model2vec/blob/main/model2vec/train/README.md) and [results](https://github.com/MinishLab/blob/main/results#training-results).
 
 - **30/01/2024**: We released two new models: [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) and [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M). [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) is our most performant model to date, using a larger vocabulary and higher dimensions. [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) is a finetune of [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) that is optimized for retrieval tasks, and is the best performing static retrieval model currently available.
 
