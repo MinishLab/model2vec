@@ -37,6 +37,7 @@ rng = np.random.default_rng()
         (None, True, "auto", False),  # Subword, PCA set to 'auto'
         (None, True, 1024, False),  # Subword, PCA set to high number.
         (None, True, None, True),  # No PCA applied
+        (None, True, 0.9, True),  # PCA as float applied
         (["wordA", "wordB"], False, 4, True),  # Custom vocab without subwords PCA and Zipf applied
         (None, False, 256, True),  # use_subword = False without passing a vocabulary should raise an error
     ],
@@ -159,22 +160,29 @@ def test_distill_removal_pattern(
 
 
 @pytest.mark.parametrize(
-    "vocabulary, use_subword, pca_dims, apply_zipf, expected_shape",
+    "vocabulary, use_subword, pca_dims, apply_zipf, sif_coefficient, expected_shape",
     [
-        (None, True, 256, True, (29528, 256)),  # Output vocab with subwords, PCA applied
+        (None, True, 256, True, None, (29528, 256)),  # Output vocab with subwords, PCA applied
         (
             ["wordA", "wordB"],
             False,
             4,
             False,
+            None,
             (7, 4),
         ),  # Custom vocab without subword , PCA applied
-        (None, True, "auto", False, (29528, 768)),  # Subword, PCA set to 'auto'
-        (None, True, 1024, False, (29528, 768)),  # Subword, PCA set to high number.
-        (["wordA", "wordB"], True, 4, False, (29530, 4)),  # Custom vocab with subword, PCA applied
-        (None, True, None, True, (29528, 768)),  # No PCA applied
-        (["wordA", "wordB"], False, 4, True, (7, 4)),  # Custom vocab without subwords PCA and Zipf applied
-        (None, False, 256, True, None),  # use_subword = False without passing a vocabulary should raise an error
+        (None, True, "auto", False, None, (29528, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", True, 1e-4, (29528, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", False, 1e-4, (29528, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", True, 0, None),  # Sif too low
+        (None, True, "auto", True, 1, None),  # Sif too high
+        (None, True, "auto", False, 0, (29528, 768)),  # Sif too low, but apply_zipf is False
+        (None, True, "auto", False, 1, (29528, 768)),  # Sif too high, but apply_zipf is False
+        (None, True, 1024, False, None, (29528, 768)),  # Subword, PCA set to high number.
+        (["wordA", "wordB"], True, 4, False, None, (29530, 4)),  # Custom vocab with subword, PCA applied
+        (None, True, None, True, None, (29528, 768)),  # No PCA applied
+        (["wordA", "wordB"], False, 4, True, None, (7, 4)),  # Custom vocab without subwords PCA and Zipf applied
+        (None, False, 256, True, None, None),  # use_subword = False without passing a vocabulary should raise an error
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -187,6 +195,7 @@ def test_distill(
     use_subword: bool,
     pca_dims: int | None,
     apply_zipf: bool,
+    sif_coefficient: float | None,
     expected_shape: tuple[int, int],
 ) -> None:
     """Test distill function with different parameters."""
@@ -207,7 +216,25 @@ def test_distill(
                 pca_dims=pca_dims,
                 apply_zipf=apply_zipf,
                 use_subword=use_subword,
+                sif_coefficient=sif_coefficient,
             )
+    elif (
+        apply_zipf is not None
+        and apply_zipf
+        and sif_coefficient is not None
+        and (sif_coefficient <= 0 or sif_coefficient >= 1)
+    ):
+        with pytest.raises(ValueError):
+            static_model = distill(
+                model_name=model_name,
+                vocabulary=vocabulary,
+                device="cpu",
+                pca_dims=pca_dims,
+                apply_zipf=apply_zipf,
+                use_subword=use_subword,
+                sif_coefficient=sif_coefficient,
+            )
+
     else:
         # Call the distill function with the parametrized inputs
         static_model = distill(
@@ -217,6 +244,7 @@ def test_distill(
             pca_dims=pca_dims,
             apply_zipf=apply_zipf,
             use_subword=use_subword,
+            sif_coefficient=sif_coefficient,
         )
 
         # Assert the model is correctly generated
@@ -239,16 +267,16 @@ def test_missing_modelinfo(
 
 
 @pytest.mark.parametrize(
-    "embeddings, pca_dims, apply_zipf, expected_shape",
+    "embeddings, pca_dims, sif_coefficient, expected_shape",
     [
-        (rng.random((1000, 768)), 256, False, (1000, 256)),  # PCA applied correctly
-        (rng.random((1000, 768)), None, False, (1000, 768)),  # No PCA applied, dimensions remain unchanged
-        (rng.random((1000, 768)), 256, True, (1000, 256)),  # PCA and Zipf applied
-        (rng.random((10, 768)), 256, False, (10, 768)),  # PCA dims higher than vocab size, no PCA applied
+        (rng.random((1000, 768)), 256, None, (1000, 256)),  # PCA applied correctly
+        (rng.random((1000, 768)), None, None, (1000, 768)),  # No PCA applied, dimensions remain unchanged
+        (rng.random((1000, 768)), 256, 1e-4, (1000, 256)),  # PCA and Zipf applied
+        (rng.random((10, 768)), 256, 1e-4, (10, 768)),  # PCA dims higher than vocab size, no PCA applied
     ],
 )
 def test__post_process_embeddings(
-    embeddings: np.ndarray, pca_dims: int, apply_zipf: bool, expected_shape: tuple[int, int]
+    embeddings: np.ndarray, pca_dims: int, sif_coefficient: float | None, expected_shape: tuple[int, int]
 ) -> None:
     """Test the _post_process_embeddings function."""
     original_embeddings = embeddings.copy()  # Copy embeddings to compare later
@@ -256,18 +284,21 @@ def test__post_process_embeddings(
     # Test that the function raises an error if the PCA dims are larger than the number of dimensions
     if pca_dims and pca_dims > embeddings.shape[1]:
         with pytest.raises(ValueError):
-            _post_process_embeddings(embeddings, pca_dims, False)
+            _post_process_embeddings(embeddings, pca_dims, None)
 
-    processed_embeddings = _post_process_embeddings(embeddings, pca_dims, apply_zipf)
+    processed_embeddings = _post_process_embeddings(embeddings, pca_dims, sif_coefficient)
 
     # Assert the shape is correct
     assert processed_embeddings.shape == expected_shape
 
     # If Zipf weighting is applied compare the original and processed embeddings
     # and check the weights are applied correctly
-    if apply_zipf and pca_dims is None:
-        zipf_weights = np.log(1 + np.arange(embeddings.shape[0]))[:, None]
-        expected_zipf_embeddings = original_embeddings * zipf_weights
+    if sif_coefficient and pca_dims is None:
+        inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
+        proba = inv_rank / np.sum(inv_rank)
+        sif_weights = (sif_coefficient / (sif_coefficient + proba))[:, None]
+
+        expected_zipf_embeddings = original_embeddings * sif_weights
         assert np.allclose(
             processed_embeddings, expected_zipf_embeddings, rtol=1e-5
         ), "Zipf weighting not applied correctly"

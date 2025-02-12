@@ -13,8 +13,8 @@ from tokenizers.models import BPE, Unigram
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import (
-    create_output_embeddings_from_model_name,
-    create_output_embeddings_from_model_name_and_tokens,
+    create_output_embeddings_from_model,
+    create_output_embeddings_from_model_and_tokens,
 )
 from model2vec.distill.tokenizer import add_tokens, preprocess_vocabulary, remove_tokens
 from model2vec.distill.utils import select_optimal_device
@@ -31,7 +31,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-PCADimType = Union[int, None, Literal["auto"]]
+PCADimType = Union[int, None, float, Literal["auto"]]
 
 
 def distill_from_model(
@@ -40,7 +40,8 @@ def distill_from_model(
     vocabulary: list[str] | None = None,
     device: str | None = None,
     pca_dims: PCADimType = 256,
-    apply_zipf: bool = True,
+    apply_zipf: bool | None = None,
+    sif_coefficient: float | None = 1e-4,
     use_subword: bool = True,
     token_remove_pattern: str | None = r"\[unused\d+\]",
 ) -> StaticModel:
@@ -60,35 +61,24 @@ def distill_from_model(
     :param pca_dims: The number of components to use for PCA.
         If this is None, we don't apply PCA.
         If this is 'auto', we don't reduce dimensionality, but still apply PCA.
-    :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
+    :param apply_zipf: DEPRECATED: This parameter used to control whether Zipf is applied.
+        Zipf weighting is now controlled by the sif_coefficient parameter. If this is set to None, no weighting is applied.
+    :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
+        Should be a value > 0 and < 1.0. A value of 1e-4 is a good default.
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
-    :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
-    :raises: ValueError if the vocabulary contains duplicate tokens.
-    :raises: ValueError if the regex can't be compiled.
-    :raises: ValueError if the vocabulary is empty after token removal.
     :return: A StaticModel
 
     """
+    sif_coefficient = _validate_parameters(tokenizer, vocabulary, apply_zipf, sif_coefficient, use_subword)
+
     device = select_optimal_device(device)
-    if not use_subword and vocabulary is None:
-        raise ValueError(
-            "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
-        )
-
-    if vocabulary and isinstance(tokenizer.backend_tokenizer.model, (BPE, Unigram)):
-        raise ValueError(
-            "You passed a vocabulary, but the model you are using does not use a WordPiece tokenizer. "
-            "This is not supported yet."
-            "Feel free to open an issue if this is a blocker: https://github.com/MinishLab/model2vec/issues"
-        )
-
     # Make a base list of tokens.
     tokens: list[str] = []
     if use_subword:
         # Create the subword embeddings.
-        tokens, embeddings = create_output_embeddings_from_model_name(model=model, tokenizer=tokenizer, device=device)
+        tokens, embeddings = create_output_embeddings_from_model(model=model, tokenizer=tokenizer, device=device)
         new_tokenizer, embeddings = _remove_tokens_and_embeddings(tokenizer, token_remove_pattern, tokens, embeddings)
     else:
         # We need to keep the unk token in the tokenizer.
@@ -111,7 +101,7 @@ def distill_from_model(
         # Only create embeddings if we have tokens to add.
         if cleaned_vocabulary:
             # Create the embeddings.
-            _, token_embeddings = create_output_embeddings_from_model_name_and_tokens(
+            _, token_embeddings = create_output_embeddings_from_model_and_tokens(
                 model=model,
                 tokenizer=tokenizer,
                 tokens=cleaned_vocabulary,
@@ -129,7 +119,7 @@ def distill_from_model(
             logger.warning("Didn't create any token embeddings as all tokens were duplicates or empty.")
 
     # Post process the embeddings by applying PCA and Zipf weighting.
-    embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, apply_zipf)
+    embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
 
     model_name = getattr(model, "name_or_path", "")
 
@@ -139,8 +129,10 @@ def distill_from_model(
         "tokenizer_name": model_name,
         "apply_pca": pca_dims,
         "apply_zipf": apply_zipf,
+        "sif_coefficient": sif_coefficient,
         "hidden_dim": embeddings.shape[1],
         "seq_length": 1000000,  # Set this to a high value since we don't have a sequence length limit.
+        "normalize": True,
     }
 
     if os.path.exists(model_name):
@@ -157,8 +149,69 @@ def distill_from_model(
             language = None
 
     return StaticModel(
-        vectors=embeddings, tokenizer=new_tokenizer, config=config, base_model_name=model_name, language=language
+        vectors=embeddings,
+        tokenizer=new_tokenizer,
+        config=config,
+        base_model_name=model_name,
+        language=language,
+        normalize=True,
     )
+
+
+def _validate_parameters(
+    tokenizer: PreTrainedTokenizerFast,
+    vocabulary: list[str] | None,
+    apply_zipf: bool | None,
+    sif_coefficient: float | None,
+    use_subword: bool,
+) -> float | None:
+    """
+    Validate the parameters passed to the distillation function.
+
+    :param tokenizer: The tokenizer to use.
+    :param vocabulary: The vocabulary to use.
+    :param apply_zipf: DEPRECATED: This parameter used to control whether Zipf is applied.
+        Zipf weighting is now controlled by the sif_coefficient parameter. If this is set to None, no weighting is applied.
+    :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
+        Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
+    :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
+    :return: The SIF coefficient to use.
+    :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
+    :raises: ValueError if the vocabulary contains duplicate tokens.
+    :raises: ValueError if the regex can't be compiled.
+    :raises: ValueError if the vocabulary is empty after token removal.
+
+    """
+    if apply_zipf is not None:
+        logger.warning(
+            "The `apply_zipf` parameter is deprecated and will be removed in the next release. "
+            "Zipf weighting is applied based on the sif_coefficient parameter. If this is set to None, "
+            "no weighting is applied."
+        )
+        if apply_zipf and sif_coefficient is None:
+            logger.warning("You set apply_zipf to True, but sif_coefficient is None. Setting sif_coefficient to 1e-4.")
+            sif_coefficient = 1e-4
+        elif not apply_zipf:
+            logger.warning("Because you set apply_zipf to False, we ignore the sif_coefficient parameter.")
+            sif_coefficient = None
+
+    if sif_coefficient is not None:
+        if not 0 < sif_coefficient < 1.0:
+            raise ValueError("SIF coefficient must be a value > 0 and < 1.0.")
+
+    if not use_subword and vocabulary is None:
+        raise ValueError(
+            "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
+        )
+
+    if vocabulary and isinstance(tokenizer.backend_tokenizer.model, (BPE, Unigram)):
+        raise ValueError(
+            "You passed a vocabulary, but the model you are using does not use a WordPiece tokenizer. "
+            "This is not supported yet."
+            "Feel free to open an issue if this is a blocker: https://github.com/MinishLab/model2vec/issues"
+        )
+
+    return sif_coefficient
 
 
 def _remove_tokens_and_embeddings(
@@ -185,6 +238,10 @@ def _remove_tokens_and_embeddings(
 
         # Remove the unused tokens from the tokenizer.
     new_tokenizer = remove_tokens(tokenizer.backend_tokenizer, wrong_tokens)
+    if new_tokenizer.get_vocab_size() == tokenizer.backend_tokenizer.get_vocab_size():
+        # This happens if we didn't remove any tokens.
+        return new_tokenizer, embeddings
+
     # Remove the embeddings of the unused tokens.
     embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
     logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
@@ -197,8 +254,11 @@ def distill(
     vocabulary: list[str] | None = None,
     device: str | None = None,
     pca_dims: PCADimType = 256,
-    apply_zipf: bool = True,
+    apply_zipf: bool | None = None,
+    sif_coefficient: float | None = 1e-4,
     use_subword: bool = True,
+    token_remove_pattern: str | None = r"\[unused\d+\]",
+    trust_remote_code: bool = False,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -215,13 +275,18 @@ def distill(
     :param pca_dims: The number of components to use for PCA.
         If this is None, we don't apply PCA.
         If this is 'auto', we don't reduce dimenionality, but still apply PCA.
-    :param apply_zipf: Whether to apply Zipf weighting to the embeddings.
+    :param apply_zipf: DEPRECATED: This parameter used to control whether Zipf is applied.
+        Zipf weighting is now controlled by the sif_coefficient parameter. If this is set to None, no weighting is applied.
+    :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
+        Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
+    :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
+    :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming from `transformers`. If this is True, we will load all components.
     :return: A StaticModel
 
     """
-    model: PreTrainedModel = AutoModel.from_pretrained(model_name)
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_name)
+    model: PreTrainedModel = AutoModel.from_pretrained(model_name, trust_remote_code=trust_remote_code)
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code)
 
     return distill_from_model(
         model=model,
@@ -231,11 +296,15 @@ def distill(
         pca_dims=pca_dims,
         apply_zipf=apply_zipf,
         use_subword=use_subword,
+        token_remove_pattern=token_remove_pattern,
+        sif_coefficient=sif_coefficient,
     )
 
 
-def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCADimType, apply_zipf: bool) -> np.ndarray:
-    """Post process embeddings by applying PCA and Zipf weighting."""
+def _post_process_embeddings(
+    embeddings: np.ndarray, pca_dims: PCADimType, sif_coefficient: float | None = 1e-4
+) -> np.ndarray:
+    """Post process embeddings by applying PCA and SIF weighting by estimating the frequencies through Zipf's law."""
     if pca_dims is not None:
         if pca_dims == "auto":
             pca_dims = embeddings.shape[1]
@@ -251,10 +320,13 @@ def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCADimType, apply
                 f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
             )
         elif pca_dims <= embeddings.shape[1]:
-            logger.info(f"Applying PCA with n_components {pca_dims}")
+            if isinstance(pca_dims, float):
+                logger.info(f"Applying PCA with {pca_dims} explained variance.")
+            else:
+                logger.info(f"Applying PCA with n_components {pca_dims}")
 
             orig_dims = embeddings.shape[1]
-            p = PCA(n_components=pca_dims, whiten=False)
+            p = PCA(n_components=pca_dims, svd_solver="full")
             embeddings = p.fit_transform(embeddings)
 
             if embeddings.shape[1] < orig_dims:
@@ -264,9 +336,11 @@ def _post_process_embeddings(embeddings: np.ndarray, pca_dims: PCADimType, apply
                 logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
                 logger.info(f"Explained variance: {explained_variance:.3f}.")
 
-    if apply_zipf:
-        logger.info("Applying Zipf weighting")
-        embeddings *= np.log(1 + np.arange(embeddings.shape[0]))[:, None]
+    if sif_coefficient is not None:
+        logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
+        inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
+        proba = inv_rank / np.sum(inv_rank)
+        embeddings *= (sif_coefficient / (sif_coefficient + proba))[:, None]
 
     return embeddings
 

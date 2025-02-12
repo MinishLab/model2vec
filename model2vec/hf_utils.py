@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import huggingface_hub
-import huggingface_hub.errors
 import numpy as np
 import safetensors
 from huggingface_hub import ModelCard, ModelCardData
@@ -61,6 +60,7 @@ def _create_model_card(
     license: str = "mit",
     language: list[str] | None = None,
     model_name: str | None = None,
+    template_path: str = "modelcards/model_card_template.md",
     **kwargs: Any,
 ) -> None:
     """
@@ -71,11 +71,12 @@ def _create_model_card(
     :param license: The license to use.
     :param language: The language of the model.
     :param model_name: The name of the model to use in the Model Card.
+    :param template_path: The path to the template.
     :param **kwargs: Additional metadata for the model card (e.g., model_name, base_model, etc.).
     """
     folder_path = Path(folder_path)
     model_name = model_name or folder_path.name
-    template_path = Path(__file__).parent / "model_card_template.md"
+    full_path = Path(__file__).parent / template_path
 
     model_card_data = ModelCardData(
         model_name=model_name,
@@ -86,7 +87,7 @@ def _create_model_card(
         library_name="model2vec",
         **kwargs,
     )
-    model_card = ModelCard.from_template(model_card_data, template_path=template_path)
+    model_card = ModelCard.from_template(model_card_data, template_path=full_path)
     model_card.save(folder_path / "README.md")
 
 

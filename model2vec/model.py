@@ -35,7 +35,7 @@ class StaticModel:
         :param vectors: The vectors to use.
         :param tokenizer: The Transformers tokenizer to use.
         :param config: Any metadata config.
-        :param normalize: Whether to normalize.
+        :param normalize: Whether to normalize the embeddings.
         :param base_model_name: The used base model name. Used for creating a model card.
         :param language: The language of the model. Used for creating a model card.
         :raises: ValueError if the number of tokens does not match the number of vectors.
@@ -87,7 +87,7 @@ class StaticModel:
     @normalize.setter
     def normalize(self, value: bool) -> None:
         """Update the config if the value of normalize changes."""
-        config_normalize = self.config.get("normalize", False)
+        config_normalize = self.config.get("normalize")
         self._normalize = value
         if config_normalize is not None and value != config_normalize:
             logger.warning(
@@ -114,13 +114,14 @@ class StaticModel:
             model_name=model_name,
         )
 
-    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[int]:
+    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[list[int]]:
         """
-        Tokenize a sentence.
+        Tokenize a list of sentences.
 
-        :param sentences: The sentence to tokenize.
-        :param max_length: The maximum length of the sentence.
-        :return: The tokens.
+        :param sentences: The sentences to tokenize.
+        :param max_length: The maximum length of the sentences in tokens. If this is None, sequences
+            are not truncated.
+        :return: A list of list of tokens.
         """
         if max_length is not None:
             m = max_length * self.median_token_length
@@ -148,6 +149,7 @@ class StaticModel:
         cls: type[StaticModel],
         path: PathLike,
         token: str | None = None,
+        normalize: bool | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -156,6 +158,7 @@ class StaticModel:
 
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
+        :param normalize: Whether to normalize the embeddings.
         :return: A StaticModel
         """
         from model2vec.hf_utils import load_pretrained
@@ -163,7 +166,12 @@ class StaticModel:
         embeddings, tokenizer, config, metadata = load_pretrained(path, token=token, from_sentence_transformers=False)
 
         return cls(
-            embeddings, tokenizer, config, base_model_name=metadata.get("base_model"), language=metadata.get("language")
+            embeddings,
+            tokenizer,
+            config,
+            normalize=normalize,
+            base_model_name=metadata.get("base_model"),
+            language=metadata.get("language"),
         )
 
     @classmethod
@@ -171,6 +179,7 @@ class StaticModel:
         cls: type[StaticModel],
         path: PathLike,
         token: str | None = None,
+        normalize: bool | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
@@ -179,13 +188,14 @@ class StaticModel:
 
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
+        :param normalize: Whether to normalize the embeddings.
         :return: A StaticModel
         """
         from model2vec.hf_utils import load_pretrained
 
         embeddings, tokenizer, config, _ = load_pretrained(path, token=token, from_sentence_transformers=True)
 
-        return cls(embeddings, tokenizer, config, base_model_name=None, language=None)
+        return cls(embeddings, tokenizer, config, normalize=normalize, base_model_name=None, language=None)
 
     def encode_as_sequence(
         self,
