@@ -69,12 +69,20 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         return nn.Sequential(*modules)
 
-    def predict(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
+    def predict(
+        self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024, threshold: float = 0.5
+    ) -> np.ndarray:
         """
         Predict labels for a set of texts.
 
         In single-label mode, each prediction is a single class.
         In multilabel mode, each prediction is a list of classes.
+
+        :param X: The texts to predict on.
+        :param show_progress_bar: Whether to show a progress bar.
+        :param batch_size: The batch size.
+        :param threshold: The threshold for multilabel classification.
+        :return: The predictions.
         """
         pred = []
         for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
@@ -82,7 +90,7 @@ class StaticModelForClassification(FinetunableStaticModel):
             if self.multilabel:
                 probs = torch.sigmoid(logits)
                 for sample in probs:
-                    sample_labels = [self.classes[i] for i, p in enumerate(sample) if p > 0.5]
+                    sample_labels = [self.classes[i] for i, p in enumerate(sample) if p > threshold]
                     # Fallback: if no label passes the threshold, choose the highest probability label.
                     if not sample_labels:
                         sample_labels = [self.classes[sample.argmax().item()]]

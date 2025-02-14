@@ -5,15 +5,12 @@ from typing import Any
 import numpy as np
 import pytest
 import torch
-from sklearn.neural_network import MLPClassifier
-from sklearn.pipeline import make_pipeline
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
 from transformers import AutoModel, AutoTokenizer
 
 from model2vec.inference import StaticModelPipeline
-from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 
 
