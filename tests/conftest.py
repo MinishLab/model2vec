@@ -86,13 +86,24 @@ def mock_inference_pipeline(mock_trained_pipeline: StaticModelForClassification)
     return mock_trained_pipeline.to_pipeline()
 
 
-@pytest.fixture(scope="session")
-def mock_trained_pipeline() -> StaticModelForClassification:
+@pytest.fixture(params=[False, True], ids=["single_label", "multilabel"], scope="session")
+def mock_trained_pipeline(request: pytest.FixtureRequest) -> StaticModelForClassification:
     """Mock staticmodelforclassification."""
     tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
     torch.random.manual_seed(42)
     vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
-    s = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
-    s.fit(["dog", "cat"], ["a", "b"], device="cpu")
+    model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+    X = ["dog", "cat"]
+    y: list[str] | list[list[str]]
 
-    return s
+    if request.param:
+        # Use multilabel targets.
+
+        y = [["a", "b"], ["a"]]
+    else:
+        # Use single-label targets.
+        X = ["dog", "cat"]
+        y = ["a", "b"]
+    model.fit(X, y)
+
+    return model

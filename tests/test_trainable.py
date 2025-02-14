@@ -112,7 +112,10 @@ def test_textdataset_init_incorrect() -> None:
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
-    assert result == ["b", "b"]
+    if mock_trained_pipeline.multilabel:
+        assert result == [["a", "b"], ["a", "b"]]
+    else:
+        assert result == ["b", "b"]
 
 
 def test_predict_proba(mock_trained_pipeline: StaticModelForClassification) -> None:
