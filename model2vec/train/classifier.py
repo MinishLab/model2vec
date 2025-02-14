@@ -232,40 +232,21 @@ class StaticModelForClassification(FinetunableStaticModel):
         :raises ValueError: If the labels are inconsistent.
         """
         if isinstance(y[0], str):
-            # Now we know y should be a list of strings.
+            # Check if all labels are strings.
             if not all(isinstance(label, str) for label in y):
                 raise ValueError("Inconsistent label types in y. All labels must be strings.")
             self.multilabel = False
-            y_single: list[str] = y  # Now mypy knows this is a list of strings.
-            classes = sorted(set(y_single))
+            # y_single: list[str] = y
+            classes = sorted(set(y))
         elif isinstance(y[0], (list, tuple)):
-            # Now we know y should be a list of lists/tuples.
+            # Check if all labels are lists or tuples.
             if not all(isinstance(label, (list, tuple)) for label in y):
                 raise ValueError("Inconsistent label types in y. All labels must be lists or tuples.")
             self.multilabel = True
-            y_multilabel: list[list[str]] = y  # mypy now knows this is a list of lists.
-            classes = sorted(set(chain.from_iterable(y_multilabel)))
+            # y_multilabel: list[list[str]] = y  # mypy now knows this is a list of lists.
+            classes = sorted(set(chain.from_iterable(y)))
         else:
             raise ValueError("Labels must be either strings or lists/tuples of strings.")
-
-        # # Determine multilabel status by checking the type of each element in y.
-        # if any(isinstance(label, (list, tuple)) for label in y):
-        #     if not all(isinstance(label, (list, tuple)) for label in y):
-        #         raise ValueError("Inconsistent label types in y. All labels must be either singular or list/tuple.")
-        #     self.multilabel = True
-        #     y_multilabel: list[list[str]] = y
-        #     classes = sorted(set(chain.from_iterable(y_multilabel)))
-        # else:
-        #     self.multilabel = False
-        #     y_single: list[str] = y
-        #     classes = sorted(set(y_single))
-
-        # self.multilabel = multilabel
-        # if multilabel:
-        #     # Flatten the labels
-        #     classes = sorted(set(chain.from_iterable(y)))
-        # else:
-        #     classes = sorted(set(cast(list[str], y)))
 
         self.classes_ = classes
         self.out_dim = len(self.classes_)  # Update output dimension
