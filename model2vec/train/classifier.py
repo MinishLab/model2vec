@@ -96,8 +96,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         y: list[str],
         learning_rate: float = 1e-3,
         batch_size: int | None = None,
-        min_epochs: int = 1,
-        max_epochs: int = 500,
+        min_epochs: int | None = None,
+        max_epochs: int | None = -1,
         early_stopping_patience: int | None = 5,
         test_size: float = 0.1,
         device: str = "auto",
@@ -118,6 +118,7 @@ class StaticModelForClassification(FinetunableStaticModel):
             If this is None, a good batch size is chosen automatically.
         :param min_epochs: The minimum number of epochs to train for.
         :param max_epochs: The maximum number of epochs to train for.
+            If this is -1, the model trains until early stopping is triggered.
         :param early_stopping_patience: The patience for early stopping.
             If this is None, early stopping is disabled.
         :param test_size: The test size for the train-test split.
