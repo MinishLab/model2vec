@@ -91,9 +91,6 @@ class StaticModelForClassification(FinetunableStaticModel):
                 probs = torch.sigmoid(logits)
                 for sample in probs:
                     sample_labels = [self.classes[i] for i, p in enumerate(sample) if p > threshold]
-                    # Fallback: if no label passes the threshold, choose the highest probability label.
-                    if not sample_labels:
-                        sample_labels = [self.classes[sample.argmax().item()]]
                     pred.append(sample_labels)
             else:
                 pred.extend([self.classes[idx] for idx in logits.argmax(dim=1).tolist()])
