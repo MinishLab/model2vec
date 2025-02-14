@@ -141,7 +141,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param batch_size: The batch size. If None, a good batch size is chosen automatically.
         :param min_epochs: The minimum number of epochs to train for.
         :param max_epochs: The maximum number of epochs to train for.
-            If -1, training continues until early stopping is triggered.
+            If this is -1, the model trains until early stopping is triggered.
         :param early_stopping_patience: The patience for early stopping.
             If this is None, early stopping is disabled.
         :param test_size: The test size for the train-test split.
