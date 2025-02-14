@@ -93,17 +93,16 @@ def mock_trained_pipeline(request: pytest.FixtureRequest) -> StaticModelForClass
     torch.random.manual_seed(42)
     vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
     model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+
     X = ["dog", "cat"]
     y: list[str] | list[list[str]]
-
     if request.param:
         # Use multilabel targets.
-
         y = [["a", "b"], ["a"]]
     else:
-        # Use single-label targets.
-        X = ["dog", "cat"]
+        # Use singlelabel targets.
         y = ["a", "b"]
+
     model.fit(X, y)
 
     return model
