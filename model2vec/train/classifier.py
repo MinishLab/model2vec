@@ -323,7 +323,7 @@ class _ClassifierLightningModule(pl.LightningModule):
         self.learning_rate = learning_rate
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass."""
+        """Simple forward pass."""
         return self.model(x)
 
     def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
@@ -342,10 +342,9 @@ class _ClassifierLightningModule(pl.LightningModule):
         x, y = batch
         head_out, _ = self.model(x)
         if self.model.multilabel:
-            # Compute multi-label accuracy by checking if all labels are correct.
             loss = nn.functional.binary_cross_entropy_with_logits(head_out, y.float())
             preds = (torch.sigmoid(head_out) > 0.5).float()
-            # Accuracy is defined as the Jaccard score averaged over samples.
+            # Multilabel accuracy is defined as the Jaccard score averaged over samples.
             accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples")
         else:
             loss = nn.functional.cross_entropy(head_out, y)
