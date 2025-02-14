@@ -231,18 +231,14 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param y: The labels.
         :raises ValueError: If the labels are inconsistent.
         """
-        if not y:
-            raise ValueError("y must not be empty")
-
-        first_label = y[0]
-        if isinstance(first_label, str):
+        if isinstance(y[0], str):
             # Now we know y should be a list of strings.
             if not all(isinstance(label, str) for label in y):
                 raise ValueError("Inconsistent label types in y. All labels must be strings.")
             self.multilabel = False
             y_single: list[str] = y  # Now mypy knows this is a list of strings.
             classes = sorted(set(y_single))
-        elif isinstance(first_label, (list, tuple)):
+        elif isinstance(y[0], (list, tuple)):
             # Now we know y should be a list of lists/tuples.
             if not all(isinstance(label, (list, tuple)) for label in y):
                 raise ValueError("Inconsistent label types in y. All labels must be lists or tuples.")
