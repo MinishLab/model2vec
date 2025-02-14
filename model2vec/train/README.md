@@ -95,8 +95,8 @@ Then, we can evaluate the classifier:
 from sklearn import metrics
 from sklearn.preprocessing import MultiLabelBinarizer
 
-# Make predictions on the test set
-predictions = classifier.predict(ds["test"]["text"])
+# Make predictions on the test set with a threshold of 0.3
+predictions = classifier.predict(ds["test"]["text"], threshold=0.3)
 
 # Evaluate the classifier
 mlb = MultiLabelBinarizer(classes=classifier.classes)
@@ -107,10 +107,10 @@ print(f"Accuracy: {metrics.accuracy_score(y_true, y_pred):.3f}")
 print(f"Precision: {metrics.precision_score(y_true, y_pred, average='macro', zero_division=0):.3f}")
 print(f"Recall: {metrics.recall_score(y_true, y_pred, average='macro', zero_division=0):.3f}")
 print(f"F1: {metrics.f1_score(y_true, y_pred, average='macro', zero_division=0):.3f}")
-# Accuracy: 0.488
-# Precision: 0.510
-# Recall: 0.372
-# F1: 0.412
+# Accuracy: 0.410
+# Precision: 0.527
+# Recall: 0.410
+# F1: 0.439
 ```
 
 The scores are competetive with the popular [roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions) model, while our model is orders of magnitude faster.
