@@ -94,8 +94,8 @@ class StaticModelForClassification(FinetunableStaticModel):
     @torch.no_grad()
     def _predict_single_batch(self, X: list[str]) -> torch.Tensor:
         input_ids = self.tokenize(X)
-        head_out, _ = self.forward(input_ids)
-        return head_out
+        vectors, _ = self.forward(input_ids)
+        return vectors
 
     def predict_proba(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
         """
@@ -132,8 +132,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         It supports both single-label and multi-label classification.
         We use early stopping. After training, the weights of the best model are loaded back into the model.
 
-        The function seeds everything with a seed of 42, so the results are reproducible.
-        It also splits the data into training and validation sets using a random seed.
+        This function seeds everything with a seed of 42, so the results are reproducible.
+        It also splits the data into a train and validation set, again with a random seed.
 
         :param X: The texts to train on.
         :param y: The labels to train on. If the first element is a list, multi-label classification is assumed.
@@ -150,7 +150,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         pl.seed_everything(_RANDOM_SEED)
         logger.info("Re-initializing model.")
 
-        # Determine whether we're in multilabel mode based on the first element of y.
+        # Determine whether the task is multilabel based on the type of y.
         multilabel = isinstance(y[0], list)
         self._initialize(y, multilabel=multilabel)
 
@@ -176,7 +176,8 @@ class StaticModelForClassification(FinetunableStaticModel):
             callback = EarlyStopping(monitor="val_accuracy", mode="max", patience=early_stopping_patience)
             callbacks.append(callback)
 
-        # Check validation frequency.
+        # If the dataset is small, we check the validation set every epoch.
+        # If the dataset is large, we check the validation set every 250 batches.
         if n_train_batches < 250:
             val_check_interval = None
             check_val_every_epoch = 1
@@ -215,7 +216,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         """
         Sets the output dimensionality, the classes, and initializes the head.
 
-        For multilabel classification, y is assumed to be a list of lists.
+        :param y: The labels.
+        :param multilabel: Whether the task is multilabel.
         """
         self.multilabel = multilabel
         if multilabel:
@@ -233,10 +235,16 @@ class StaticModelForClassification(FinetunableStaticModel):
         self, X: list[str], y: list[str] | list[list[str]], max_length: int = 512, multilabel: bool = False
     ) -> TextDataset:
         """
-        Prepare a dataset.
+        Prepare a dataset. For multilabel classification, each target is converted into a multi-hot vector.
 
-        For multilabel classification, each target is converted into a multi-hot vector.
+        :param X: The texts.
+        :param y: The labels.
+        :param max_length: The maximum length of the input.
+        :param multilabel: Whether the task is multilabel.
+        :return: A TextDataset.
         """
+        # This is a speed optimization.
+        # assumes a mean token length of 10, which is really high, so safe.
         truncate_length = max_length * 10
         X = [x[:truncate_length] for x in X]
         tokenized: list[list[int]] = [
@@ -270,7 +278,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         For multilabel classification, a random split is performed.
         """
         if not multilabel:
-            label_counts = Counter(y)  # type: ignore
+            label_counts = Counter(y)
             if min(label_counts.values()) < 2:
                 logger.info("Some classes have less than 2 samples. Stratification is disabled.")
                 return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True)
