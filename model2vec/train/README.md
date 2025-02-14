@@ -113,7 +113,7 @@ print(f"F1: {metrics.f1_score(y_true, y_pred, average='macro', zero_division=0):
 # F1: 0.439
 ```
 
-The scores are competetive with the popular [roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions) model, while our model is orders of magnitude faster.
+The scores are competitive with the popular [roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions) model, while our model is orders of magnitude faster.
 
 # Persistence
 
