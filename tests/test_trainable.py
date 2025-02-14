@@ -139,9 +139,9 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
     assert np.allclose(p1, p2)
 
 
-def test_train_test_split() -> None:
+def test_train_test_split(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the train test split function."""
-    a, b, c, d = StaticModelForClassification._train_test_split(["0", "1", "2", "3"], ["1", "1", "0", "0"], 0.5)
+    a, b, c, d = mock_trained_pipeline._train_test_split(["0", "1", "2", "3"], ["1", "1", "0", "0"], 0.5)
     assert len(a) == 2
     assert len(b) == 2
     assert len(c) == len(a)

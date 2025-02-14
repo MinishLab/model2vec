@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from itertools import chain
 from tempfile import TemporaryDirectory
-from typing import cast
+from typing import TypeVar, cast
 
 import lightning as pl
 import numpy as np
@@ -23,6 +24,8 @@ from model2vec.train.base import FinetunableStaticModel, TextDataset
 
 logger = logging.getLogger(__name__)
 _RANDOM_SEED = 42
+
+LabelType = TypeVar("LabelType", list[str], list[list[str]])
 
 
 class StaticModelForClassification(FinetunableStaticModel):
@@ -121,7 +124,7 @@ class StaticModelForClassification(FinetunableStaticModel):
     def fit(
         self,
         X: list[str],
-        y: list[str] | list[list[str]],
+        y: LabelType,
         learning_rate: float = 1e-3,
         batch_size: int | None = None,
         min_epochs: int | None = None,
@@ -157,22 +160,25 @@ class StaticModelForClassification(FinetunableStaticModel):
         logger.info("Re-initializing model.")
 
         # Determine whether the task is multilabel based on the type of y.
-        multilabel = isinstance(y[0], list)
-        self._initialize(y, multilabel=multilabel)
+
+        self._initialize(y)
 
         train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
-            X, y, test_size=test_size, multilabel=multilabel
+            X,
+            y,
+            test_size=test_size,
         )
 
         if batch_size is None:
+            # Set to a multiple of 32
             base_number = int(min(max(1, (len(train_texts) / 30) // 32), 16))
             batch_size = int(base_number * 32)
             logger.info("Batch size automatically set to %d.", batch_size)
 
         logger.info("Preparing train dataset.")
-        train_dataset = self._prepare_dataset(train_texts, train_labels, multilabel=multilabel)
+        train_dataset = self._prepare_dataset(train_texts, train_labels)
         logger.info("Preparing validation dataset.")
-        val_dataset = self._prepare_dataset(validation_texts, validation_labels, multilabel=multilabel)
+        val_dataset = self._prepare_dataset(validation_texts, validation_labels)
 
         c = _ClassifierLightningModule(self, learning_rate=learning_rate)
 
@@ -218,18 +224,28 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.eval()
         return self
 
-    def _initialize(self, y: list[str] | list[list[str]], multilabel: bool = False) -> None:
+    def _initialize(self, y: LabelType) -> None:
         """
         Sets the output dimensionality, the classes, and initializes the head.
 
         :param y: The labels.
-        :param multilabel: Whether the task is multilabel.
+        :raises ValueError: If the labels are inconsistent.
         """
+        # Determine multilabel status by checking the type of each element in y.
+        if any(isinstance(label, (list, tuple)) for label in y):
+            if not all(isinstance(label, (list, tuple)) for label in y):
+                raise ValueError("Inconsistent label types in y. All labels must be either singular or list/tuple.")
+            multilabel = True
+        else:
+            multilabel = False
+
         self.multilabel = multilabel
         if multilabel:
-            classes = sorted({label for sublist in y for label in sublist})
+            # Flatten the labels
+            classes = sorted(set(chain.from_iterable(y)))
         else:
             classes = sorted(set(cast(list[str], y)))
+
         self.classes_ = classes
         self.out_dim = len(self.classes_)  # Update output dimension
         self.head = self.construct_head()
@@ -237,16 +253,13 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.w = self.construct_weights()
         self.train()
 
-    def _prepare_dataset(
-        self, X: list[str], y: list[str] | list[list[str]], max_length: int = 512, multilabel: bool = False
-    ) -> TextDataset:
+    def _prepare_dataset(self, X: list[str], y: LabelType, max_length: int = 512) -> TextDataset:
         """
         Prepare a dataset. For multilabel classification, each target is converted into a multi-hot vector.
 
         :param X: The texts.
         :param y: The labels.
         :param max_length: The maximum length of the input.
-        :param multilabel: Whether the task is multilabel.
         :return: A TextDataset.
         """
         # This is a speed optimization.
@@ -256,34 +269,31 @@ class StaticModelForClassification(FinetunableStaticModel):
         tokenized: list[list[int]] = [
             encoding.ids[:max_length] for encoding in self.tokenizer.encode_batch_fast(X, add_special_tokens=False)
         ]
-        if multilabel:
-            num_classes = len(self.classes)
-            label_list = []
-            for sample_labels in y:
-                multi_hot = torch.zeros(num_classes, dtype=torch.float)
-                for label in sample_labels:
-                    index = self.classes.index(label)
-                    multi_hot[index] = 1.0
-                label_list.append(multi_hot)
-            labels_tensor = torch.stack(label_list)
+        if self.multilabel:
+            # Convert labels to multi-hot vectors
+            num_classes = len(self.classes_)
+            labels_tensor = torch.zeros(len(y), num_classes, dtype=torch.float)
+            mapping = {label: idx for idx, label in enumerate(self.classes_)}
+            for i, sample_labels in enumerate(y):
+                indices = [mapping[label] for label in sample_labels]
+                labels_tensor[i, indices] = 1.0
         else:
             labels_tensor = torch.tensor([self.classes.index(label) for label in cast(list[str], y)], dtype=torch.long)
         return TextDataset(tokenized, labels_tensor)
 
-    @staticmethod
     def _train_test_split(
+        self,
         X: list[str],
         y: list[str] | list[list[str]],
         test_size: float,
-        multilabel: bool = False,
-    ) -> tuple[list[str], list[str], list[str] | list[list[str]], list[str] | list[list[str]]]:
+    ) -> tuple[list[str], list[str], LabelType, LabelType]:
         """
         Split the data.
 
         For single-label classification, stratification is attempted (if possible).
         For multilabel classification, a random split is performed.
         """
-        if not multilabel:
+        if not self.multilabel:
             label_counts = Counter(y)
             if min(label_counts.values()) < 2:
                 logger.info("Some classes have less than 2 samples. Stratification is disabled.")

@@ -69,7 +69,7 @@ print(f"Took {int((perf_counter() - s) * 1000)} milliseconds for {len(test)} ins
 
 ## Multi-label classification
 
-Multi-label classification is supported out of the box. Just pass a list of multi-labels to the `fit` function, and a multi-label classifier will be trained. For example, the following code trains a multi-label classifier on the [go_emotions](https://huggingface.co/datasets/google-research-datasets/go_emotions) dataset:
+Multi-label classification is supported out of the box. Just pass a list of lists to the `fit` function (e.g. `[[label1, label2], [label1, label3]]`), and a multi-label classifier will be trained. For example, the following code trains a multi-label classifier on the [go_emotions](https://huggingface.co/datasets/google-research-datasets/go_emotions) dataset:
 
 ```python
 from datasets import load_dataset
