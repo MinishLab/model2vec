@@ -106,3 +106,7 @@ The core functionality of the `StaticModelForClassification` is contained in a c
 * `fit`: contains all the lightning-related fitting logic.
 
 The training of the model is done in a `lighting.LightningModule`, which can be modified but is very basic.
+
+# Results
+
+We ran extensive benchmarks where we compared our model to several well known architectures. The results can be found in the [training results](https://github.com/MinishLab/model2vec/tree/main/results#training-results) documentation.
