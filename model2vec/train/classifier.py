@@ -96,6 +96,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         y: list[str],
         learning_rate: float = 1e-3,
         batch_size: int | None = None,
+        min_epochs: int = 1,
+        max_epochs: int = 500,
         early_stopping_patience: int | None = 5,
         test_size: float = 0.1,
         device: str = "auto",
@@ -114,6 +116,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param learning_rate: The learning rate.
         :param batch_size: The batch size.
             If this is None, a good batch size is chosen automatically.
+        :param min_epochs: The minimum number of epochs to train for.
+        :param max_epochs: The maximum number of epochs to train for.
         :param early_stopping_patience: The patience for early stopping.
             If this is None, early stopping is disabled.
         :param test_size: The test size for the train-test split.
@@ -158,7 +162,8 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         with TemporaryDirectory() as tempdir:
             trainer = pl.Trainer(
-                max_epochs=500,
+                min_epochs=min_epochs,
+                max_epochs=max_epochs,
                 callbacks=callbacks,
                 val_check_interval=val_check_interval,
                 check_val_every_n_epoch=check_val_every_epoch,
