@@ -231,20 +231,45 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param y: The labels.
         :raises ValueError: If the labels are inconsistent.
         """
-        # Determine multilabel status by checking the type of each element in y.
-        if any(isinstance(label, (list, tuple)) for label in y):
-            if not all(isinstance(label, (list, tuple)) for label in y):
-                raise ValueError("Inconsistent label types in y. All labels must be either singular or list/tuple.")
-            multilabel = True
-        else:
-            multilabel = False
+        if not y:
+            raise ValueError("y must not be empty")
 
-        self.multilabel = multilabel
-        if multilabel:
-            # Flatten the labels
-            classes = sorted(set(chain.from_iterable(y)))
+        first_label = y[0]
+        if isinstance(first_label, str):
+            # Now we know y should be a list of strings.
+            if not all(isinstance(label, str) for label in y):
+                raise ValueError("Inconsistent label types in y. All labels must be strings.")
+            self.multilabel = False
+            y_single: list[str] = y  # Now mypy knows this is a list of strings.
+            classes = sorted(set(y_single))
+        elif isinstance(first_label, (list, tuple)):
+            # Now we know y should be a list of lists/tuples.
+            if not all(isinstance(label, (list, tuple)) for label in y):
+                raise ValueError("Inconsistent label types in y. All labels must be lists or tuples.")
+            self.multilabel = True
+            y_multilabel: list[list[str]] = y  # mypy now knows this is a list of lists.
+            classes = sorted(set(chain.from_iterable(y_multilabel)))
         else:
-            classes = sorted(set(cast(list[str], y)))
+            raise ValueError("Labels must be either strings or lists/tuples of strings.")
+
+        # # Determine multilabel status by checking the type of each element in y.
+        # if any(isinstance(label, (list, tuple)) for label in y):
+        #     if not all(isinstance(label, (list, tuple)) for label in y):
+        #         raise ValueError("Inconsistent label types in y. All labels must be either singular or list/tuple.")
+        #     self.multilabel = True
+        #     y_multilabel: list[list[str]] = y
+        #     classes = sorted(set(chain.from_iterable(y_multilabel)))
+        # else:
+        #     self.multilabel = False
+        #     y_single: list[str] = y
+        #     classes = sorted(set(y_single))
+
+        # self.multilabel = multilabel
+        # if multilabel:
+        #     # Flatten the labels
+        #     classes = sorted(set(chain.from_iterable(y)))
+        # else:
+        #     classes = sorted(set(cast(list[str], y)))
 
         self.classes_ = classes
         self.out_dim = len(self.classes_)  # Update output dimension
@@ -337,6 +362,7 @@ class _ClassifierLightningModule(pl.LightningModule):
         super().__init__()
         self.model = model
         self.learning_rate = learning_rate
+        self.loss_function = nn.CrossEntropyLoss() if not model.multilabel else nn.BCEWithLogitsLoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Simple forward pass."""
@@ -346,10 +372,7 @@ class _ClassifierLightningModule(pl.LightningModule):
         """Training step using cross-entropy loss for single-label and binary cross-entropy for multilabel training."""
         x, y = batch
         head_out, _ = self.model(x)
-        if self.model.multilabel:
-            loss = nn.functional.binary_cross_entropy_with_logits(head_out, y.float())
-        else:
-            loss = nn.functional.cross_entropy(head_out, y)
+        loss = self.loss_function(head_out, y)
         self.log("train_loss", loss)
         return loss
 
@@ -357,13 +380,12 @@ class _ClassifierLightningModule(pl.LightningModule):
         """Validation step computing loss and accuracy."""
         x, y = batch
         head_out, _ = self.model(x)
+        loss = self.loss_function(head_out, y)
         if self.model.multilabel:
-            loss = nn.functional.binary_cross_entropy_with_logits(head_out, y.float())
             preds = (torch.sigmoid(head_out) > 0.5).float()
             # Multilabel accuracy is defined as the Jaccard score averaged over samples.
             accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples")
         else:
-            loss = nn.functional.cross_entropy(head_out, y)
             accuracy = (head_out.argmax(dim=1) == y).float().mean()
         self.log("val_loss", loss)
         self.log("val_accuracy", accuracy, prog_bar=True)
