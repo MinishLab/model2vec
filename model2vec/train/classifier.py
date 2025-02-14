@@ -47,7 +47,7 @@ class StaticModelForClassification(FinetunableStaticModel):
 
     @property
     def classes(self) -> list[str]:
-        """Return the classes in the correct order."""
+        """Return all clasess in the correct order."""
         return self.classes_
 
     def construct_head(self) -> nn.Sequential:
@@ -142,9 +142,10 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param min_epochs: The minimum number of epochs to train for.
         :param max_epochs: The maximum number of epochs to train for.
             If -1, training continues until early stopping is triggered.
-        :param early_stopping_patience: The patience for early stopping. If None, early stopping is disabled.
+        :param early_stopping_patience: The patience for early stopping.
+            If this is None, early stopping is disabled.
         :param test_size: The test size for the train-test split.
-        :param device: The device to train on. If "auto", the device is chosen automatically.
+        :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :return: The fitted model.
         """
         pl.seed_everything(_RANDOM_SEED)
