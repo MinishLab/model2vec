@@ -92,9 +92,8 @@ class StaticModelForClassification(FinetunableStaticModel):
             logits = self._predict_single_batch(X[batch : batch + batch_size])
             if self.multilabel:
                 probs = torch.sigmoid(logits)
-                for sample in probs:
-                    sample_labels = [self.classes[i] for i, p in enumerate(sample) if p > threshold]
-                    pred.append(sample_labels)
+                mask = (probs > threshold).cpu().numpy()
+                pred.extend([np.array(self.classes)[np.flatnonzero(row)] for row in mask])
             else:
                 pred.extend([self.classes[idx] for idx in logits.argmax(dim=1).tolist()])
         return np.array(pred, dtype=object)
