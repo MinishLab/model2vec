@@ -323,8 +323,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         # To convert correctly, we need to set the outputs correctly, and fix the activation function.
         # Make sure n_outputs is set to > 1.
         mlp_head.n_outputs_ = self.out_dim
-        # Set to softmax
-        mlp_head.out_activation_ = "softmax"
+        # Set to softmax or sigmoid
+        mlp_head.out_activation_ = "logistic" if self.multilabel else "softmax"
 
         return StaticModelPipeline(static_model, converted)
 
@@ -373,7 +373,6 @@ class _ClassifierLightningModule(pl.LightningModule):
             mode="min",
             factor=0.5,
             patience=3,
-            verbose=True,
             min_lr=1e-6,
             threshold=0.03,
             threshold_mode="rel",

@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 import huggingface_hub
 import numpy as np
 import skops.io
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 
 from model2vec.hf_utils import _create_model_card
@@ -21,6 +22,20 @@ class StaticModelPipeline:
         """Create a pipeline with a StaticModel encoder."""
         self.model = model
         self.head = head
+        classifier = self.head[-1]
+        # Check if the classifier is a multilabel classifier.
+        # NOTE: this doesn't look robust, but it is.
+        # Different classifiers, such as OVR wrappers, support multilabel output natively, so we
+        # can just use predict.
+        self.multilabel = False
+        if isinstance(classifier, MLPClassifier):
+            if classifier.out_activation_ == "logistic":
+                self.multilabel = True
+
+    @property
+    def classes_(self) -> np.ndarray:
+        """The classes of the classifier."""
+        return self.head.classes_
 
     @classmethod
     def from_pretrained(
@@ -60,7 +75,7 @@ class StaticModelPipeline:
             self.model.save_pretrained(temp_dir)
             push_folder_to_hub(Path(temp_dir), repo_id, private, token)
 
-    def _predict_and_coerce_to_2d(
+    def _encode_and_coerce_to_2d(
         self,
         X: list[str] | str,
         show_progress_bar: bool,
@@ -69,7 +84,7 @@ class StaticModelPipeline:
         use_multiprocessing: bool,
         multiprocessing_threshold: int,
     ) -> np.ndarray:
-        """Predict the labels of the input and coerce the output to a matrix."""
+        """Encode the instances and coerce the output to a matrix."""
         encoded = self.model.encode(
             X,
             show_progress_bar=show_progress_bar,
@@ -91,9 +106,21 @@ class StaticModelPipeline:
         batch_size: int = 1024,
         use_multiprocessing: bool = True,
         multiprocessing_threshold: int = 10_000,
+        threshold: float = 0.5,
     ) -> np.ndarray:
-        """Predict the labels of the input."""
-        encoded = self._predict_and_coerce_to_2d(
+        """
+        Predict the labels of the input.
+
+        :param X: The input data to predict. Can be a list of strings or a single string.
+        :param show_progress_bar: Whether to display a progress bar during prediction. Defaults to False.
+        :param max_length: The maximum length of the input sequences. Defaults to 512.
+        :param batch_size: The batch size for prediction. Defaults to 1024.
+        :param use_multiprocessing: Whether to use multiprocessing for encoding. Defaults to True.
+        :param multiprocessing_threshold: The threshold for the number of samples to use multiprocessing. Defaults to 10,000.
+        :param threshold: The threshold for multilabel classification. Defaults to 0.5. Ignored if not multilabel.
+        :return: The predicted labels or probabilities.
+        """
+        encoded = self._encode_and_coerce_to_2d(
             X,
             show_progress_bar=show_progress_bar,
             max_length=max_length,
@@ -101,6 +128,13 @@ class StaticModelPipeline:
             use_multiprocessing=use_multiprocessing,
             multiprocessing_threshold=multiprocessing_threshold,
         )
+
+        if self.multilabel:
+            out_labels = []
+            proba = self.head.predict_proba(encoded)
+            for vector in proba:
+                out_labels.append(self.classes_[vector > threshold])
+            return np.asarray(out_labels)
 
         return self.head.predict(encoded)
 
@@ -113,8 +147,18 @@ class StaticModelPipeline:
         use_multiprocessing: bool = True,
         multiprocessing_threshold: int = 10_000,
     ) -> np.ndarray:
-        """Predict the probabilities of the labels of the input."""
-        encoded = self._predict_and_coerce_to_2d(
+        """
+        Predict the labels of the input.
+
+        :param X: The input data to predict. Can be a list of strings or a single string.
+        :param show_progress_bar: Whether to display a progress bar during prediction. Defaults to False.
+        :param max_length: The maximum length of the input sequences. Defaults to 512.
+        :param batch_size: The batch size for prediction. Defaults to 1024.
+        :param use_multiprocessing: Whether to use multiprocessing for encoding. Defaults to True.
+        :param multiprocessing_threshold: The threshold for the number of samples to use multiprocessing. Defaults to 10,000.
+        :return: The predicted labels or probabilities.
+        """
+        encoded = self._encode_and_coerce_to_2d(
             X,
             show_progress_bar=show_progress_bar,
             max_length=max_length,
