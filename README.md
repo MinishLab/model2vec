@@ -31,7 +31,7 @@
       <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Codecov">
     </a>
     <a href="https://discord.gg/4BDPR5nmtK">
-      <img src="https://img.shields.io/discord/4BDPR5nmtK.svg?label=Join&logo=discord&color=5865F2" alt="Join Discord">
+      <img src="https://img.shields.io/badge/Join-Discord-5865F2?logo=discord&logoColor=white" alt="Join Discord">
     </a>
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE">
       <img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT">
