@@ -134,7 +134,7 @@ class StaticModelPipeline:
             proba = self.head.predict_proba(encoded)
             for vector in proba:
                 out_labels.append(self.classes_[vector > threshold])
-            return np.asarray(out_labels)
+            return np.asarray(out_labels, dtype=object)
 
         return self.head.predict(encoded)
 
