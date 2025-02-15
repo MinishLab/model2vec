@@ -49,9 +49,9 @@ class StaticModelForClassification(FinetunableStaticModel):
         super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
 
     @property
-    def classes(self) -> list[str]:
+    def classes(self) -> np.ndarray:
         """Return all clasess in the correct order."""
-        return self.classes_
+        return np.array(self.classes_)
 
     def construct_head(self) -> nn.Sequential:
         """Constructs a simple classifier head."""
@@ -93,7 +93,7 @@ class StaticModelForClassification(FinetunableStaticModel):
             if self.multilabel:
                 probs = torch.sigmoid(logits)
                 mask = (probs > threshold).cpu().numpy()
-                pred.extend([np.array(self.classes)[np.flatnonzero(row)] for row in mask])
+                pred.extend([self.classes[np.flatnonzero(row)] for row in mask])
             else:
                 pred.extend([self.classes[idx] for idx in logits.argmax(dim=1).tolist()])
         return np.array(pred, dtype=object)
@@ -275,7 +275,7 @@ class StaticModelForClassification(FinetunableStaticModel):
                 indices = [mapping[label] for label in sample_labels]
                 labels_tensor[i, indices] = 1.0
         else:
-            labels_tensor = torch.tensor([self.classes.index(label) for label in cast(list[str], y)], dtype=torch.long)
+            labels_tensor = torch.tensor([self.classes_.index(label) for label in cast(list[str], y)], dtype=torch.long)
         return TextDataset(tokenized, labels_tensor)
 
     def _train_test_split(

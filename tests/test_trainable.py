@@ -17,8 +17,8 @@ def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: T
     s = StaticModelForClassification(vectors=vectors_torched, tokenizer=mock_tokenizer, n_layers=n_layers)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
-    assert s.classes == s.classes_
-    assert s.classes == ["0", "1"]
+    assert list(s.classes) == s.classes_
+    assert list(s.classes) == ["0", "1"]
 
     head = s.construct_head()
     assert head[0].in_features == mock_vectors.shape[1]
