@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from itertools import chain
 from tempfile import TemporaryDirectory
+from typing import TypeVar, cast
 
 import lightning as pl
 import numpy as np
 import torch
 from lightning.pytorch.callbacks import Callback, EarlyStopping
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
+from sklearn.metrics import jaccard_score
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
@@ -20,8 +23,9 @@ from model2vec.inference import StaticModelPipeline
 from model2vec.train.base import FinetunableStaticModel, TextDataset
 
 logger = logging.getLogger(__name__)
-
 _RANDOM_SEED = 42
+
+LabelType = TypeVar("LabelType", list[str], list[list[str]])
 
 
 class StaticModelForClassification(FinetunableStaticModel):
@@ -40,12 +44,14 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.hidden_dim = hidden_dim
         # Alias: Follows scikit-learn. Set to dummy classes
         self.classes_: list[str] = [str(x) for x in range(out_dim)]
+        # multilabel flag will be set based on the type of `y` passed to fit.
+        self.multilabel: bool = False
         super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
 
     @property
-    def classes(self) -> list[str]:
+    def classes(self) -> np.ndarray:
         """Return all clasess in the correct order."""
-        return self.classes_
+        return np.array(self.classes_)
 
     def construct_head(self) -> nn.Sequential:
         """Constructs a simple classifier head."""
@@ -66,14 +72,35 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         return nn.Sequential(*modules)
 
-    def predict(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
-        """Predict a class for a set of texts."""
-        pred: list[str] = []
+    def predict(
+        self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024, threshold: float = 0.5
+    ) -> np.ndarray:
+        """
+        Predict labels for a set of texts.
+
+        In single-label mode, each prediction is a single class.
+        In multilabel mode, each prediction is a list of classes.
+
+        :param X: The texts to predict on.
+        :param show_progress_bar: Whether to show a progress bar.
+        :param batch_size: The batch size.
+        :param threshold: The threshold for multilabel classification.
+        :return: The predictions.
+        """
+        pred = []
         for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
             logits = self._predict_single_batch(X[batch : batch + batch_size])
-            pred.extend([self.classes[idx] for idx in logits.argmax(1)])
-
-        return np.asarray(pred)
+            if self.multilabel:
+                probs = torch.sigmoid(logits)
+                mask = (probs > threshold).cpu().numpy()
+                pred.extend([self.classes[np.flatnonzero(row)] for row in mask])
+            else:
+                pred.extend([self.classes[idx] for idx in logits.argmax(dim=1).tolist()])
+        if self.multilabel:
+            # Return as object array to allow for lists of varying lengths.
+            return np.array(pred, dtype=object)
+        else:
+            return np.array(pred)
 
     @torch.no_grad()
     def _predict_single_batch(self, X: list[str]) -> torch.Tensor:
@@ -82,18 +109,25 @@ class StaticModelForClassification(FinetunableStaticModel):
         return vectors
 
     def predict_proba(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
-        """Predict the probability of each class."""
-        pred: list[np.ndarray] = []
+        """
+        Predict probabilities for each class.
+
+        In single-label mode, returns softmax probabilities.
+        In multilabel mode, returns sigmoid probabilities.
+        """
+        pred = []
         for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
             logits = self._predict_single_batch(X[batch : batch + batch_size])
-            pred.append(torch.softmax(logits, dim=1).numpy())
-
-        return np.concatenate(pred)
+            if self.multilabel:
+                pred.append(torch.sigmoid(logits).cpu().numpy())
+            else:
+                pred.append(torch.softmax(logits, dim=1).cpu().numpy())
+        return np.concatenate(pred, axis=0)
 
     def fit(
         self,
         X: list[str],
-        y: list[str],
+        y: LabelType,
         learning_rate: float = 1e-3,
         batch_size: int | None = None,
         min_epochs: int | None = None,
@@ -106,16 +140,16 @@ class StaticModelForClassification(FinetunableStaticModel):
         Fit a model.
 
         This function creates a Lightning Trainer object and fits the model to the data.
-        We use early stopping. After training, the weigths of the best model are loaded back into the model.
+        It supports both single-label and multi-label classification.
+        We use early stopping. After training, the weights of the best model are loaded back into the model.
 
         This function seeds everything with a seed of 42, so the results are reproducible.
         It also splits the data into a train and validation set, again with a random seed.
 
         :param X: The texts to train on.
-        :param y: The labels to train on.
+        :param y: The labels to train on. If the first element is a list, multi-label classification is assumed.
         :param learning_rate: The learning rate.
-        :param batch_size: The batch size.
-            If this is None, a good batch size is chosen automatically.
+        :param batch_size: The batch size. If None, a good batch size is chosen automatically.
         :param min_epochs: The minimum number of epochs to train for.
         :param max_epochs: The maximum number of epochs to train for.
             If this is -1, the model trains until early stopping is triggered.
@@ -127,10 +161,15 @@ class StaticModelForClassification(FinetunableStaticModel):
         """
         pl.seed_everything(_RANDOM_SEED)
         logger.info("Re-initializing model.")
+
+        # Determine whether the task is multilabel based on the type of y.
+
         self._initialize(y)
 
         train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
-            X, y, test_size=test_size
+            X,
+            y,
+            test_size=test_size,
         )
 
         if batch_size is None:
@@ -186,24 +225,44 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         self.load_state_dict(state_dict)
         self.eval()
-
         return self
 
-    def _initialize(self, y: list[str]) -> None:
-        """Sets the out dimensionality, the classes and initializes the head."""
-        classes = sorted(set(y))
+    def _initialize(self, y: LabelType) -> None:
+        """
+        Sets the output dimensionality, the classes, and initializes the head.
+
+        :param y: The labels.
+        :raises ValueError: If the labels are inconsistent.
+        """
+        if isinstance(y[0], (str, int)):
+            # Check if all labels are strings or integers.
+            if not all(isinstance(label, (str, int)) for label in y):
+                raise ValueError("Inconsistent label types in y. All labels must be strings or integers.")
+            self.multilabel = False
+            classes = sorted(set(y))
+        else:
+            # Check if all labels are lists or tuples.
+            if not all(isinstance(label, (list, tuple)) for label in y):
+                raise ValueError("Inconsistent label types in y. All labels must be lists or tuples.")
+            self.multilabel = True
+            classes = sorted(set(chain.from_iterable(y)))
+
         self.classes_ = classes
-
-        if len(self.classes) != self.out_dim:
-            self.out_dim = len(self.classes)
-
+        self.out_dim = len(self.classes_)  # Update output dimension
         self.head = self.construct_head()
         self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
         self.w = self.construct_weights()
         self.train()
 
-    def _prepare_dataset(self, X: list[str], y: list[str], max_length: int = 512) -> TextDataset:
-        """Prepare a dataset."""
+    def _prepare_dataset(self, X: list[str], y: LabelType, max_length: int = 512) -> TextDataset:
+        """
+        Prepare a dataset. For multilabel classification, each target is converted into a multi-hot vector.
+
+        :param X: The texts.
+        :param y: The labels.
+        :param max_length: The maximum length of the input.
+        :return: A TextDataset.
+        """
         # This is a speed optimization.
         # assumes a mean token length of 10, which is really high, so safe.
         truncate_length = max_length * 10
@@ -211,20 +270,39 @@ class StaticModelForClassification(FinetunableStaticModel):
         tokenized: list[list[int]] = [
             encoding.ids[:max_length] for encoding in self.tokenizer.encode_batch_fast(X, add_special_tokens=False)
         ]
-        labels_tensor = torch.Tensor([self.classes.index(label) for label in y]).long()
-
+        if self.multilabel:
+            # Convert labels to multi-hot vectors
+            num_classes = len(self.classes_)
+            labels_tensor = torch.zeros(len(y), num_classes, dtype=torch.float)
+            mapping = {label: idx for idx, label in enumerate(self.classes_)}
+            for i, sample_labels in enumerate(y):
+                indices = [mapping[label] for label in sample_labels]
+                labels_tensor[i, indices] = 1.0
+        else:
+            labels_tensor = torch.tensor([self.classes_.index(label) for label in cast(list[str], y)], dtype=torch.long)
         return TextDataset(tokenized, labels_tensor)
 
-    @staticmethod
     def _train_test_split(
-        X: list[str], y: list[str], test_size: float
-    ) -> tuple[list[str], list[str], list[str], list[str]]:
-        """Split the data."""
-        label_counts = Counter(y)
-        if min(label_counts.values()) < 2:
-            logger.info("Some classes have less than 2 samples. Stratification is disabled.")
+        self,
+        X: list[str],
+        y: list[str] | list[list[str]],
+        test_size: float,
+    ) -> tuple[list[str], list[str], LabelType, LabelType]:
+        """
+        Split the data.
+
+        For single-label classification, stratification is attempted (if possible).
+        For multilabel classification, a random split is performed.
+        """
+        if not self.multilabel:
+            label_counts = Counter(y)
+            if min(label_counts.values()) < 2:
+                logger.info("Some classes have less than 2 samples. Stratification is disabled.")
+                return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True)
+            return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=y)
+        else:
+            # Multilabel classification does not support stratification.
             return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True)
-        return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=y)
 
     def to_pipeline(self) -> StaticModelPipeline:
         """Convert the model to an sklearn pipeline."""
@@ -248,56 +326,58 @@ class StaticModelForClassification(FinetunableStaticModel):
         # To convert correctly, we need to set the outputs correctly, and fix the activation function.
         # Make sure n_outputs is set to > 1.
         mlp_head.n_outputs_ = self.out_dim
-        # Set to softmax
-        mlp_head.out_activation_ = "softmax"
+        # Set to softmax or sigmoid
+        mlp_head.out_activation_ = "logistic" if self.multilabel else "softmax"
 
         return StaticModelPipeline(static_model, converted)
 
 
 class _ClassifierLightningModule(pl.LightningModule):
     def __init__(self, model: StaticModelForClassification, learning_rate: float) -> None:
-        """Initialize the lightningmodule."""
+        """Initialize the LightningModule."""
         super().__init__()
         self.model = model
         self.learning_rate = learning_rate
+        self.loss_function = nn.CrossEntropyLoss() if not model.multilabel else nn.BCEWithLogitsLoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Simple forward pass."""
         return self.model(x)
 
     def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
-        """Simple training step using cross entropy loss."""
+        """Training step using cross-entropy loss for single-label and binary cross-entropy for multilabel training."""
         x, y = batch
         head_out, _ = self.model(x)
-        loss = nn.functional.cross_entropy(head_out, y).mean()
-
+        loss = self.loss_function(head_out, y)
         self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
-        """Simple validation step using cross entropy loss and accuracy."""
+        """Validation step computing loss and accuracy."""
         x, y = batch
         head_out, _ = self.model(x)
-        loss = nn.functional.cross_entropy(head_out, y).mean()
-        accuracy = (head_out.argmax(1) == y).float().mean()
-
+        loss = self.loss_function(head_out, y)
+        if self.model.multilabel:
+            preds = (torch.sigmoid(head_out) > 0.5).float()
+            # Multilabel accuracy is defined as the Jaccard score averaged over samples.
+            accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples")
+        else:
+            accuracy = (head_out.argmax(dim=1) == y).float().mean()
         self.log("val_loss", loss)
         self.log("val_accuracy", accuracy, prog_bar=True)
 
         return loss
 
     def configure_optimizers(self) -> OptimizerLRScheduler:
-        """Simple Adam optimizer."""
+        """Configure optimizer and learning rate scheduler."""
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
             factor=0.5,
             patience=3,
-            verbose=True,
             min_lr=1e-6,
             threshold=0.03,
             threshold_mode="rel",
         )
-
         return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "monitor": "val_loss"}}

@@ -17,8 +17,8 @@ def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: T
     s = StaticModelForClassification(vectors=vectors_torched, tokenizer=mock_tokenizer, n_layers=n_layers)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
-    assert s.classes == s.classes_
-    assert s.classes == ["0", "1"]
+    assert list(s.classes) == s.classes_
+    assert list(s.classes) == ["0", "1"]
 
     head = s.construct_head()
     assert head[0].in_features == mock_vectors.shape[1]
@@ -112,7 +112,10 @@ def test_textdataset_init_incorrect() -> None:
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
-    assert result == ["b", "b"]
+    if mock_trained_pipeline.multilabel:
+        assert result == [["a", "b"], ["a", "b"]]
+    else:
+        assert result == ["b", "b"]
 
 
 def test_predict_proba(mock_trained_pipeline: StaticModelForClassification) -> None:
@@ -136,9 +139,9 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
     assert np.allclose(p1, p2)
 
 
-def test_train_test_split() -> None:
+def test_train_test_split(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the train test split function."""
-    a, b, c, d = StaticModelForClassification._train_test_split(["0", "1", "2", "3"], ["1", "1", "0", "0"], 0.5)
+    a, b, c, d = mock_trained_pipeline._train_test_split(["0", "1", "2", "3"], ["1", "1", "0", "0"], 0.5)
     assert len(a) == 2
     assert len(b) == 2
     assert len(c) == len(a)
