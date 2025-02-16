@@ -232,7 +232,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         """
         if isinstance(y[0], (str, int)):
             # Check if all labels are strings or integers.
-            if not all(isinstance(label, (str | int)) for label in y):
+            if not all(isinstance(label, (str, int)) for label in y):
                 raise ValueError("Inconsistent label types in y. All labels must be strings or integers.")
             self.multilabel = False
             classes = sorted(set(y))
