@@ -229,8 +229,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         return self
 
     def evaluate(
-        self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5
-    ) -> dict[str, dict[str, float]]:
+        self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
+    ) -> str | dict[str, dict[str, float]]:
         """
         Evaluate the classifier on a given dataset using scikit-learn's classification report.
 
@@ -238,6 +238,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param y: The ground truth labels.
         :param batch_size: The batch size.
         :param threshold: The threshold for multilabel classification.
+        :param output_dict: Whether to output the classification report as a dictionary.
         :return: A classification report.
         """
         self.eval()
@@ -246,25 +247,27 @@ class StaticModelForClassification(FinetunableStaticModel):
         if not self.multilabel:
             # Encode the labels using a LabelEncoder
             label_encoder = LabelEncoder()
-            y = label_encoder.fit_transform(y)
+            label_idx = label_encoder.fit_transform(self.classes_)
+            y = label_encoder.transform(y)
             predictions = label_encoder.transform(predictions)
             report = classification_report(
                 y,
                 predictions,
-                target_names=self.classes_,
-                output_dict=True,
+                labels=label_idx,
+                target_names=[str(c) for c in self.classes_],
+                output_dict=output_dict,
                 zero_division=0,
             )
         else:
             # Encode the labels using a MultiLabelBinarizer
             mlb = MultiLabelBinarizer(classes=self.classes)
-            y_true = mlb.fit_transform(y)
-            y_pred = mlb.transform(predictions)
+            y = mlb.fit_transform(y)
+            predictions = mlb.transform(predictions)
             report = classification_report(
-                y_true,
-                y_pred,
-                target_names=mlb.classes_,
-                output_dict=True,
+                y,
+                predictions,
+                target_names=[str(c) for c in mlb.classes_],
+                output_dict=output_dict,
                 zero_division=0,
             )
 
