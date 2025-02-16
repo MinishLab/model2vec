@@ -96,7 +96,11 @@ class StaticModelForClassification(FinetunableStaticModel):
                 pred.extend([self.classes[np.flatnonzero(row)] for row in mask])
             else:
                 pred.extend([self.classes[idx] for idx in logits.argmax(dim=1).tolist()])
-        return np.array(pred, dtype=object)
+        if self.multilabel:
+            # Return as object array to allow for lists of varying lengths.
+            return np.array(pred, dtype=object)
+        else:
+            return np.array(pred)
 
     @torch.no_grad()
     def _predict_single_batch(self, X: list[str]) -> torch.Tensor:
