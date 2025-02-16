@@ -112,8 +112,7 @@ ds = load_dataset("setfit/subj")
 classifier.fit(ds["train"]["text"], ds["train"]["label"])
 
 # Evaluate the classifier
-predictions = classifier.predict(ds["test"]["text"])
-accuracy = np.mean(np.array(predictions) == np.array(ds["test"]["label"])) * 100
+classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["label"])
 ```
 
 For advanced usage, please refer to our [usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md).
