@@ -231,9 +231,9 @@ class StaticModelForClassification(FinetunableStaticModel):
         :raises ValueError: If the labels are inconsistent.
         """
         if isinstance(y[0], (str, int)):
-            # Check if all labels are strings.
+            # Check if all labels are strings or integers.
             if not all(isinstance(label, (str | int)) for label in y):
-                raise ValueError("Inconsistent label types in y. All labels must be strings.")
+                raise ValueError("Inconsistent label types in y. All labels must be strings or integers.")
             self.multilabel = False
             classes = sorted(set(y))
         else:
