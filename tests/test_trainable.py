@@ -113,9 +113,15 @@ def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
     if mock_trained_pipeline.multilabel:
-        assert result == [["a", "b"], ["a", "b"]]
+        if type(mock_trained_pipeline.classes_[0]) == str:
+            assert result == [["a", "b"], ["a", "b"]]
+        else:
+            assert result == [[0, 1], [0, 1]]
     else:
-        assert result == ["b", "b"]
+        if type(mock_trained_pipeline.classes_[0]) == str:
+            assert result == ["b", "b"]
+        else:
+            assert result == [1, 1]
 
 
 def test_predict_proba(mock_trained_pipeline: StaticModelForClassification) -> None:
@@ -146,3 +152,19 @@ def test_train_test_split(mock_trained_pipeline: StaticModelForClassification) -
     assert len(b) == 2
     assert len(c) == len(a)
     assert len(d) == len(b)
+
+
+def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
+    """Test the evaluate function."""
+    if mock_trained_pipeline.multilabel:
+        if type(mock_trained_pipeline.classes_[0]) == str:
+            mock_trained_pipeline.evaluate(["dog cat", "dog"], [["a", "b"], ["a"]])
+        else:
+            # Ignore the type error since we don't support int labels in our typing, but the code does
+            mock_trained_pipeline.evaluate(["dog cat", "dog"], [[0, 1], [0]])  # type: ignore
+    else:
+        if type(mock_trained_pipeline.classes_[0]) == str:
+            mock_trained_pipeline.evaluate(["dog cat", "dog"], ["a", "a"])
+        else:
+            # Ignore the type error since we don't support int labels in our typing, but the code does
+            mock_trained_pipeline.evaluate(["dog cat", "dog"], [1, 1])  # type: ignore

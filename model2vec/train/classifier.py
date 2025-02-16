@@ -11,10 +11,11 @@ import numpy as np
 import torch
 from lightning.pytorch.callbacks import Callback, EarlyStopping
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
-from sklearn.metrics import jaccard_score
+from sklearn.metrics import classification_report, jaccard_score
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
 from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
@@ -226,6 +227,51 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.load_state_dict(state_dict)
         self.eval()
         return self
+
+    def evaluate(
+        self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
+    ) -> str | dict[str, dict[str, float]]:
+        """
+        Evaluate the classifier on a given dataset using scikit-learn's classification report.
+
+        :param X: The texts to predict on.
+        :param y: The ground truth labels.
+        :param batch_size: The batch size.
+        :param threshold: The threshold for multilabel classification.
+        :param output_dict: Whether to output the classification report as a dictionary.
+        :return: A classification report.
+        """
+        self.eval()
+        predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
+
+        if not self.multilabel:
+            # Encode the labels using a LabelEncoder
+            label_encoder = LabelEncoder()
+            label_idx = label_encoder.fit_transform(self.classes_)
+            y = label_encoder.transform(y)
+            predictions = label_encoder.transform(predictions)
+            report = classification_report(
+                y,
+                predictions,
+                labels=label_idx,
+                target_names=[str(c) for c in self.classes_],
+                output_dict=output_dict,
+                zero_division=0,
+            )
+        else:
+            # Encode the labels using a MultiLabelBinarizer
+            mlb = MultiLabelBinarizer(classes=self.classes)
+            y = mlb.fit_transform(y)
+            predictions = mlb.transform(predictions)
+            report = classification_report(
+                y,
+                predictions,
+                target_names=[str(c) for c in mlb.classes_],
+                output_dict=output_dict,
+                zero_division=0,
+            )
+
+        return report
 
     def _initialize(self, y: LabelType) -> None:
         """
