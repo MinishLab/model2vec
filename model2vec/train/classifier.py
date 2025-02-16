@@ -278,7 +278,7 @@ class StaticModelForClassification(FinetunableStaticModel):
                 indices = [mapping[str(label)] for label in sample_labels]
                 labels_tensor[i, indices] = 1.0
         else:
-            labels_tensor = torch.tensor([self.classes_.index(label) for label in cast(list[str], y)], dtype=torch.long)
+            labels_tensor = torch.tensor([self.classes_.index(str(label)) for label in y], dtype=torch.long)
         return TextDataset(tokenized, labels_tensor)
 
     def _train_test_split(
