@@ -11,11 +11,10 @@ import numpy as np
 import torch
 from lightning.pytorch.callbacks import Callback, EarlyStopping
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
-from sklearn.metrics import classification_report, jaccard_score
+from sklearn.metrics import jaccard_score
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import MultiLabelBinarizer
 from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
