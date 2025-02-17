@@ -15,12 +15,12 @@ from sklearn.metrics import classification_report, jaccard_score
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
+from sklearn.preprocessing import MultiLabelBinarizer
 from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
 
-from model2vec.inference import StaticModelPipeline
+from model2vec.inference import StaticModelPipeline, evaluate_single_or_multi_label
 from model2vec.train.base import FinetunableStaticModel, TextDataset
 
 logger = logging.getLogger(__name__)
@@ -243,33 +243,9 @@ class StaticModelForClassification(FinetunableStaticModel):
         """
         self.eval()
         predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
-
-        if not self.multilabel:
-            # Encode the labels using a LabelEncoder
-            label_encoder = LabelEncoder()
-            label_idx = label_encoder.fit_transform(self.classes_)
-            y = label_encoder.transform(y)
-            predictions = label_encoder.transform(predictions)
-            report = classification_report(
-                y,
-                predictions,
-                labels=label_idx,
-                target_names=[str(c) for c in self.classes_],
-                output_dict=output_dict,
-                zero_division=0,
-            )
-        else:
-            # Encode the labels using a MultiLabelBinarizer
-            mlb = MultiLabelBinarizer(classes=self.classes)
-            y = mlb.fit_transform(y)
-            predictions = mlb.transform(predictions)
-            report = classification_report(
-                y,
-                predictions,
-                target_names=[str(c) for c in mlb.classes_],
-                output_dict=output_dict,
-                zero_division=0,
-            )
+        report = evaluate_single_or_multi_label(
+            predictions=predictions, y=y, classes=self.classes, output_dict=output_dict
+        )
 
         return report
 
