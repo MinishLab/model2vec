@@ -46,7 +46,71 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.classes_: list[str] = [str(x) for x in range(out_dim)]
         # multilabel flag will be set based on the type of `y` passed to fit.
         self.multilabel: bool = False
+        self.token_logits: dict[int, np.ndarray] | None = None
         super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
+
+    @torch.inference_mode()
+    def compute_token_logits(
+        self,
+        batch_size: int = 512,
+        show_progress_bar: bool = False,
+    ) -> None:
+        """Compute the output logits for each token in the vocabulary."""
+        # Set model to eval mode and disable normalization
+        self.eval()
+        self.normalize = False
+        device = self.device
+
+        # Initialize the token logits
+        vocab_size = self.embeddings.num_embeddings
+        token_logits = {}
+        # all_ids maps to all token ids in the vocabulary
+        all_ids = torch.arange(vocab_size, dtype=torch.long, device=device)
+
+        for start in trange(0, vocab_size, batch_size, disable=not show_progress_bar):
+            # Forward pass the batch tokens and store the logits
+            end = min(start + batch_size, vocab_size)
+            batch_tokens = all_ids[start:end].unsqueeze(1)
+            logits = self.forward(batch_tokens)[0].cpu().numpy()
+            for idx, logit in enumerate(logits):
+                token_logits[start + idx] = logit
+
+        # Set normalization back to True and set token_logits
+        self.normalize = True
+        self.token_logits = token_logits
+
+    @torch.inference_mode()
+    def get_most_important_tokens(
+        self,
+        text: str,
+    ) -> list[tuple[str, float]]:
+        """Get the token scores for the predicted label."""
+        self.eval()
+        if self.token_logits is None:
+            raise ValueError("Token logits are not computed. Run compute_token_logits first to use this function.")
+        # Get the predicted label index
+        input_ids = self.tokenize([text]).to(self.device)
+        logits = self.forward(input_ids)[0]
+        label_idx = int(torch.argmax(logits, dim=1).item())
+
+        # Get the unique token ids in the input
+        unique_ids = list(set(input_ids[0].tolist()))
+
+        results = []
+        for token_id in unique_ids:
+            # Get the token string and logits
+            token_str = self.tokenizer.id_to_token(token_id)
+            token_logits = self.token_logits.get(token_id)
+            if not token_logits:
+                continue
+            # Get the score for the predicted label
+            logit = float(token_logits[label_idx])
+            results.append((token_str, logit))
+
+        # Sort by descending logit
+        results.sort(key=lambda x: x[1], reverse=True)
+
+        return results
 
     @property
     def classes(self) -> np.ndarray:

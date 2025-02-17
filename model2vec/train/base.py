@@ -27,6 +27,7 @@ class FinetunableStaticModel(nn.Module):
         self.out_dim = out_dim
         self.embed_dim = vectors.shape[1]
         self.vectors = vectors
+        self.normalize = True
 
         self.embeddings = nn.Embedding.from_pretrained(vectors.clone().float(), freeze=False, padding_idx=pad_id)
         self.head = self.construct_head()
@@ -85,7 +86,8 @@ class FinetunableStaticModel(nn.Module):
         embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
         # Mean pooling by dividing by the length
         embedded = embedded / length[:, None]
-
+        if not self.normalize:
+            return embedded
         return nn.functional.normalize(embedded)
 
     def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
