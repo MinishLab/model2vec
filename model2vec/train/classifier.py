@@ -242,9 +242,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         """
         self.eval()
         predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
-        report = evaluate_single_or_multi_label(
-            predictions=predictions, y=y, classes=self.classes, output_dict=output_dict
-        )
+        report = evaluate_single_or_multi_label(predictions=predictions, y=y, output_dict=output_dict)
 
         return report
 

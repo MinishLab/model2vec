@@ -188,9 +188,7 @@ class StaticModelPipeline:
         :return: A classification report.
         """
         predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
-        report = evaluate_single_or_multi_label(
-            predictions=predictions, y=y, classes=self.classes_, output_dict=output_dict
-        )
+        report = evaluate_single_or_multi_label(predictions=predictions, y=y, output_dict=output_dict)
 
         return report
 
@@ -279,7 +277,6 @@ def _is_multi_label_shaped(y: LabelType) -> bool:
 def evaluate_single_or_multi_label(
     predictions: np.ndarray,
     y: LabelType,
-    classes: np.ndarray,
     output_dict: bool = False,
 ) -> str | dict[str, dict[str, float]]:
     """
@@ -287,14 +284,16 @@ def evaluate_single_or_multi_label(
 
     :param predictions: The predictions.
     :param y: The ground truth labels.
-    :param classes: The classes of the classifier.
     :param output_dict: Whether to output the classification report as a dictionary.
     :return: A classification report.
     """
     if _is_multi_label_shaped(y):
+        classes = sorted(set([label for labels in y for label in labels]))
         mlb = MultiLabelBinarizer(classes=classes)
         y = mlb.fit_transform(y)
         predictions = mlb.transform(predictions)
+    elif isinstance(y[0], (str, int)):
+        classes = sorted(set(y))
 
     report = classification_report(
         y,
