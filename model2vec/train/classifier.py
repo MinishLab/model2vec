@@ -19,7 +19,7 @@ from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
 
-from model2vec.inference import StaticModelPipeline
+from model2vec.inference import StaticModelPipeline, evaluate_single_or_multi_label
 from model2vec.train.base import FinetunableStaticModel, TextDataset
 
 logger = logging.getLogger(__name__)
@@ -226,6 +226,25 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.load_state_dict(state_dict)
         self.eval()
         return self
+
+    def evaluate(
+        self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
+    ) -> str | dict[str, dict[str, float]]:
+        """
+        Evaluate the classifier on a given dataset using scikit-learn's classification report.
+
+        :param X: The texts to predict on.
+        :param y: The ground truth labels.
+        :param batch_size: The batch size.
+        :param threshold: The threshold for multilabel classification.
+        :param output_dict: Whether to output the classification report as a dictionary.
+        :return: A classification report.
+        """
+        self.eval()
+        predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
+        report = evaluate_single_or_multi_label(predictions=predictions, y=y, output_dict=output_dict)
+
+        return report
 
     def _initialize(self, y: LabelType) -> None:
         """

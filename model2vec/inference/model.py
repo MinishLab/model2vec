@@ -3,18 +3,23 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import TypeVar
 
 import huggingface_hub
 import numpy as np
 import skops.io
+from sklearn.metrics import classification_report
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MultiLabelBinarizer
 
 from model2vec.hf_utils import _create_model_card
 from model2vec.model import PathLike, StaticModel
 
 _DEFAULT_TRUST_PATTERN = re.compile(r"sklearn\..+")
 _DEFAULT_MODEL_FILENAME = "pipeline.skops"
+
+LabelType = TypeVar("LabelType", list[str], list[list[str]])
 
 
 class StaticModelPipeline:
@@ -169,6 +174,24 @@ class StaticModelPipeline:
 
         return self.head.predict_proba(encoded)
 
+    def evaluate(
+        self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
+    ) -> str | dict[str, dict[str, float]]:
+        """
+        Evaluate the classifier on a given dataset using scikit-learn's classification report.
+
+        :param X: The texts to predict on.
+        :param y: The ground truth labels.
+        :param batch_size: The batch size.
+        :param threshold: The threshold for multilabel classification.
+        :param output_dict: Whether to output the classification report as a dictionary.
+        :return: A classification report.
+        """
+        predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
+        report = evaluate_single_or_multi_label(predictions=predictions, y=y, output_dict=output_dict)
+
+        return report
+
 
 def _load_pipeline(
     folder_or_repo_path: PathLike, token: str | None = None, trust_remote_code: bool = False
@@ -244,3 +267,41 @@ def save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> Non
         language=pipeline.model.language,
         template_path="modelcards/classifier_template.md",
     )
+
+
+def _is_multi_label_shaped(y: LabelType) -> bool:
+    """Check if the labels are in a multi-label shape."""
+    return isinstance(y, (list, tuple)) and len(y) > 0 and isinstance(y[0], (list, tuple, set))
+
+
+def evaluate_single_or_multi_label(
+    predictions: np.ndarray,
+    y: LabelType,
+    output_dict: bool = False,
+) -> str | dict[str, dict[str, float]]:
+    """
+    Evaluate the classifier on a given dataset using scikit-learn's classification report.
+
+    :param predictions: The predictions.
+    :param y: The ground truth labels.
+    :param output_dict: Whether to output the classification report as a dictionary.
+    :return: A classification report.
+    """
+    if _is_multi_label_shaped(y):
+        classes = sorted(set([label for labels in y for label in labels]))
+        mlb = MultiLabelBinarizer(classes=classes)
+        y = mlb.fit_transform(y)
+        predictions = mlb.transform(predictions)
+    elif isinstance(y[0], (str, int)):
+        classes = sorted(set(y))
+
+    report = classification_report(
+        y,
+        predictions,
+        labels=np.arange(len(classes)),
+        target_names=[str(c) for c in classes],
+        output_dict=output_dict,
+        zero_division=0,
+    )
+
+    return report
