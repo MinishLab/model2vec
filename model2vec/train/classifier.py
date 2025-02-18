@@ -101,7 +101,7 @@ class StaticModelForClassification(FinetunableStaticModel):
             # Get the token string and logits
             token_str = self.tokenizer.id_to_token(token_id)
             token_logits = self.token_logits.get(token_id)
-            if not token_logits:
+            if token_logits is None:
                 continue
             # Get the score for the predicted label
             logit = float(token_logits[label_idx])
