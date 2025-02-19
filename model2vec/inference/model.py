@@ -49,11 +49,6 @@ class StaticModelPipeline:
         self.model.normalize = value
 
     @property
-    def embeddings(self) -> np.ndarray:
-        """Get the embeddings of the model."""
-        return self.model.embedding
-
-    @property
     def tokenizer(self) -> str:
         """Get the tokenizer of the model."""
         return self.model.tokenizer
@@ -411,6 +406,6 @@ def get_most_important_tokens(model: Any, token_logits: dict[int, np.ndarray], t
         logit = float(token_logit[label_idx])
         results.append((token_str, logit))
 
-    # Sort tokens by descending importance.
+    # Sort tokens by descending importance
     results.sort(key=lambda x: x[1], reverse=True)
     return results
