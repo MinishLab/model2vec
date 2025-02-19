@@ -220,7 +220,7 @@ class StaticModelPipeline:
     def get_most_important_tokens(self, text: str) -> list[tuple[str, float]]:
         """Get the token scores for the predicted label."""
         if self.token_logits is None:
-            raise ValueError("Token logits are not computed. Run compute_token_logits first to use this function.")
+            self.token_logits = compute_token_logits(self)
         return get_most_important_tokens(self, token_logits=self.token_logits, text=text)
 
 
@@ -339,7 +339,13 @@ def evaluate_single_or_multi_label(
 
 
 def compute_token_logits(model: Any) -> dict[int, np.ndarray]:
-    """Compute the output logits for each token in the vocabulary."""
+    """
+    Compute the output logits for each token in the vocabulary.
+
+    :param model: The model to compute the token logits for.
+    :return: The token logits for each token in the vocabulary.
+    """
+    # Temporarily disable normalization
     original_normalize = model.normalize
     model.normalize = False
 
@@ -348,8 +354,14 @@ def compute_token_logits(model: Any) -> dict[int, np.ndarray]:
     all_tokens = [token for token, _ in sorted(vocab.items(), key=lambda item: item[1])]
 
     if isinstance(model, StaticModelPipeline):
+        # Use the StaticModelPipeline logic
+        original_out_activation = model.head[-1].out_activation_
+        # Set the output activation to identity to get the logits
+        model.head[-1].out_activation_ = "identity"
         all_logits = model.predict_proba(all_tokens)
+        model.head[-1].out_activation_ = original_out_activation
     else:
+        # Use the StaticModelForClassification logic
         all_logits = model.predict_proba(all_tokens, output_logits=True)
 
     for idx, logit in enumerate(all_logits):
@@ -361,13 +373,28 @@ def compute_token_logits(model: Any) -> dict[int, np.ndarray]:
 
 
 def get_most_important_tokens(model: Any, token_logits: dict[int, np.ndarray], text: str) -> list[tuple[str, float]]:
-    """Get the token scores for the predicted label."""
+    """
+    Get the most important tokens for the predicted class.
+
+    :param model: The model to get the most important tokens for.
+    :param token_logits: The token logits for the model.
+    :param text: The text to get the most important tokens for.
+    :return: A list of (token, score) tuples sorted by descending importance.
+    """
     if isinstance(model, StaticModelPipeline):
+        # Use the StaticModelPipeline logic
+        original_out_activation = model.head[-1].out_activation_
+        # Set the output activation to identity to get the logits
+        model.head[-1].out_activation_ = "identity"
         input_ids = model.model.tokenize([text])
         logits = model.predict_proba([text])[0]
+        model.head[-1].out_activation_ = original_out_activation
     else:
+        # Use the StaticModelForClassification logic
         input_ids = model.tokenize([text]).tolist()
         logits = model.predict_proba([text], output_logits=True)[0]
+
+    # Get the index of the predicted label
     label_idx = int(np.argmax(logits))
 
     # Get unique token ids from the input
@@ -375,13 +402,14 @@ def get_most_important_tokens(model: Any, token_logits: dict[int, np.ndarray], t
 
     results = []
     for token_id in unique_ids:
+        # Get the token string and logits
         token_str = model.tokenizer.id_to_token(token_id)
         token_logit = token_logits.get(token_id)
         if token_logit is None:
             continue
-        # Extract the logit corresponding to the predicted label.
-        score = float(token_logit[label_idx])
-        results.append((token_str, score))
+        # Get the logit for the predicted label
+        logit = float(token_logit[label_idx])
+        results.append((token_str, logit))
 
     # Sort tokens by descending importance.
     results.sort(key=lambda x: x[1], reverse=True)

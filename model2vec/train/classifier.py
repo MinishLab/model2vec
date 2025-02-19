@@ -54,16 +54,6 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.token_logits: dict[int, np.ndarray] | None = None
         super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
 
-    def compute_token_logits(self) -> None:
-        """Compute the output logits for each token in the vocabulary."""
-        self.token_logits = compute_token_logits(self)
-
-    def get_most_important_tokens(self, text: str) -> list[tuple[str, float]]:
-        """Get the token scores for the predicted label."""
-        if self.token_logits is None:
-            raise ValueError("Token logits are not computed. Run compute_token_logits first to use this function.")
-        return get_most_important_tokens(self, token_logits=self.token_logits, text=text)
-
     @property
     def classes(self) -> np.ndarray:
         """Return all clasess in the correct order."""
@@ -265,6 +255,16 @@ class StaticModelForClassification(FinetunableStaticModel):
         report = evaluate_single_or_multi_label(predictions=predictions, y=y, output_dict=output_dict)
 
         return report
+
+    def compute_token_logits(self) -> None:
+        """Compute the output logits for each token in the vocabulary."""
+        self.token_logits = compute_token_logits(self)
+
+    def get_most_important_tokens(self, text: str) -> list[tuple[str, float]]:
+        """Get the token scores for the predicted label."""
+        if self.token_logits is None:
+            self.token_logits = compute_token_logits(self)
+        return get_most_important_tokens(self, token_logits=self.token_logits, text=text)
 
     def _initialize(self, y: LabelType) -> None:
         """

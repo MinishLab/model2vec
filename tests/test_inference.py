@@ -90,8 +90,5 @@ def test_roundtrip_save_file_gone(mock_inference_pipeline: StaticModelPipeline) 
 
 def test_get_most_important_tokens(mock_inference_pipeline: StaticModelPipeline) -> None:
     """The the get_most_important_tokens function."""
-    with pytest.raises(ValueError):
-        mock_inference_pipeline.get_most_important_tokens(text="dog cat")
-    mock_inference_pipeline.compute_token_logits()
     result = mock_inference_pipeline.get_most_important_tokens(text="dog cat")
     assert len(result) == 2
