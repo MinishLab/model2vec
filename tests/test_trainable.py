@@ -173,7 +173,7 @@ def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
 def test_get_most_important_tokens(mock_trained_pipeline: StaticModelForClassification) -> None:
     """The the get_most_important_tokens function."""
     with pytest.raises(ValueError):
-        mock_trained_pipeline.get_most_important_tokens("dog cat")
+        mock_trained_pipeline.get_most_important_tokens(text="dog cat")
     mock_trained_pipeline.compute_token_logits()
-    result = mock_trained_pipeline.get_most_important_tokens("dog cat")
+    result = mock_trained_pipeline.get_most_important_tokens(text="dog cat")
     assert len(result) == 2

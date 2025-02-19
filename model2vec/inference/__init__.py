@@ -5,6 +5,11 @@ _REQUIRED_EXTRA = "inference"
 for extra_dependency in get_package_extras("model2vec", _REQUIRED_EXTRA):
     importable(extra_dependency, _REQUIRED_EXTRA)
 
-from model2vec.inference.model import StaticModelPipeline, evaluate_single_or_multi_label
+from model2vec.inference.model import (
+    StaticModelPipeline,
+    compute_token_logits,
+    evaluate_single_or_multi_label,
+    get_most_important_tokens,
+)
 
-__all__ = ["StaticModelPipeline", "evaluate_single_or_multi_label"]
+__all__ = ["StaticModelPipeline", "evaluate_single_or_multi_label", "compute_token_logits", "get_most_important_tokens"]

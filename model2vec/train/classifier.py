@@ -19,7 +19,12 @@ from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
 
-from model2vec.inference import StaticModelPipeline, evaluate_single_or_multi_label
+from model2vec.inference import (
+    StaticModelPipeline,
+    compute_token_logits,
+    evaluate_single_or_multi_label,
+    get_most_important_tokens,
+)
 from model2vec.train.base import FinetunableStaticModel, TextDataset
 
 logger = logging.getLogger(__name__)
@@ -49,68 +54,15 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.token_logits: dict[int, np.ndarray] | None = None
         super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
 
-    @torch.inference_mode()
-    def compute_token_logits(
-        self,
-        batch_size: int = 512,
-        show_progress_bar: bool = False,
-    ) -> None:
+    def compute_token_logits(self) -> None:
         """Compute the output logits for each token in the vocabulary."""
-        # Set model to eval mode and disable normalization
-        self.eval()
-        self.normalize = False
-        device = self.device
+        self.token_logits = compute_token_logits(self)
 
-        # Initialize the token logits
-        vocab_size = self.embeddings.num_embeddings
-        token_logits = {}
-        # all_ids maps to all token ids in the vocabulary
-        all_ids = torch.arange(vocab_size, dtype=torch.long, device=device)
-
-        for start in trange(0, vocab_size, batch_size, disable=not show_progress_bar):
-            # Forward pass the batch tokens and store the logits
-            end = min(start + batch_size, vocab_size)
-            batch_tokens = all_ids[start:end].unsqueeze(1)
-            logits = self.forward(batch_tokens)[0].cpu().numpy()
-            for idx, logit in enumerate(logits):
-                token_logits[start + idx] = logit
-
-        # Set normalization back to True and set token_logits
-        self.normalize = True
-        self.token_logits = token_logits
-
-    @torch.inference_mode()
-    def get_most_important_tokens(
-        self,
-        text: str,
-    ) -> list[tuple[str, float]]:
+    def get_most_important_tokens(self, text: str) -> list[tuple[str, float]]:
         """Get the token scores for the predicted label."""
-        self.eval()
         if self.token_logits is None:
             raise ValueError("Token logits are not computed. Run compute_token_logits first to use this function.")
-        # Get the predicted label index
-        input_ids = self.tokenize([text]).to(self.device)
-        logits = self.forward(input_ids)[0]
-        label_idx = int(torch.argmax(logits, dim=1).item())
-
-        # Get the unique token ids in the input
-        unique_ids = list(set(input_ids[0].tolist()))
-
-        results = []
-        for token_id in unique_ids:
-            # Get the token string and logits
-            token_str = self.tokenizer.id_to_token(token_id)
-            token_logits = self.token_logits.get(token_id)
-            if token_logits is None:
-                continue
-            # Get the score for the predicted label
-            logit = float(token_logits[label_idx])
-            results.append((token_str, logit))
-
-        # Sort by descending logit
-        results.sort(key=lambda x: x[1], reverse=True)
-
-        return results
+        return get_most_important_tokens(self, token_logits=self.token_logits, text=text)
 
     @property
     def classes(self) -> np.ndarray:
@@ -172,7 +124,9 @@ class StaticModelForClassification(FinetunableStaticModel):
         vectors, _ = self.forward(input_ids)
         return vectors
 
-    def predict_proba(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
+    def predict_proba(
+        self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024, output_logits: bool = False
+    ) -> np.ndarray:
         """
         Predict probabilities for each class.
 
@@ -182,7 +136,9 @@ class StaticModelForClassification(FinetunableStaticModel):
         pred = []
         for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
             logits = self._predict_single_batch(X[batch : batch + batch_size])
-            if self.multilabel:
+            if output_logits:
+                pred.append(logits.cpu().numpy())
+            elif self.multilabel:
                 pred.append(torch.sigmoid(logits).cpu().numpy())
             else:
                 pred.append(torch.softmax(logits, dim=1).cpu().numpy())

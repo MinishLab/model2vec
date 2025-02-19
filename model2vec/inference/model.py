@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import huggingface_hub
 import numpy as np
@@ -33,9 +33,30 @@ class StaticModelPipeline:
         # Different classifiers, such as OVR wrappers, support multilabel output natively, so we
         # can just use predict.
         self.multilabel = False
+        self.token_logits: dict[int, np.ndarray] | None = None
         if isinstance(classifier, MLPClassifier):
             if classifier.out_activation_ == "logistic":
                 self.multilabel = True
+
+    @property
+    def normalize(self) -> bool:
+        """Get the normalization setting of the model."""
+        return self.model.normalize
+
+    @normalize.setter
+    def normalize(self, value: bool) -> None:
+        """Set the normalization of the model."""
+        self.model.normalize = value
+
+    @property
+    def embeddings(self) -> np.ndarray:
+        """Get the embeddings of the model."""
+        return self.model.embedding
+
+    @property
+    def tokenizer(self) -> str:
+        """Get the tokenizer of the model."""
+        return self.model.tokenizer
 
     @property
     def classes_(self) -> np.ndarray:
@@ -192,6 +213,16 @@ class StaticModelPipeline:
 
         return report
 
+    def compute_token_logits(self) -> None:
+        """Compute the output logits for each token in the vocabulary."""
+        self.token_logits = compute_token_logits(self)
+
+    def get_most_important_tokens(self, text: str) -> list[tuple[str, float]]:
+        """Get the token scores for the predicted label."""
+        if self.token_logits is None:
+            raise ValueError("Token logits are not computed. Run compute_token_logits first to use this function.")
+        return get_most_important_tokens(self, token_logits=self.token_logits, text=text)
+
 
 def _load_pipeline(
     folder_or_repo_path: PathLike, token: str | None = None, trust_remote_code: bool = False
@@ -305,3 +336,53 @@ def evaluate_single_or_multi_label(
     )
 
     return report
+
+
+def compute_token_logits(model: Any) -> dict[int, np.ndarray]:
+    """Compute the output logits for each token in the vocabulary."""
+    original_normalize = model.normalize
+    model.normalize = False
+
+    token_logits = {}
+    vocab = model.tokenizer.get_vocab()
+    all_tokens = [token for token, _ in sorted(vocab.items(), key=lambda item: item[1])]
+
+    if isinstance(model, StaticModelPipeline):
+        all_logits = model.predict_proba(all_tokens)
+    else:
+        all_logits = model.predict_proba(all_tokens, output_logits=True)
+
+    for idx, logit in enumerate(all_logits):
+        token_logits[idx] = logit
+
+    # Restore the original normalization setting
+    model.normalize = original_normalize
+    return token_logits
+
+
+def get_most_important_tokens(model: Any, token_logits: dict[int, np.ndarray], text: str) -> list[tuple[str, float]]:
+    """Get the token scores for the predicted label."""
+    if isinstance(model, StaticModelPipeline):
+        input_ids = model.model.tokenize([text])
+        logits = model.predict_proba([text])[0]
+    else:
+        input_ids = model.tokenize([text]).tolist()
+        logits = model.predict_proba([text], output_logits=True)[0]
+    label_idx = int(np.argmax(logits))
+
+    # Get unique token ids from the input
+    unique_ids = set(input_ids[0])
+
+    results = []
+    for token_id in unique_ids:
+        token_str = model.tokenizer.id_to_token(token_id)
+        token_logit = token_logits.get(token_id)
+        if token_logit is None:
+            continue
+        # Extract the logit corresponding to the predicted label.
+        score = float(token_logit[label_idx])
+        results.append((token_str, score))
+
+    # Sort tokens by descending importance.
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results
