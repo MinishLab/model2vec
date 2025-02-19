@@ -120,8 +120,16 @@ class StaticModelForClassification(FinetunableStaticModel):
         """
         Predict probabilities for each class.
 
-        In single-label mode, returns softmax probabilities.
-        In multilabel mode, returns sigmoid probabilities.
+        This function outputs:
+        - Softmax probabilities in single-label mode.
+        - Sigmoid probabilities in multilabel mode.
+        - Logits if `output_logits` is True.
+
+        :param X: The texts to predict on.
+        :param show_progress_bar: Whether to show a progress bar.
+        :param batch_size: The batch size.
+        :param output_logits: Whether to output logits.
+        :return: The probabilities.
         """
         pred = []
         for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
