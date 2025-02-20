@@ -21,7 +21,6 @@ from tqdm import trange
 
 from model2vec.inference import (
     StaticModelPipeline,
-    compute_token_logits,
     evaluate_single_or_multi_label,
     get_most_important_tokens,
 )
@@ -51,7 +50,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.classes_: list[str] = [str(x) for x in range(out_dim)]
         # multilabel flag will be set based on the type of `y` passed to fit.
         self.multilabel: bool = False
-        self.token_logits: dict[int, np.ndarray] | None = None
+        self.token_logits_cache: dict[int, np.ndarray] = {}
         super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
 
     @property
@@ -136,9 +135,14 @@ class StaticModelForClassification(FinetunableStaticModel):
                 pred.append(torch.softmax(logits, dim=1).cpu().numpy())
         return np.concatenate(pred, axis=0)
 
-    def predict_logits(self, embeddings: nn.Embedding) -> torch.Tensor:
-        """Predict logits for a given set of embeddings."""
-        scaled_embeddings = embeddings.weight * torch.sigmoid(self.w).unsqueeze(1)
+    def predict_logits(self, token_ids: list[int]) -> torch.Tensor:
+        """Predict the logits for the specified token IDs."""
+        # Extract embeddings for the given token IDs.
+        token_embeddings = self.embeddings.weight[token_ids]
+        # Scale each embedding by its corresponding learned weight
+        scale = torch.sigmoid(self.w[token_ids]).unsqueeze(1)
+        scaled_embeddings = token_embeddings * scale
+        # Compute and return the logits
         return self.head(scaled_embeddings)
 
     def fit(
@@ -263,15 +267,14 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         return report
 
-    def compute_token_logits(self) -> None:
-        """Compute the output logits for each token in the vocabulary."""
-        self.token_logits = compute_token_logits(self)
-
     def get_most_important_tokens(self, text: str) -> list[tuple[str, float]]:
-        """Get the token scores for the predicted label."""
-        if self.token_logits is None:
-            self.token_logits = compute_token_logits(self)
-        return get_most_important_tokens(self, token_logits=self.token_logits, text=text)
+        """
+        Get the text tokens that are most important for the predicted class.
+
+        :param text: The input text.
+        :return: A list of (token, score) tuples sorted by descending importance.
+        """
+        return get_most_important_tokens(self, text=text)
 
     def _initialize(self, y: LabelType) -> None:
         """
