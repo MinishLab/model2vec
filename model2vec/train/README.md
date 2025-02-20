@@ -106,7 +106,7 @@ The scores are competitive with the popular [roberta-base-go_emotions](https://h
 
 ## Explainability
 
-We offer a simple explainability method that allows you to see the most important tokens for a prediction. This is based on the logit outputs for the tokens in the input text, which we extract by forward passing them individually through the trained classifier. Since our classifier is a simple mean embedding followed by a single linear layer (meaning there is interaction between tokens), this is a good approximation of the importance of each token. The following code example shows how this works:
+We offer a simple explainability method that allows you to see the most important tokens for a prediction. This is based on the logit outputs for the tokens in the input text, which we extract by forward passing them individually through the trained classifier. Since our classifier is a simple mean embedding followed by a single linear layer (meaning there is no interaction between tokens), this is a good approximation of the importance of each token. The following code example shows how this works:
 
 ```python
 from datasets import load_dataset
