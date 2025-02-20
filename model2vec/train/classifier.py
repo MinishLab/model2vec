@@ -114,33 +114,32 @@ class StaticModelForClassification(FinetunableStaticModel):
         vectors, _ = self.forward(input_ids)
         return vectors
 
-    def predict_proba(
-        self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024, output_logits: bool = False
-    ) -> np.ndarray:
+    def predict_proba(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
         """
         Predict probabilities for each class.
 
         This function outputs:
         - Softmax probabilities in single-label mode.
         - Sigmoid probabilities in multilabel mode.
-        - Logits if `output_logits` is True.
 
         :param X: The texts to predict on.
         :param show_progress_bar: Whether to show a progress bar.
         :param batch_size: The batch size.
-        :param output_logits: Whether to output logits.
         :return: The probabilities.
         """
         pred = []
         for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
             logits = self._predict_single_batch(X[batch : batch + batch_size])
-            if output_logits:
-                pred.append(logits.cpu().numpy())
-            elif self.multilabel:
+            if self.multilabel:
                 pred.append(torch.sigmoid(logits).cpu().numpy())
             else:
                 pred.append(torch.softmax(logits, dim=1).cpu().numpy())
         return np.concatenate(pred, axis=0)
+
+    def predict_logits(self, embeddings: nn.Embedding) -> torch.Tensor:
+        """Predict logits for a given set of embeddings."""
+        scaled_embeddings = embeddings.weight * torch.sigmoid(self.w).unsqueeze(1)
+        return self.head(scaled_embeddings)
 
     def fit(
         self,

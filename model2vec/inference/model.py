@@ -54,6 +54,11 @@ class StaticModelPipeline:
         return self.model.tokenizer
 
     @property
+    def embeddings(self) -> np.ndarray:
+        """Get the embedding matrix of the model."""
+        return self.model.embedding
+
+    @property
     def classes_(self) -> np.ndarray:
         """The classes of the classifier."""
         return self.head.classes_
@@ -218,6 +223,20 @@ class StaticModelPipeline:
             self.token_logits = compute_token_logits(self)
         return get_most_important_tokens(self, token_logits=self.token_logits, text=text)
 
+    def predict_logits(self, embeddings: np.ndarray) -> np.ndarray:
+        """Predict the logits of the input embeddings."""
+        # Access the underlying MLPClassifier from the pipeline.
+        mlp = self.head[-1]
+        original_activation = mlp.out_activation_
+        # Temporarily disable activation to get raw logits.
+        mlp.out_activation_ = "identity"
+        # Use the pipeline's predict_proba function, which now returns the logits.
+        logits = self.head.predict_proba(embeddings)
+
+        # Restore the original activation setting.
+        mlp.out_activation_ = original_activation
+        return logits
+
 
 def _load_pipeline(
     folder_or_repo_path: PathLike, token: str | None = None, trust_remote_code: bool = False
@@ -333,40 +352,6 @@ def evaluate_single_or_multi_label(
     return report
 
 
-def compute_token_logits(model: Any) -> dict[int, np.ndarray]:
-    """
-    Compute the output logits for each token in the vocabulary.
-
-    :param model: The model to compute the token logits for.
-    :return: The token logits for each token in the vocabulary.
-    """
-    # Temporarily disable normalization
-    original_normalize = model.normalize
-    model.normalize = False
-
-    token_logits = {}
-    vocab = model.tokenizer.get_vocab()
-    all_tokens = [token for token, _ in sorted(vocab.items(), key=lambda item: item[1])]
-
-    if isinstance(model, StaticModelPipeline):
-        # Use the StaticModelPipeline logic
-        original_out_activation = model.head[-1].out_activation_
-        # Set the output activation to identity to get the logits
-        model.head[-1].out_activation_ = "identity"
-        all_logits = model.predict_proba(all_tokens)
-        model.head[-1].out_activation_ = original_out_activation
-    else:
-        # Use the StaticModelForClassification logic
-        all_logits = model.predict_proba(all_tokens, output_logits=True)
-
-    for idx, logit in enumerate(all_logits):
-        token_logits[idx] = logit
-
-    # Restore the original normalization setting
-    model.normalize = original_normalize
-    return token_logits
-
-
 def get_most_important_tokens(model: Any, token_logits: dict[int, np.ndarray], text: str) -> list[tuple[str, float]]:
     """
     Get the most important tokens for the predicted class.
@@ -376,36 +361,51 @@ def get_most_important_tokens(model: Any, token_logits: dict[int, np.ndarray], t
     :param text: The text to get the most important tokens for.
     :return: A list of (token, score) tuples sorted by descending importance.
     """
+    # Use the model's tokenizer to get the input IDs
     if isinstance(model, StaticModelPipeline):
-        # Use the StaticModelPipeline logic
-        original_out_activation = model.head[-1].out_activation_
-        # Set the output activation to identity to get the logits
-        model.head[-1].out_activation_ = "identity"
         input_ids = model.model.tokenize([text])
-        logits = model.predict_proba([text])[0]
-        model.head[-1].out_activation_ = original_out_activation
     else:
-        # Use the StaticModelForClassification logic
         input_ids = model.tokenize([text]).tolist()
-        logits = model.predict_proba([text], output_logits=True)[0]
 
-    # Get the index of the predicted label
-    label_idx = int(np.argmax(logits))
+    # Get the predicted label
+    probs = model.predict_proba([text])[0]
+    label_idx = int(np.argmax(probs))
 
-    # Get unique token ids from the input
+    # Get unique token IDs from the input
     unique_ids = set(input_ids[0])
 
     results = []
     for token_id in unique_ids:
-        # Get the token string and logits
+        # Get the token string and logit
         token_str = model.tokenizer.id_to_token(token_id)
         token_logit = token_logits.get(token_id)
         if token_logit is None:
             continue
         # Get the logit for the predicted label
-        logit = float(token_logit[label_idx])
-        results.append((token_str, logit))
+        score = float(token_logit[label_idx])
+        results.append((token_str, score))
 
-    # Sort tokens by descending importance
+    # Sort tokens by descending score
     results.sort(key=lambda x: x[1], reverse=True)
     return results
+
+
+def compute_token_logits(model: Any) -> dict[int, np.ndarray]:
+    """
+    Compute the output logits for each token in the vocabulary.
+
+    :param model: The model to compute the token logits for.
+    :return: The token logits for each token in the vocabulary.
+    """
+    # Disable normalization
+    original_normalize = model.normalize
+    model.normalize = False
+
+    # Compute logits using the embedding matrix
+    logits = model.predict_logits(model.embeddings)
+
+    token_logits = {idx: logit for idx, logit in enumerate(logits)}
+
+    # Restore original normalization setting
+    model.normalize = original_normalize
+    return token_logits

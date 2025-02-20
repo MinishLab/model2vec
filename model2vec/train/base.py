@@ -86,9 +86,9 @@ class FinetunableStaticModel(nn.Module):
         embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
         # Mean pooling by dividing by the length
         embedded = embedded / length[:, None]
-        if not self.normalize:
-            return embedded
-        return nn.functional.normalize(embedded)
+        if self.normalize:
+            nn.functional.normalize(embedded)
+        return embedded
 
     def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass through the mean, and a classifier layer after."""
