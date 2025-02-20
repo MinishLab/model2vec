@@ -87,7 +87,7 @@ class FinetunableStaticModel(nn.Module):
         # Mean pooling by dividing by the length
         embedded = embedded / length[:, None]
         if self.normalize:
-            nn.functional.normalize(embedded)
+            return nn.functional.normalize(embedded)
         return embedded
 
     def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
