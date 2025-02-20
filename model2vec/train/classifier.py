@@ -409,7 +409,7 @@ class _ClassifierLightningModule(pl.LightningModule):
         if self.model.multilabel:
             preds = (torch.sigmoid(head_out) > 0.5).float()
             # Multilabel accuracy is defined as the Jaccard score averaged over samples.
-            accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples")
+            accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples", zero_division=0)
         else:
             accuracy = (head_out.argmax(dim=1) == y).float().mean()
         self.log("val_loss", loss)
