@@ -115,7 +115,7 @@ from model2vec.train import StaticModelForClassification
 # Initialize a classifier from a pre-trained model
 classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32M")
 
-# Load a multi-label dataset
+# Load a dataset, in this case the (multi-label) Reuters dataset
 ds = load_dataset("ucirvine/reuters21578", "ModApte")
 
 # Train the classifier on text (X) and labels (y)
