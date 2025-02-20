@@ -104,6 +104,54 @@ print(classification_report)
 
 The scores are competitive with the popular [roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions) model, while our model is orders of magnitude faster.
 
+## Explainability
+
+We offer a simple explainability method that allows you to see the most important tokens for a prediction. This is based on the logit outputs for the tokens in the input text, which we extract by forward passing them individually through the trained classifier. Since our classifier is a simple mean embedding followed by a single linear layer (meaning there is interaction between tokens), this is a good approximation of the importance of each token. The following code example shows how this works:
+
+```python
+from datasets import load_dataset
+from model2vec.train import StaticModelForClassification
+
+# Initialize a classifier from a pre-trained model
+classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32M")
+
+# Load a multi-label dataset
+ds = load_dataset("ucirvine/reuters21578", "ModApte")
+
+# Train the classifier on text (X) and labels (y)
+classifier.fit(ds["train"]["text"], ds["train"]["topics"])
+
+# Extract the most important tokens for a given article
+most_important_tokens = classifier.get_most_important_tokens(ds["test"]["text"][8])
+print(f"""Article text:
+{"="*50}
+{ds["test"]["text"][8]}
+{"="*50}
+Article topics: {ds["test"]["topics"][8]}
+{"="*50}
+Most important tokens:""")
+for token, score in most_important_tokens[:5]:
+    print(f"Token: {token:15s} | Importance: {score:.4f}")
+# Article text:
+# ==================================================
+# Food Department officials said the U.S.
+# Department of Agriculture approved the Continental Grain Co
+# sale of 52,500 tonnes of soft wheat at 89 U.S. Dlrs a tonne C
+# and F from Pacific Northwest to Colombo.
+#     They said the shipment was for April 8 to 20 delivery.
+#  REUTER
+
+# ==================================================
+# Article topics: ['grain', 'wheat']
+# ==================================================
+# Most important tokens:
+# Token: wheat           | Importance: 786.2589
+# Token: grain           | Importance: 533.8633
+# Token: agriculture     | Importance: 186.2029
+# Token: food            | Importance: 49.7997
+# Token: northwest       | Importance: 37.6511
+```
+
 # Persistence
 
 You can turn a classifier into a scikit-learn compatible pipeline, as follows:
