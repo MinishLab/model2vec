@@ -1,6 +1,6 @@
 [project]
 name = "model2vec"
-description = "The Fastest State-of-the-Art Static Embeddings in the World"
+description = "Fast State-of-the-Art Static Embeddings"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
 requires-python = ">=3.9"

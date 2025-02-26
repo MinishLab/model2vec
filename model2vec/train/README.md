@@ -2,6 +2,8 @@
 
 Aside from [distillation](../../README.md#distillation), `model2vec` also supports training simple classifiers on top of static models, using [pytorch](https://pytorch.org/), [lightning](https://lightning.ai/) and [scikit-learn](https://scikit-learn.org/stable/index.html).
 
+We support both single and multi-label classification, which work seamlessly based on the labels you provide.
+
 # Installation
 
 To train, make sure you install the training extra:
@@ -23,10 +25,10 @@ distilled_model = distill("baai/bge-base-en-v1.5")
 classifier = StaticModelForClassification.from_static_model(distilled_model)
 
 # From a pre-trained model: potion is the default
-classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-8m")
+classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32m")
 ```
 
-This creates a very simple classifier: a StaticModel with a single 512-unit hidden layer on top. You can adjust the number of hidden layers and the number units through some parameters on both functions. Note that the default for `from_pretrained` is [potion-base-8m](https://huggingface.co/minishlab/potion-base-8M), our best model to date. This is our recommended path if you're working with general English data.
+This creates a very simple classifier: a StaticModel with a single 512-unit hidden layer on top. You can adjust the number of hidden layers and the number units through some parameters on both functions. Note that the default for `from_pretrained` is [potion-base-32m](https://huggingface.co/minishlab/potion-base-32M), our best model to date. This is our recommended path if you're working with general English data.
 
 Now that you have created the classifier, let's just train a model. The example below assumes you have the [`datasets`](https://github.com/huggingface/datasets) library installed.
 
@@ -42,11 +44,10 @@ test = ds["test"]
 s = perf_counter()
 classifier = classifier.fit(train["text"], train["label"])
 
-predicted = classifier.predict(test["text"])
 print(f"Training took {int(perf_counter() - s)} seconds.")
 # Training took 81 seconds
-accuracy = np.mean([x == y for x, y in zip(predicted, test["label"])]) * 100
-print(f"Achieved {accuracy} test accuracy")
+classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["label"])
+print(classification_report)
 # Achieved 91.0 test accuracy
 ```
 
@@ -64,6 +65,44 @@ classifier.predict(test["text"])
 print(f"Took {int((perf_counter() - s) * 1000)} milliseconds for {len(test)} instances on CPU.")
 # Took 67 milliseconds for 2000 instances on CPU.
 ```
+
+## Multi-label classification
+
+Multi-label classification is supported out of the box. Just pass a list of lists to the `fit` function (e.g. `[[label1, label2], [label1, label3]]`), and a multi-label classifier will be trained. For example, the following code trains a multi-label classifier on the [go_emotions](https://huggingface.co/datasets/google-research-datasets/go_emotions) dataset:
+
+```python
+from datasets import load_dataset
+from model2vec.train import StaticModelForClassification
+
+# Initialize a classifier from a pre-trained model
+classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32M")
+
+# Load a multi-label dataset
+ds = load_dataset("google-research-datasets/go_emotions")
+
+# Inspect some of the labels
+print(ds["train"]["labels"][40:50])
+# [[0, 15], [15, 18], [16, 27], [27], [7, 13], [10], [20], [27], [27], [27]]
+
+# Train the classifier on text (X) and labels (y)
+classifier.fit(ds["train"]["text"], ds["train"]["labels"])
+```
+
+Then, we can evaluate the classifier:
+
+```python
+from sklearn import metrics
+from sklearn.preprocessing import MultiLabelBinarizer
+
+classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["labels"], threshold=0.3)
+print(classification_report)
+# Accuracy: 0.410
+# Precision: 0.527
+# Recall: 0.410
+# F1: 0.439
+```
+
+The scores are competitive with the popular [roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions) model, while our model is orders of magnitude faster.
 
 # Persistence
 
@@ -92,35 +131,6 @@ pipeline = StaticModelPipeline.from_pretrained("my_cool/project")
 
 Loading pipelines in this way is _extremely_ fast. It takes only 30ms to load a pipeline from disk.
 
-# Results
-
-The main results are detailed in our training blogpost, but we'll do a comparison with vanilla model2vec here. In a vanilla model2vec classifier, you just put a scikit-learn `LogisticRegressionCV` on top of the model encoder. In contrast, training a `StaticModelForClassification` fine-tunes the full model, including the `StaticModel` weights.
-
-We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
-
-|  dataset name                  |      model2vec logreg  |     model2vec full finetune  |      setfit  |
-|:-------------------------------|-----------------------:|-----------------------------:|-------------:|
-| 20_newgroups                   |                  54.53 |                        55.55 |        59.54 |
-| ade                            |                  71.57 |                        74.03 |        78.88 |
-| ag_news                        |                  86.02 |                        85.83 |        88.01 |
-| amazon_counterfactual          |                  63.78 |                        74.43 |        87.32 |
-| bbc                            |                  95.57 |                        96.5  |        96.58 |
-| emotion                        |                  51.63 |                        58.63 |        59.89 |
-| enron_spam                     |                  95.2  |                        96.5  |        97.45 |
-| hatespeech_offensive           |                  54.38 |                        59.26 |        65.99 |
-| imdb                           |                  83.9  |                        84.62 |        86    |
-| massive_scenario               |                  79.78 |                        82.28 |        81.46 |
-| senteval_cr                    |                  74.34 |                        74.59 |        85.26 |
-| sst5                           |                  29.02 |                        36.31 |        39.32 |
-| student                        |                  80.61 |                        83.76 |        88.94 |
-| subj                           |                  87.84 |                        88.94 |        93.8  |
-| tweet_sentiment_extraction     |                  63.87 |                        63.2  |        75.53 |
-
-|                |   logreg   |  full finetune | setfit
-|:---------------------------|-----------:|---------------:|-------:|
-| average                    |   71.47    |    74.29       |   78.93 |
-
-As you can see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-8m`, and to use full fine-tuning if you are starting from another base model.
 
 # Bring your own architecture
 
@@ -135,3 +145,7 @@ The core functionality of the `StaticModelForClassification` is contained in a c
 * `fit`: contains all the lightning-related fitting logic.
 
 The training of the model is done in a `lighting.LightningModule`, which can be modified but is very basic.
+
+# Results
+
+We ran extensive benchmarks where we compared our model to several well known architectures. The results can be found in the [training results](https://github.com/MinishLab/model2vec/tree/main/results#training-results) documentation.

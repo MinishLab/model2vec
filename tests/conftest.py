@@ -5,15 +5,12 @@ from typing import Any
 import numpy as np
 import pytest
 import torch
-from sklearn.neural_network import MLPClassifier
-from sklearn.pipeline import make_pipeline
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
 from transformers import AutoModel, AutoTokenizer
 
 from model2vec.inference import StaticModelPipeline
-from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 
 
@@ -86,13 +83,31 @@ def mock_inference_pipeline(mock_trained_pipeline: StaticModelForClassification)
     return mock_trained_pipeline.to_pipeline()
 
 
-@pytest.fixture(scope="session")
-def mock_trained_pipeline() -> StaticModelForClassification:
-    """Mock staticmodelforclassification."""
+@pytest.fixture(
+    params=[
+        (False, "single_label", "str"),
+        (False, "single_label", "int"),
+        (True, "multilabel", "str"),
+        (True, "multilabel", "int"),
+    ],
+    ids=lambda param: f"{param[1]}_{param[2]}",
+    scope="session",
+)
+def mock_trained_pipeline(request: pytest.FixtureRequest) -> StaticModelForClassification:
+    """Mock StaticModelForClassification with different label formats."""
     tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
     torch.random.manual_seed(42)
     vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
-    s = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
-    s.fit(["dog", "cat"], ["a", "b"], device="cpu")
+    model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
 
-    return s
+    X = ["dog", "cat"]
+    is_multilabel, label_type = request.param[0], request.param[2]
+
+    if label_type == "str":
+        y = [["a", "b"], ["a"]] if is_multilabel else ["a", "b"]  # type: ignore
+    else:
+        y = [[0, 1], [0]] if is_multilabel else [0, 1]  # type: ignore
+
+    model.fit(X, y)
+
+    return model

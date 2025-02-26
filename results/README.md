@@ -1,7 +1,8 @@
 # Results
 
-This page contains the experiments results of the Model2Vec project. The results are presented in the following sections:
+This document contains the results of the Model2Vec project. The results are presented in the following sections:
 - [MTEB Results](#mteb-results)
+- [Training Results](#training-results)
 - [Ablations](#ablations)
 
 ## MTEB Results
@@ -51,7 +52,7 @@ NOTE: for fairness of comparison, we disabled multiprocessing for Model2Vec for 
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
 
-## Retrieval Results
+### Retrieval Results
 
 A subset of models we created and compare against are specifically designed for retrieval tasks. The results are shown in the table below, including two general-purpose models for comparison and a transformer.
 
@@ -64,6 +65,62 @@ A subset of models we created and compare against are specifically designed for 
 | [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)                       | 31.71              |
 
 As can be seen, [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) model is the most performant static retrieval model, reaching 86.65%% of the performance of [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) with a retrieval score of 36.35.
+
+## Training Results
+
+The main results for Model2Vec training are outlined in this section.
+
+We compare five different architectures for our main results:
+- `model2vec + logreg`: A model2vec model with a scikit-learn `LogisticRegressionCV` on top.
+- `model2vec full finetune`: A model2vec classifier with the full model finetuned. This uses our `StaticModelForClassification`.
+- `tfidf`: A TF-IDF model with a scikit-learn `LogisticRegressionCV` on top.
+- `setfit`: A [SetFit](https://github.com/huggingface/setfit/tree/main) model trained using [all-minilm-l6-v2](sentence-transformers/all-MiniLM-L6-v2) as a base model.
+- `bge-base + logreg`: A [BGE-base](https://huggingface.co/BAAI/bge-base-en-v1.5) encoder model with a scikit-learn `LogisticRegressionCV` on top.
+
+We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
+
+| dataset                    |   tfidf |   model2vec + logreg |   model2vec full finetune |   setfit |   bge-base + logreg |
+|:---------------------------|--------:|---------------------:|--------------------------:|---------:|--------------------:|
+| 20_newgroups               |   50.71 |                56.24 |                     57.94 |    61.29 |               67.39 |
+| ade                        |   71.46 |                79.20 |                     79.68 |    83.05 |               86.12 |
+| ag_news                    |   81.68 |                86.70 |                     87.20 |    88.01 |               88.95 |
+| amazon_counterfactual      |   85.18 |                90.96 |                     91.93 |    95.51 |               92.74 |
+| bbc                        |   95.09 |                95.80 |                     97.21 |    96.60 |               97.50 |
+| emotion                    |   59.28 |                65.57 |                     67.11 |    72.86 |               65.63 |
+| enron_spam                 |   96.00 |                96.40 |                     96.85 |    97.45 |               97.30 |
+| hatespeech_offensive       |   66.45 |                83.54 |                     85.61 |    87.69 |               84.92 |
+| imdb                       |   80.44 |                85.34 |                     85.59 |    86.00 |               92.25 |
+| massive_scenario           |   77.26 |                82.86 |                     84.42 |    83.54 |               87.07 |
+| senteval_cr                |   65.61 |                77.03 |                     79.47 |    86.15 |               90.53 |
+| sst5                       |   18.52 |                32.34 |                     37.95 |    42.31 |               38.49 |
+| student                    |   74.16 |                83.20 |                     85.02 |    89.62 |               89.71 |
+| subj                       |   86.39 |                89.20 |                     89.85 |    93.80 |               94.55 |
+| tweet_sentiment_extraction |   53.20 |                64.96 |                     62.65 |    75.15 |               69.48 |
+
+
+|         |   tfidf |   model2vec + logreg |   model2vec full finetune |   setfit |   bge-base + logreg |
+|:--------|--------:|---------------------:|--------------------------:|---------:|--------------------:|
+| average |    70.8 |                 78.0 |                      79.2 |     82.6 |                82.8 |
+
+
+
+
+As can be seen see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-32m`, and to use full fine-tuning if you are starting from another base model.
+
+The speed difference between model2vec and the other models is immeense, with the full finetune being 35x faster than a setfit based on `all-minilm-l6-v2` on CPU and 200x faster than the`bge-base` transformer model.
+
+
+|                  |   tfidf |   model2vec + logreg |   model2vec full finetune |   setfit |   bge-base + logreg |
+|:-----------------|--------:|---------------------:|--------------------------:|---------:|--------------------:|
+| samples / second |  108434 |                17925 |                     24744 |      716 |                 118 |
+
+
+The figure below shows the relationship between the number of sentences per second and the average training score, where we've included more transformer-based models for comparison.
+
+| ![Description](../assets/images/training_speed_vs_score.png) |
+|:--:|
+|*Figure: The average training score plotted against sentences per second (log scale).*|
+
 
 ## Ablations
 
