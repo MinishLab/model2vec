@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Optional, Type
 
 import lightning as pl
@@ -9,7 +10,6 @@ import torch.nn.functional as F
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
-from torch import nn
 
 from model2vec import StaticModel
 from model2vec.knowledge_distill.utils import calculate_token_probabilities, collect_means_and_texts
@@ -17,14 +17,8 @@ from model2vec.train.base import FinetunableStaticModel, ModelType, TextDataset
 
 logger = logging.getLogger(__name__)
 
-
-class KnowledgeDistillationDataset(TextDataset):
-    """Dataset class for Knowledge Distillation training."""
-
-    def __init__(self, texts: list[str], targets: torch.Tensor, tokenizer: Tokenizer) -> None:
-        """Initialize a Knowledge Distillation dataset."""
-        tokenized_texts = [encoding.ids for encoding in tokenizer.encode_batch_fast(texts, add_special_tokens=False)]
-        super().__init__(tokenized_texts, targets)
+# By default, train on 512 token chunks.
+_MAX_LENGTH = 512
 
 
 class KnowledgeDistillationModel(FinetunableStaticModel, pl.LightningModule):
@@ -62,32 +56,6 @@ class KnowledgeDistillationModel(FinetunableStaticModel, pl.LightningModule):
         self.cosine_weight = cosine_weight
         self.mse_weight = mse_weight
         self.w = self.construct_weights()
-
-    def construct_weights(self) -> nn.Parameter:
-        """Construct the weights for the model."""
-        weights = torch.ones(len(self.vectors))  # Change from zeros to ones
-        weights[self.pad_id] = 0  # Make sure padding gets ignored
-        return nn.Parameter(weights)
-
-    def sub_forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the mean pooling."""
-        w = self.w[x]
-        zeros = (x != self.pad_id).float()
-        length = zeros.sum(1)
-        embedded = self.embeddings(x)
-
-        # Zero out the padding
-        embedded = embedded * zeros[:, :, None]
-        embedded = (embedded * w[:, :, None]).sum(1) / (w.sum(1)[:, None])
-
-        embedded = embedded / length[:, None]
-
-        return embedded
-
-    def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass through the mean pooling, and a classifier layer after."""
-        encoded = self.sub_forward(input_ids)
-        return self.head(encoded), encoded
 
     def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         """The training step for the model."""
@@ -151,24 +119,24 @@ class KnowledgeDistillationModel(FinetunableStaticModel, pl.LightningModule):
         if patience is not None:
             callbacks.append(EarlyStopping(monitor="train_loss", mode="min", patience=patience))
 
-        checkpoint_callback = ModelCheckpoint(
-            monitor="train_loss",
-            mode="min",
-            save_top_k=1,
-            dirpath="checkpoints/",
-            filename="best_model",
-        )
-        callbacks.append(checkpoint_callback)
+        with TemporaryDirectory() as tempdir:
+            checkpoint_callback = ModelCheckpoint(
+                monitor="train_loss",
+                mode="min",
+                save_top_k=1,
+                dirpath=tempdir,
+            )
+            callbacks.append(checkpoint_callback)
 
-        train_loader = dataset.to_dataloader(batch_size=batch_size, shuffle=True)
-        trainer = pl.Trainer(max_epochs=max_epochs, accelerator=device, callbacks=callbacks)
-        trainer.fit(self, train_loader)
+            train_loader = dataset.to_dataloader(batch_size=batch_size, shuffle=True)
+            trainer = pl.Trainer(max_epochs=max_epochs, accelerator=device, callbacks=callbacks)
+            trainer.fit(self, train_loader)
 
-        # Load the best checkpoint after training
-        best_model_path = checkpoint_callback.best_model_path
-        if best_model_path:
-            logger.info(f"Loading best model from {best_model_path}")
-            self.load_state_dict(torch.load(best_model_path)["state_dict"])
+            # Load the best checkpoint after training
+            best_model_path = checkpoint_callback.best_model_path
+            if best_model_path:
+                logger.info(f"Loading best model from {best_model_path}")
+                self.load_state_dict(torch.load(best_model_path, weights_only=True)["state_dict"])
 
     def apply_weighting(self, texts: list[str], alpha: float = 1e-3, pca_dims: int = 256) -> StaticModel:
         """
@@ -206,7 +174,7 @@ class KnowledgeDistillationModel(FinetunableStaticModel, pl.LightningModule):
         """Convert the trained model to a StaticModel and save it."""
         final_static = self.to_static_model()
         final_static.save_pretrained(save_directory)
-        logger.info(f"Saved TokenlearnModel as a static model to '{save_directory}'")
+        logger.info(f"Saved Tokenlearn model as a static model to '{save_directory}'")
 
 
 def main() -> None:
@@ -217,7 +185,7 @@ def main() -> None:
 
     # Collect paths for training data
     paths = sorted(Path("../tokenlearn/data/c4_features_bgebase_test").glob("*.json"))
-    X, y = collect_means_and_texts(paths)
+    texts, y = collect_means_and_texts(paths)
 
     # Detect device
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -226,7 +194,8 @@ def main() -> None:
     y_tensor = torch.tensor(y, dtype=torch.float32, device=device)
 
     # Convert to TokenlearnDataset
-    dataset = KnowledgeDistillationDataset(X, y_tensor, tokenizer=model.tokenizer)
+    tokenized = model.tokenize(texts)
+    dataset = TextDataset(tokenized, y_tensor)
 
     # Create a TokenlearnModel from the StaticModel
     tokenlearn_model = KnowledgeDistillationModel.from_static_model(model, out_dim=y_tensor.shape[1])
@@ -236,7 +205,7 @@ def main() -> None:
     tokenlearn_model.fit(dataset, batch_size=256, max_epochs=50, device=device)
 
     # Apply SIF weighting + PCA to the embeddings
-    tokenlearn_model.apply_weighting(X, alpha=1e-3, pca_dims=256)
+    tokenlearn_model.apply_weighting(texts, alpha=1e-3, pca_dims=256)
 
     # Save the final static model
     tokenlearn_model.save_pretrained("models/potion-base-8M-reproduce-v1")
