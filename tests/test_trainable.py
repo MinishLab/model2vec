@@ -41,7 +41,7 @@ def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) ->
 def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test initializion from a static model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
-    s = FinetunableStaticModel.from_static_model(model)
+    s = FinetunableStaticModel.from_static_model(model=model)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
 
@@ -55,7 +55,7 @@ def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenize
 def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test initializion from a static model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
-    s = StaticModelForClassification.from_static_model(model)
+    s = StaticModelForClassification.from_static_model(model=model)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
 
