@@ -22,7 +22,7 @@ from model2vec.train import StaticModelForClassification
 
 # From a distilled model
 distilled_model = distill("baai/bge-base-en-v1.5")
-classifier = StaticModelForClassification.from_static_model(distilled_model)
+classifier = StaticModelForClassification.from_static_model(model=distilled_model)
 
 # From a pre-trained model: potion is the default
 classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32m")
