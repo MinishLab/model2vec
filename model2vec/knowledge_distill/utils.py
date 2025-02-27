@@ -2,10 +2,8 @@ import json
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any
 
 import numpy as np
-import regex
 from more_itertools import batched
 from tokenizers import Tokenizer
 from tqdm import tqdm
@@ -13,26 +11,26 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-def create_vocab(texts: list[str], vocab_size: int = 56_000) -> list[str]:
+def create_vocab(texts: list[str], tokenizer: Tokenizer, vocab_size: int = 56_000) -> tuple[str, ...]:
     """
     Create a vocabulary from a list of texts.
 
     :param texts: The list of texts to create the vocabulary from.
+    :param tokenizer: The tokenizer to use.
     :param vocab_size: The size of the vocabulary. Defaults to 56,000, which is the vocab_size used for our 32M models.
     :return: The vocabulary.
     """
-    tokenizer_regex = regex.compile(r"\w+|[^\w\s]+")
-
     # Tokenize all texts
-    tokens = []
+    tokens: list[str] = []
     for text in tqdm(texts, desc="Tokenizing texts"):
-        tokens.extend(tokenizer_regex.findall(text.lower()))
+        _, toks = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(text))
+        tokens.extend(toks)
 
     # Count the tokens
     token_counts = Counter(tokens)
 
     # Get the most common tokens as the vocabulary
-    vocab = [word for word, _ in token_counts.most_common(vocab_size)]
+    vocab, _ = zip(*token_counts.most_common(vocab_size))
     return vocab
 
 
@@ -91,11 +89,3 @@ def calculate_token_probabilities(tokenizer: Tokenizer, txt: list[str]) -> np.nd
     x /= sum_id
 
     return x
-
-
-# def load_dataset(path: str):
-#     """Load a dataset from a file."""
-#     # Collect paths for training data
-#     paths = sorted(Path(path).glob("*.json"))
-#     X, y = collect_means_and_texts(paths)
-#     return X, y
