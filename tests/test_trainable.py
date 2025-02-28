@@ -17,8 +17,8 @@ def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: T
     s = StaticModelForClassification(vectors=vectors_torched, tokenizer=mock_tokenizer, n_layers=n_layers)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
-    assert s.classes == s.classes_
-    assert s.classes == ["0", "1"]
+    assert list(s.classes) == s.classes_
+    assert list(s.classes) == ["0", "1"]
 
     head = s.construct_head()
     assert head[0].in_features == mock_vectors.shape[1]
@@ -41,7 +41,7 @@ def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) ->
 def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test initializion from a static model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
-    s = FinetunableStaticModel.from_static_model(model)
+    s = FinetunableStaticModel.from_static_model(model=model)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
 
@@ -55,7 +55,7 @@ def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenize
 def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test initializion from a static model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
-    s = StaticModelForClassification.from_static_model(model)
+    s = StaticModelForClassification.from_static_model(model=model)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
 
@@ -112,7 +112,16 @@ def test_textdataset_init_incorrect() -> None:
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
-    assert result == ["b", "b"]
+    if mock_trained_pipeline.multilabel:
+        if type(mock_trained_pipeline.classes_[0]) == str:
+            assert result == [["a", "b"], ["a", "b"]]
+        else:
+            assert result == [[0, 1], [0, 1]]
+    else:
+        if type(mock_trained_pipeline.classes_[0]) == str:
+            assert result == ["b", "b"]
+        else:
+            assert result == [1, 1]
 
 
 def test_predict_proba(mock_trained_pipeline: StaticModelForClassification) -> None:
@@ -136,10 +145,26 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
     assert np.allclose(p1, p2)
 
 
-def test_train_test_split() -> None:
+def test_train_test_split(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the train test split function."""
-    a, b, c, d = StaticModelForClassification._train_test_split(["0", "1", "2", "3"], ["1", "1", "0", "0"], 0.5)
+    a, b, c, d = mock_trained_pipeline._train_test_split(["0", "1", "2", "3"], ["1", "1", "0", "0"], 0.5)
     assert len(a) == 2
     assert len(b) == 2
     assert len(c) == len(a)
     assert len(d) == len(b)
+
+
+def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
+    """Test the evaluate function."""
+    if mock_trained_pipeline.multilabel:
+        if type(mock_trained_pipeline.classes_[0]) == str:
+            mock_trained_pipeline.evaluate(["dog cat", "dog"], [["a", "b"], ["a"]])
+        else:
+            # Ignore the type error since we don't support int labels in our typing, but the code does
+            mock_trained_pipeline.evaluate(["dog cat", "dog"], [[0, 1], [0]])  # type: ignore
+    else:
+        if type(mock_trained_pipeline.classes_[0]) == str:
+            mock_trained_pipeline.evaluate(["dog cat", "dog"], ["a", "a"])
+        else:
+            # Ignore the type error since we don't support int labels in our typing, but the code does
+            mock_trained_pipeline.evaluate(["dog cat", "dog"], [1, 1])  # type: ignore

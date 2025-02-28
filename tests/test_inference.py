@@ -9,15 +9,42 @@ from model2vec.inference import StaticModelPipeline
 
 
 def test_init_predict(mock_inference_pipeline: StaticModelPipeline) -> None:
-    """Test successful initialization of StaticModelPipeline."""
-    assert mock_inference_pipeline.predict("dog").tolist() == ["b"]
-    assert mock_inference_pipeline.predict(["dog"]).tolist() == ["b"]
+    """Test successful init and predict with StaticModelPipeline."""
+    target: list[str] | list[list[str]]
+    if mock_inference_pipeline.multilabel:
+        if isinstance(mock_inference_pipeline.classes_[0], str):
+            target = [["a", "b"]]
+        else:
+            target = [[0, 1]]  # type: ignore
+    else:
+        if isinstance(mock_inference_pipeline.classes_[0], str):
+            target = ["b"]
+        else:
+            target = [1]  # type: ignore
+    assert mock_inference_pipeline.predict("dog").tolist() == target
+    assert mock_inference_pipeline.predict(["dog"]).tolist() == target
 
 
 def test_init_predict_proba(mock_inference_pipeline: StaticModelPipeline) -> None:
-    """Test successful initialization of StaticModelPipeline."""
+    """Test successful init and predict_proba with StaticModelPipeline."""
     assert mock_inference_pipeline.predict_proba("dog").argmax() == 1
     assert mock_inference_pipeline.predict_proba(["dog"]).argmax(1).tolist() == [1]
+
+
+def test_init_evaluate(mock_inference_pipeline: StaticModelPipeline) -> None:
+    """Test successful init and evaluate with StaticModelPipeline."""
+    target: list[str] | list[list[str]]
+    if mock_inference_pipeline.multilabel:
+        if isinstance(mock_inference_pipeline.classes_[0], str):
+            target = [["a", "b"]]
+        else:
+            target = [[0, 1]]  # type: ignore
+    else:
+        if isinstance(mock_inference_pipeline.classes_[0], str):
+            target = ["b"]
+        else:
+            target = [1]  # type: ignore
+    mock_inference_pipeline.evaluate("dog", target)  # type: ignore
 
 
 def test_roundtrip_save(mock_inference_pipeline: StaticModelPipeline) -> None:
@@ -25,8 +52,19 @@ def test_roundtrip_save(mock_inference_pipeline: StaticModelPipeline) -> None:
     with TemporaryDirectory() as temp_dir:
         mock_inference_pipeline.save_pretrained(temp_dir)
         loaded = StaticModelPipeline.from_pretrained(temp_dir)
-        assert loaded.predict("dog") == ["b"]
-        assert loaded.predict(["dog"]) == ["b"]
+        target: list[str] | list[list[str]]
+        if mock_inference_pipeline.multilabel:
+            if isinstance(mock_inference_pipeline.classes_[0], str):
+                target = [["a", "b"]]
+            else:
+                target = [[0, 1]]  # type: ignore
+        else:
+            if isinstance(mock_inference_pipeline.classes_[0], str):
+                target = ["b"]
+            else:
+                target = [1]  # type: ignore
+        assert loaded.predict("dog").tolist() == target
+        assert loaded.predict(["dog"]).tolist() == target
         assert loaded.predict_proba("dog").argmax() == 1
         assert loaded.predict_proba(["dog"]).argmax(1).tolist() == [1]
 

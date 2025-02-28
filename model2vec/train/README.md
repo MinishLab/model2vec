@@ -2,6 +2,8 @@
 
 Aside from [distillation](../../README.md#distillation), `model2vec` also supports training simple classifiers on top of static models, using [pytorch](https://pytorch.org/), [lightning](https://lightning.ai/) and [scikit-learn](https://scikit-learn.org/stable/index.html).
 
+We support both single and multi-label classification, which work seamlessly based on the labels you provide.
+
 # Installation
 
 To train, make sure you install the training extra:
@@ -20,7 +22,7 @@ from model2vec.train import StaticModelForClassification
 
 # From a distilled model
 distilled_model = distill("baai/bge-base-en-v1.5")
-classifier = StaticModelForClassification.from_static_model(distilled_model)
+classifier = StaticModelForClassification.from_static_model(model=distilled_model)
 
 # From a pre-trained model: potion is the default
 classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32m")
@@ -42,11 +44,10 @@ test = ds["test"]
 s = perf_counter()
 classifier = classifier.fit(train["text"], train["label"])
 
-predicted = classifier.predict(test["text"])
 print(f"Training took {int(perf_counter() - s)} seconds.")
 # Training took 81 seconds
-accuracy = np.mean([x == y for x, y in zip(predicted, test["label"])]) * 100
-print(f"Achieved {accuracy} test accuracy")
+classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["label"])
+print(classification_report)
 # Achieved 91.0 test accuracy
 ```
 
@@ -64,6 +65,44 @@ classifier.predict(test["text"])
 print(f"Took {int((perf_counter() - s) * 1000)} milliseconds for {len(test)} instances on CPU.")
 # Took 67 milliseconds for 2000 instances on CPU.
 ```
+
+## Multi-label classification
+
+Multi-label classification is supported out of the box. Just pass a list of lists to the `fit` function (e.g. `[[label1, label2], [label1, label3]]`), and a multi-label classifier will be trained. For example, the following code trains a multi-label classifier on the [go_emotions](https://huggingface.co/datasets/google-research-datasets/go_emotions) dataset:
+
+```python
+from datasets import load_dataset
+from model2vec.train import StaticModelForClassification
+
+# Initialize a classifier from a pre-trained model
+classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32M")
+
+# Load a multi-label dataset
+ds = load_dataset("google-research-datasets/go_emotions")
+
+# Inspect some of the labels
+print(ds["train"]["labels"][40:50])
+# [[0, 15], [15, 18], [16, 27], [27], [7, 13], [10], [20], [27], [27], [27]]
+
+# Train the classifier on text (X) and labels (y)
+classifier.fit(ds["train"]["text"], ds["train"]["labels"])
+```
+
+Then, we can evaluate the classifier:
+
+```python
+from sklearn import metrics
+from sklearn.preprocessing import MultiLabelBinarizer
+
+classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["labels"], threshold=0.3)
+print(classification_report)
+# Accuracy: 0.410
+# Precision: 0.527
+# Recall: 0.410
+# F1: 0.439
+```
+
+The scores are competitive with the popular [roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions) model, while our model is orders of magnitude faster.
 
 # Persistence
 
@@ -106,3 +145,7 @@ The core functionality of the `StaticModelForClassification` is contained in a c
 * `fit`: contains all the lightning-related fitting logic.
 
 The training of the model is done in a `lighting.LightningModule`, which can be modified but is very basic.
+
+# Results
+
+We ran extensive benchmarks where we compared our model to several well known architectures. The results can be found in the [training results](https://github.com/MinishLab/model2vec/tree/main/results#training-results) documentation.

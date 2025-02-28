@@ -25,16 +25,20 @@
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/v/model2vec?color=%23007ec6&label=pypi%20package" alt="Package version"></a>
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/pyversions/model2vec" alt="Supported Python versions"></a>
     <a href="https://pepy.tech/project/model2vec">
-    <img src="https://static.pepy.tech/badge/model2vec" alt="Downloads">
+      <img src="https://static.pepy.tech/badge/model2vec" alt="Downloads">
     </a>
     <a href="https://app.codecov.io/gh/MinishLab/model2vec">
-    <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Codecov">
+      <img src="https://codecov.io/gh/MinishLab/model2vec/graph/badge.svg?token=21TWJ6B5ET" alt="Codecov">
     </a>
+    <a href="https://discord.gg/4BDPR5nmtK">
+      <img src="https://img.shields.io/badge/Join-Discord-5865F2?logo=discord&logoColor=white" alt="Join Discord">
     </a>
-    <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT"></a>
-
+    <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE">
+      <img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT">
+    </a>
   </h2>
 </div>
+
 
 
 
@@ -105,15 +109,14 @@ from model2vec.train import StaticModelForClassification
 # Initialize a classifier from a pre-trained model
 classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32M")
 
-# Load a dataset
+# Load a dataset. Note: both single and multi-label classification datasets are supported
 ds = load_dataset("setfit/subj")
 
 # Train the classifier on text (X) and labels (y)
 classifier.fit(ds["train"]["text"], ds["train"]["label"])
 
 # Evaluate the classifier
-predictions = classifier.predict(ds["test"]["text"])
-accuracy = np.mean(np.array(predictions) == np.array(ds["test"]["label"])) * 100
+classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["label"])
 ```
 
 For advanced usage, please refer to our [usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md).

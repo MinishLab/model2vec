@@ -45,14 +45,14 @@ class FinetunableStaticModel(nn.Module):
 
     @classmethod
     def from_pretrained(
-        cls: type[ModelType], out_dim: int = 2, model_name: str = "minishlab/potion-base-32m", **kwargs: Any
+        cls: type[ModelType], *, out_dim: int = 2, model_name: str = "minishlab/potion-base-32m", **kwargs: Any
     ) -> ModelType:
         """Load the model from a pretrained model2vec model."""
         model = StaticModel.from_pretrained(model_name)
-        return cls.from_static_model(model, out_dim, **kwargs)
+        return cls.from_static_model(model=model, out_dim=out_dim, **kwargs)
 
     @classmethod
-    def from_static_model(cls: type[ModelType], model: StaticModel, out_dim: int = 2, **kwargs: Any) -> ModelType:
+    def from_static_model(cls: type[ModelType], *, model: StaticModel, out_dim: int = 2, **kwargs: Any) -> ModelType:
         """Load the model from a static model."""
         model.embedding = np.nan_to_num(model.embedding)
         embeddings_converted = torch.from_numpy(model.embedding)
