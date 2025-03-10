@@ -204,7 +204,7 @@ def _validate_parameters(
             "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
         )
 
-    if vocabulary and isinstance(tokenizer.backend_tokenizer.model, (BPE, Unigram)):
+    if vocabulary and isinstance(tokenizer.backend_tokenizer.model, (Unigram, )):
         raise ValueError(
             "You passed a vocabulary, but the model you are using does not use a WordPiece tokenizer. "
             "This is not supported yet."

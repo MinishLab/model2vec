@@ -68,7 +68,17 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
         tokenizer_data["model"]["vocab"] = reindexed
 
     elif model_type == "Unigram":
-        logger.warning("Removing tokens from a unigram tokenizer is not supported.")
+        # Vocab is a list of tuples.
+        vocab: list[dict[str, Any]] = tokenizer_data["model"]["vocab"]
+        n_tokens = len(vocab)
+        # Remove the tokens.
+        for token in tokens_to_remove:
+            for i, (vocab_token, _) in enumerate(vocab):
+                if vocab_token == token:
+                    vocab.pop(i)
+                    break
+            else:
+                logger.warning(f"Token {token} was not in the vocabulary.")
         return tokenizer
 
     elif model_type == "BPE":
@@ -109,7 +119,12 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
                 wordpiece_vocab[token] = len(wordpiece_vocab)
 
     elif model == "Unigram":
-        raise ValueError("Adding tokens to a unigram tokenizer is not supported.")
+        unigram_vocab: list[dict[str, Any]] = data["model"]["vocab"]
+        vocab = set(item[0] for item in unigram_vocab)
+        for token in tokens_to_add:
+            if token not in vocab:
+                token = "_"+token if token[0] != "_" else token
+                unigram_vocab.append([token, 0.0])
 
     elif model == "BPE":
         raise ValueError("Adding tokens to a BPE tokenizer is not supported.")
