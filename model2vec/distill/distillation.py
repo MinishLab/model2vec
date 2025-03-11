@@ -10,6 +10,7 @@ from huggingface_hub import model_info
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
 from tokenizers.models import BPE, Unigram
+from tokenizers.pre_tokenizers import Metaspace
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import (
@@ -204,12 +205,16 @@ def _validate_parameters(
             "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
         )
 
-    if vocabulary and isinstance(tokenizer.backend_tokenizer.model, (Unigram, )):
+    if vocabulary and isinstance(tokenizer.backend_tokenizer.model, BPE):
         raise ValueError(
             "You passed a vocabulary, but the model you are using does not use a WordPiece tokenizer. "
             "This is not supported yet."
             "Feel free to open an issue if this is a blocker: https://github.com/MinishLab/model2vec/issues"
         )
+    if vocabulary and isinstance(tokenizer.backend_tokenizer.model, Unigram):
+        if not (isinstance(tokenizer.backend_tokenizer.pre_tokenizer, Metaspace) and tokenizer.backend_tokenizer.pre_tokenizer.prepend_scheme == 'always'):
+            raise ValueError("You passed a vocabulary, but the model you are using does not use a Metaspace tokenizer with prepend scheme.")
+         
 
     return sif_coefficient
 
