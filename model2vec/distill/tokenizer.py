@@ -69,17 +69,12 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
 
     elif model_type == "Unigram":
         # Vocab is a list of tuples.
-        vocab: list[dict[str, Any]] = tokenizer_data["model"]["vocab"]
-        n_tokens = len(vocab)
+        vocab: list[tuple[str, float]] = tokenizer_data["model"]["vocab"]
+
         # Remove the tokens.
-        for token in tokens_to_remove:
-            for i, (vocab_token, _) in enumerate(vocab):
-                if vocab_token == token:
-                    vocab.pop(i)
-                    break
-            else:
-                logger.warning(f"Token {token} was not in the vocabulary.")
-        return tokenizer
+        tokens_to_remove_set = set(tokens_to_remove)
+        new_vocab = [(token, score) for token, score in vocab if token not in tokens_to_remove_set]
+        tokenizer_data["model"]["vocab"] = new_vocab
 
     elif model_type == "BPE":
         logger.warning("Removing tokens from a BPE tokenizer is not supported.")
@@ -122,7 +117,7 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
         pre_tokenizer = data["pre_tokenizer"]
         if pre_tokenizer['type'] != 'Metaspace':
             if pre_tokenizer['prepend_scheme'] == 'always':
-                unigram_vocab: list[dict[str, Any]] = data["model"]["vocab"]
+                unigram_vocab: list[tuple[str, float]] = data["model"]["vocab"]
                 vocab = set(item[0] for item in unigram_vocab)
                 for token in tokens_to_add:
                     if token not in vocab:
