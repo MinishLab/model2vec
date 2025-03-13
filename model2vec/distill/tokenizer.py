@@ -126,6 +126,8 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
                             unigram_vocab.append([pre_tokenized_token, 0.0])
             else:
                 raise ValueError("Only prepend_scheme 'always' is supported for Unigram tokenizers.")
+        else:
+            raise ValueError("Only Metaspace pre-tokenizer is supported for Unigram tokenizers.")
 
     elif model == "BPE":
         raise ValueError("Adding tokens to a BPE tokenizer is not supported.")
