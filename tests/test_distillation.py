@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from importlib import import_module
 from unittest.mock import MagicMock, patch
 
@@ -166,10 +165,10 @@ def test_distill_removal_pattern(
         (
             ["wordA", "wordB"],
             False,
-            4,
+            2,
             False,
             None,
-            (7, 4),
+            (3, 2),
         ),  # Custom vocab without subword , PCA applied
         (None, True, "auto", False, None, (29528, 768)),  # Subword, PCA set to 'auto'
         (None, True, "auto", True, 1e-4, (29528, 768)),  # Subword, PCA set to 'auto'
@@ -181,7 +180,7 @@ def test_distill_removal_pattern(
         (None, True, 1024, False, None, (29528, 768)),  # Subword, PCA set to high number.
         (["wordA", "wordB"], True, 4, False, None, (29530, 4)),  # Custom vocab with subword, PCA applied
         (None, True, None, True, None, (29528, 768)),  # No PCA applied
-        (["wordA", "wordB"], False, 4, True, None, (7, 4)),  # Custom vocab without subwords PCA and Zipf applied
+        (["wordA", "wordB"], False, 2, True, None, (3, 2)),  # Custom vocab without subwords PCA and Zipf applied
         (None, False, 256, True, None, None),  # use_subword = False without passing a vocabulary should raise an error
     ],
 )
@@ -310,14 +309,15 @@ def test__post_process_embeddings(
         # Case: duplicates ("word2") and an empty token ("")
         (["word1", "word2", "word2", "word3", ""], ["word3"], ["word1", "word2"], ["Removed", "duplicate", "empty"]),
         # Case: No duplicates, no empty tokens
-        (["wordA", "wordB", "wordC"], [], ["wordA", "wordB", "wordC"], []),
+        (["wordA", "wordB", "wordC"], [], ["worda", "wordb", "wordc"], []),
         # Case: Duplicate "wordB" and "wordA" already in added_tokens
-        (["wordA", "wordB", "wordC", "wordB"], ["wordA"], ["wordB", "wordC"], ["Removed", "duplicate"]),
+        (["wordA", "wordB", "wordC", "wordB"], ["worda"], ["wordb", "wordc"], ["Removed", "duplicate"]),
         # Case: Only empty token (""), should return an empty list
         ([""], [], [], ["Removed", "empty"]),
     ],
 )
 def test__clean_vocabulary(
+    mock_berttokenizer: BertTokenizerFast,
     preprocessed_vocabulary: list[str],
     added_tokens: list[str],
     expected_output: list[str],
@@ -326,7 +326,7 @@ def test__clean_vocabulary(
 ) -> None:
     """Test the _clean_vocabulary function."""
     with caplog.at_level("WARNING"):
-        cleaned_vocab = _clean_vocabulary(preprocessed_vocabulary, added_tokens)
+        cleaned_vocab = _clean_vocabulary(mock_berttokenizer.backend_tokenizer, preprocessed_vocabulary, added_tokens)
 
         # Check the cleaned vocabulary matches the expected output
         assert cleaned_vocab == expected_output

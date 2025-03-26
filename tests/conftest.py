@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 from tokenizers import Tokenizer
-from tokenizers.models import WordLevel
+from tokenizers.models import WordPiece
 from tokenizers.pre_tokenizers import Whitespace
 from transformers import AutoModel, AutoTokenizer
 
@@ -20,7 +20,7 @@ def mock_tokenizer() -> Tokenizer:
     vocab = ["[PAD]", "word1", "word2", "word3", "[UNK]"]
     unk_token = "[UNK]"
 
-    model = WordLevel(vocab={word: idx for idx, word in enumerate(vocab)}, unk_token=unk_token)
+    model = WordPiece(vocab={word: idx for idx, word in enumerate(vocab)}, unk_token=unk_token)
     tokenizer = Tokenizer(model)
     tokenizer.pre_tokenizer = Whitespace()
 

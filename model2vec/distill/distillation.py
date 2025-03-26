@@ -12,11 +12,8 @@ from tokenizers import Tokenizer
 from tokenizers.models import BPE, Unigram
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
-from model2vec.distill.inference import (
-    create_output_embeddings_from_model,
-    create_output_embeddings_from_model_and_tokens,
-)
-from model2vec.distill.tokenizer import add_tokens, preprocess_vocabulary, remove_tokens
+from model2vec.distill.inference import create_embeddings
+from model2vec.distill.tokenizer import replace_vocabulary
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 
@@ -69,54 +66,54 @@ def distill_from_model(
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
     :return: A StaticModel
+    :raises: ValueError if the regex isn't compileable.
 
     """
-    sif_coefficient = _validate_parameters(tokenizer, vocabulary, apply_zipf, sif_coefficient, use_subword)
+    backend_tokenizer = tokenizer.backend_tokenizer
+    sif_coefficient = _validate_parameters(vocabulary, apply_zipf, sif_coefficient, use_subword)
+
+    if vocabulary is None:
+        vocabulary = []
 
     device = select_optimal_device(device)
     # Make a base list of tokens.
-    tokens: list[str] = []
-    if use_subword:
-        # Create the subword embeddings.
-        tokens, embeddings = create_output_embeddings_from_model(model=model, tokenizer=tokenizer, device=device)
-        new_tokenizer, embeddings = _remove_tokens_and_embeddings(tokenizer, token_remove_pattern, tokens, embeddings)
-    else:
-        # We need to keep the unk token in the tokenizer.
-        unk_token = tokenizer.backend_tokenizer.model.unk_token
-        # Remove all tokens except the UNK token.
-        new_tokenizer = remove_tokens(tokenizer.backend_tokenizer, list(set(tokenizer.get_vocab()) - {unk_token}))
-        # We need to set embeddings to None because we don't know the dimensions of the embeddings yet.
-        embeddings = None
+    subword_vocab: dict[str, int] = tokenizer.get_vocab()
+    subword_tokens: list[str] = [k for k, _ in sorted(subword_vocab.items(), key=lambda x: x[1])]
 
-    if vocabulary:
-        # Preprocess the vocabulary with the original tokenizer.
-        preprocessed_vocabulary = preprocess_vocabulary(tokenizer.backend_tokenizer, vocabulary)
-        n_tokens_before = len(preprocessed_vocabulary)
-        # Clean the vocabulary by removing duplicate tokens and tokens that are in the subword vocabulary.
-        cleaned_vocabulary = _clean_vocabulary(preprocessed_vocabulary, tokens)
-        n_tokens_after = len(cleaned_vocabulary)
-        logger.info(
-            f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
-        )
-        # Only create embeddings if we have tokens to add.
-        if cleaned_vocabulary:
-            # Create the embeddings.
-            _, token_embeddings = create_output_embeddings_from_model_and_tokens(
-                model=model,
-                tokenizer=tokenizer,
-                tokens=cleaned_vocabulary,
-                device=device,
-            )
+    n_tokens_before = len(vocabulary)
+    # Clean the vocabulary by removing duplicate tokens and tokens that are in the subword vocabulary.
+    cleaned_vocabulary = _clean_vocabulary(tokenizer.backend_tokenizer, vocabulary, subword_tokens)
+    n_tokens_after = len(cleaned_vocabulary)
+    logger.info(
+        f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
+    )
 
-            # If we don't have subword tokens, we still need to create
-            #  some embeddings for [UNK] and some other special tokens.
-            if embeddings is None:
-                embeddings = np.zeros((new_tokenizer.get_vocab_size(), token_embeddings.shape[1]))
-            embeddings = np.concatenate([embeddings, token_embeddings], axis=0)
-            # Add the cleaned vocabulary to the tokenizer.
-            new_tokenizer = add_tokens(new_tokenizer, cleaned_vocabulary)
-        else:
-            logger.warning("Didn't create any token embeddings as all tokens were duplicates or empty.")
+    # Create the embeddings.
+    all_tokens, embeddings = create_embeddings(
+        model=model,
+        tokenizer=tokenizer,
+        tokens=cleaned_vocabulary,
+        device=device,
+        use_subword=use_subword,
+    )
+
+    if token_remove_pattern is not None:
+        try:
+            token_regex = re.compile(token_remove_pattern)
+        except re.error as e:
+            raise ValueError(f"Couldn't compile the regex pattern {token_remove_pattern}.") from e
+        tokens_to_remove = set()
+        indices_to_remove = []
+        for idx, token in enumerate(all_tokens):
+            if token_regex.match(token):
+                tokens_to_remove.add(token)
+                indices_to_remove.append(idx)
+        all_tokens = [token for token in all_tokens if token not in tokens_to_remove]
+        embeddings = np.delete(embeddings, indices_to_remove, axis=0)
+        logger.info(f"Removed {len(tokens_to_remove)} tokens from the tokenizer and embeddings.")
+
+    # Add the cleaned vocabulary to the tokenizer.
+    backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens)
 
     # Post process the embeddings by applying PCA and Zipf weighting.
     embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
@@ -150,7 +147,7 @@ def distill_from_model(
 
     return StaticModel(
         vectors=embeddings,
-        tokenizer=new_tokenizer,
+        tokenizer=backend_tokenizer,
         config=config,
         base_model_name=model_name,
         language=language,
@@ -159,7 +156,6 @@ def distill_from_model(
 
 
 def _validate_parameters(
-    tokenizer: PreTrainedTokenizerFast,
     vocabulary: list[str] | None,
     apply_zipf: bool | None,
     sif_coefficient: float | None,
@@ -168,7 +164,6 @@ def _validate_parameters(
     """
     Validate the parameters passed to the distillation function.
 
-    :param tokenizer: The tokenizer to use.
     :param vocabulary: The vocabulary to use.
     :param apply_zipf: DEPRECATED: This parameter used to control whether Zipf is applied.
         Zipf weighting is now controlled by the sif_coefficient parameter. If this is set to None, no weighting is applied.
@@ -204,49 +199,7 @@ def _validate_parameters(
             "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
         )
 
-    if vocabulary and isinstance(tokenizer.backend_tokenizer.model, (BPE, Unigram)):
-        raise ValueError(
-            "You passed a vocabulary, but the model you are using does not use a WordPiece tokenizer. "
-            "This is not supported yet."
-            "Feel free to open an issue if this is a blocker: https://github.com/MinishLab/model2vec/issues"
-        )
-
     return sif_coefficient
-
-
-def _remove_tokens_and_embeddings(
-    tokenizer: PreTrainedTokenizerFast, token_remove_pattern: str | None, tokens: list[str], embeddings: np.ndarray
-) -> tuple[Tokenizer, np.ndarray]:
-    if not token_remove_pattern:
-        return tokenizer.backend_tokenizer, embeddings
-
-    try:
-        token_regex = re.compile(token_remove_pattern)
-    except re.error as e:
-        raise ValueError(f"Invalid regex pattern: {token_remove_pattern}") from e
-        # Remove any unused tokens from the tokenizer and embeddings.
-    wrong_tokens = [x for x in tokens if token_regex.match(x)]
-    vocab = tokenizer.get_vocab()
-    # Get the ids of the unused token.
-    wrong_token_ids = [vocab[token] for token in wrong_tokens]
-
-    if len(wrong_token_ids) == len(vocab):
-        raise ValueError(
-            "All tokens in the vocabulary are unused tokens. This will result in an empty tokenizer. "
-            "Please provide a valid token removal pattern. The pattern is now: {token_remove_pattern}"
-        )
-
-        # Remove the unused tokens from the tokenizer.
-    new_tokenizer = remove_tokens(tokenizer.backend_tokenizer, wrong_tokens)
-    if new_tokenizer.get_vocab_size() == tokenizer.backend_tokenizer.get_vocab_size():
-        # This happens if we didn't remove any tokens.
-        return new_tokenizer, embeddings
-
-    # Remove the embeddings of the unused tokens.
-    embeddings = np.delete(embeddings, wrong_token_ids, axis=0)
-    logger.info(f"Removed {len(wrong_tokens)} unused tokens from the tokenizer and embeddings.")
-
-    return new_tokenizer, embeddings
 
 
 def distill(
@@ -345,20 +298,29 @@ def _post_process_embeddings(
     return embeddings
 
 
-def _clean_vocabulary(preprocessed_vocabulary: list[str], added_tokens: list[str]) -> list[str]:
+def _clean_vocabulary(tokenizer: Tokenizer, preprocessed_vocabulary: list[str], added_tokens: list[str]) -> list[str]:
     """Cleans a vocabulary by removing duplicates and tokens that were already in the vocabulary."""
     added_tokens_set = set(added_tokens)
     seen_tokens = set()
     cleaned_vocabulary = []
     n_empty = 0
     n_duplicates = 0
+    n_multiword = 0
     for token in preprocessed_vocabulary:
+        if tokenizer.normalizer is not None:
+            token = tokenizer.normalizer.normalize_str(token)
+
         if not token:
             n_empty += 1
             continue
         if token in seen_tokens or token in added_tokens_set:
             n_duplicates += 1
             continue
+
+        if tokenizer.pre_tokenizer is not None:
+            pretokenized_tokens = tokenizer.pre_tokenizer.pre_tokenize_str(token)
+            if len(pretokenized_tokens) != 1:
+                continue
         seen_tokens.add(token)
         cleaned_vocabulary.append(token)
 
@@ -366,5 +328,7 @@ def _clean_vocabulary(preprocessed_vocabulary: list[str], added_tokens: list[str
         logger.warning(f"Removed {n_duplicates} duplicate tokens.")
     if n_empty:
         logger.warning(f"Removed {n_empty} empty tokens.")
+    if n_multiword:
+        logger.warning(f"Removed {n_multiword} multiword tokens.")
 
     return cleaned_vocabulary
