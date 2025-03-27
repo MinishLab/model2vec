@@ -337,3 +337,37 @@ def test__clean_vocabulary(
         # Ensure the expected warnings contain expected keywords like 'Removed', 'duplicate', or 'empty'
         for expected_warning in expected_warnings:
             assert any(expected_warning in logged_warning for logged_warning in logged_warnings)
+
+
+def test_distill_with_bpe_whitespace_pretokenizer() -> None:
+    """Test distill function with BPE tokenizer with whitespace pretokenizer and added vocabulary."""
+    import json
+    from unittest.mock import MagicMock
+    from model2vec.distill.distillation import distill_from_model
+
+    # Create a dummy BPE tokenizer with whitespace pretokenizer support.
+    class DummyBPE:
+        vocab_size = 100
+        def __init__(self):
+            self.vocab = {}
+        def to_str(self) -> str:
+            # Include the tokenizer type and current vocabulary in the JSON string.
+            return json.dumps({"tokenizer": "BPE-Whitespace", "vocab": list(self.vocab.keys())})
+    
+    dummy_tokenizer = DummyBPE()
+    dummy_model = MagicMock()
+    
+    extra_vocab = ["hello", "world"]
+    # Simulate that the tokenizer adds extra vocabulary words.
+    for word in extra_vocab:
+        dummy_tokenizer.vocab[word] = len(dummy_tokenizer.vocab)
+    
+    # Call distill_from_model using the dummy BPE tokenizer with added vocabulary.
+    static_model = distill_from_model(model=dummy_model, tokenizer=dummy_tokenizer, device="cpu", vocabulary=extra_vocab)
+    
+    tokens_str = static_model.tokenizer.to_str()
+    # Verify that the tokenizer configuration from the BPE tokenizer is preserved.
+    assert "BPE-Whitespace" in tokens_str
+    # Check that the extra vocabulary words have been added to the tokenizer.
+    for word in extra_vocab:
+         assert word in tokens_str

@@ -9,6 +9,25 @@ from tokenizers import Tokenizer
 logger = logging.getLogger(__name__)
 
 
+def filter_by_pretokenizer(pretokenizer, vocabulary: list[str]) -> list[str]:
+    """
+    Filter a vocabulary based on a pretokenizer.
+
+    :param pretokenizer: The pretokenizer to use.
+    :param
+    vocabulary: The vocabulary to filter.
+    :return: The filtered vocabulary.
+    """
+    filtered_vocabulary = []
+
+    for word in vocabulary:
+        # Check if the word is a single token after pre-tokenization
+        if len(pretokenizer.pre_tokenize_str(word)) == 1:
+            filtered_vocabulary.append(word)
+        else:
+            logger.warning(f"Word '{word}' is not a single token after pre-tokenization.")
+    return filtered_vocabulary
+
 def preprocess_vocabulary(tokenizer: Tokenizer, vocabulary: list[str]) -> list[str]:
     """Preprocess a vocabulary with a tokenizer by doing a roundtrip encode/decode."""
     encoded_ids: list[list[int]] = [
@@ -68,8 +87,13 @@ def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenize
         tokenizer_data["model"]["vocab"] = reindexed
 
     elif model_type == "Unigram":
-        logger.warning("Removing tokens from a unigram tokenizer is not supported.")
-        return tokenizer
+        # Vocab is a list of tuples.
+        vocab: list[tuple[str, float]] = tokenizer_data["model"]["vocab"]
+
+        # Remove the tokens.
+        tokens_to_remove_set = set(tokens_to_remove)
+        new_vocab = [(token, score) for token, score in vocab if token not in tokens_to_remove_set]
+        tokenizer_data["model"]["vocab"] = new_vocab
 
     elif model_type == "BPE":
         logger.warning("Removing tokens from a BPE tokenizer is not supported.")
@@ -109,8 +133,19 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
                 wordpiece_vocab[token] = len(wordpiece_vocab)
 
     elif model == "Unigram":
-        raise ValueError("Adding tokens to a unigram tokenizer is not supported.")
-
+        pre_tokenize = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str
+        pre_tokenizer = data["pre_tokenizer"]
+        if pre_tokenizer['type'] != 'Metaspace':
+             raise ValueError("Only Metaspace pre-tokenizer is supported for Unigram tokenizers.")
+        elif pre_tokenizer['prepend_scheme'] != 'always':
+            raise ValueError("Only prepend_scheme 'always' is supported for Unigram tokenizers with Metaspace pre-tokenizer.")
+        else:
+            unigram_vocab: list[tuple[str, float]] = data["model"]["vocab"]
+            vocab = set(item[0] for item in unigram_vocab)
+            for token in tokens_to_add:
+                if token not in vocab:
+                    unigram_vocab.append([token, 0.0])
+                        
     elif model == "BPE":
         raise ValueError("Adding tokens to a BPE tokenizer is not supported.")
 
