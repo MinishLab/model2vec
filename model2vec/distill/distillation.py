@@ -90,10 +90,13 @@ def distill_from_model(
         embeddings = None
 
     if vocabulary:
+        filterd_vocabulary = filter_by_pretokenizer(
+            tokenizer.backend_tokenizer.pre_tokenizer, vocabulary
+        )
         # Preprocess the vocabulary with the original tokenizer.
-        preprocessed_vocabulary = preprocess_vocabulary(tokenizer.backend_tokenizer, vocabulary)
+        preprocessed_vocabulary = preprocess_vocabulary(tokenizer.backend_tokenizer, filterd_vocabulary)
         n_tokens_before = len(preprocessed_vocabulary)
-        # Clean the vocabulary by removing duplicate tokens and tokens that are in the subword vocabulary.
+        # Clean the vocabulary by removing duplicate tokens and tokens that are in the subword vocabulary and tokes that will be split by the pre-tokenizer.
         cleaned_vocabulary = _clean_vocabulary(preprocessed_vocabulary, tokens)
         n_tokens_after = len(cleaned_vocabulary)
         logger.info(

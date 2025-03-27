@@ -9,6 +9,25 @@ from tokenizers import Tokenizer
 logger = logging.getLogger(__name__)
 
 
+def filter_by_pretokenizer(pretokenizer, vocabulary: list[str]) -> list[str]:
+    """
+    Filter a vocabulary based on a pretokenizer.
+
+    :param pretokenizer: The pretokenizer to use.
+    :param
+    vocabulary: The vocabulary to filter.
+    :return: The filtered vocabulary.
+    """
+    filtered_vocabulary = []
+
+    for word in vocabulary:
+        # Check if the word is a single token after pre-tokenization
+        if len(pretokenizer.pre_tokenize_str(word)) == 1:
+            filtered_vocabulary.append(word)
+        else:
+            logger.warning(f"Word '{word}' is not a single token after pre-tokenization.")
+    return filtered_vocabulary
+
 def preprocess_vocabulary(tokenizer: Tokenizer, vocabulary: list[str]) -> list[str]:
     """Preprocess a vocabulary with a tokenizer by doing a roundtrip encode/decode."""
     encoded_ids: list[list[int]] = [
@@ -125,9 +144,8 @@ def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
             vocab = set(item[0] for item in unigram_vocab)
             for token in tokens_to_add:
                 if token not in vocab:
-                    for (pre_tokenized_token, _) in pre_tokenize(token):
-                        unigram_vocab.append([pre_tokenized_token, 0.0])
-
+                    unigram_vocab.append([token, 0.0])
+                        
     elif model == "BPE":
         raise ValueError("Adding tokens to a BPE tokenizer is not supported.")
 
