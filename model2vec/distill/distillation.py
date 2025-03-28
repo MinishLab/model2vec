@@ -9,7 +9,6 @@ import numpy as np
 from huggingface_hub import model_info
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
-from tokenizers.models import BPE, Unigram
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import create_embeddings
@@ -66,11 +65,12 @@ def distill_from_model(
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
     :return: A StaticModel
-    :raises: ValueError if the regex isn't compileable.
 
     """
     backend_tokenizer = tokenizer.backend_tokenizer
-    sif_coefficient = _validate_parameters(vocabulary, apply_zipf, sif_coefficient, use_subword)
+    sif_coefficient, token_remove_regex = _validate_parameters(
+        vocabulary, apply_zipf, sif_coefficient, use_subword, token_remove_pattern
+    )
 
     if vocabulary is None:
         vocabulary = []
@@ -95,22 +95,8 @@ def distill_from_model(
         tokens=cleaned_vocabulary,
         device=device,
         use_subword=use_subword,
+        token_remove_regex=token_remove_regex,
     )
-
-    if token_remove_pattern is not None:
-        try:
-            token_regex = re.compile(token_remove_pattern)
-        except re.error as e:
-            raise ValueError(f"Couldn't compile the regex pattern {token_remove_pattern}.") from e
-        tokens_to_remove = set()
-        indices_to_remove = []
-        for idx, token in enumerate(all_tokens):
-            if token_regex.match(token):
-                tokens_to_remove.add(token)
-                indices_to_remove.append(idx)
-        all_tokens = [token for token in all_tokens if token not in tokens_to_remove]
-        embeddings = np.delete(embeddings, indices_to_remove, axis=0)
-        logger.info(f"Removed {len(tokens_to_remove)} tokens from the tokenizer and embeddings.")
 
     # Add the cleaned vocabulary to the tokenizer.
     backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens)
@@ -160,7 +146,8 @@ def _validate_parameters(
     apply_zipf: bool | None,
     sif_coefficient: float | None,
     use_subword: bool,
-) -> float | None:
+    token_remove_pattern: str | None,
+) -> tuple[float | None, re.Pattern | None]:
     """
     Validate the parameters passed to the distillation function.
 
@@ -170,6 +157,7 @@ def _validate_parameters(
     :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
         Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
+    :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
     :return: The SIF coefficient to use.
     :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
     :raises: ValueError if the vocabulary contains duplicate tokens.
@@ -199,7 +187,14 @@ def _validate_parameters(
             "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
         )
 
-    return sif_coefficient
+    token_remove_regex: re.Pattern | None = None
+    if token_remove_pattern is not None:
+        try:
+            token_remove_regex = re.compile(token_remove_pattern)
+        except re.error as e:
+            raise ValueError(f"Couldn't compile the regex pattern: {e}")
+
+    return sif_coefficient, token_remove_regex
 
 
 def distill(

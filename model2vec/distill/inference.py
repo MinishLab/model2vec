@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import re
 from pathlib import Path
 from typing import Protocol, Union
 
@@ -13,7 +14,8 @@ from tqdm import tqdm
 from transformers import PreTrainedModel, PreTrainedTokenizerFast
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 
-from model2vec.distill.tokenizer import _get_unk_token
+from model2vec.distill.tokenizer import get_unk_token
+from model2vec.distill.utils import filter_vocabulary_by_regex
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ def create_embeddings(
     use_subword: bool,
     tokens: list[str],
     device: str,
+    token_remove_regex: re.Pattern | None,
 ) -> tuple[list[str], np.ndarray]:
     """
     Create output embeddings for a bunch of tokens using a pretrained model.
@@ -45,6 +48,7 @@ def create_embeddings(
     :param use_subword: Whether to include subword tokens in the output.
     :param tokens: The tokens to use.
     :param device: The torch device to use.
+    :param token_remove_regex: A regex pattern to remove tokens from the vocabulary.
     :return: The tokens and output embeddings.
     """
     model = model.to(device)
@@ -58,9 +62,17 @@ def create_embeddings(
     tokenized: list[torch.Tensor] = []
 
     if use_subword:
-        ids = torch.arange(len(tokenizer.get_vocab()))
-    elif unk_token := _get_unk_token(tokenizer.backend_tokenizer):
-        # Include UNK token
+        if token_remove_regex is not None:
+            # Sort the vocabulary by id, important for zipf.
+            sorted_vocab = sorted(tokenizer.get_vocab().items(), key=lambda x: x[1])
+            id_list = filter_vocabulary_by_regex(token_remove_regex, sorted_vocab)
+            ids = torch.Tensor(id_list).long()
+        else:
+            # If the token remove regex is None, just use all tokens.
+            ids = torch.arange(len(tokenizer.get_vocab()))
+
+    elif unk_token := get_unk_token(tokenizer.backend_tokenizer):
+        # Include unk token. This is necessary for some models.
         ids = torch.Tensor(tokenizer.convert_tokens_to_ids([unk_token])).long()
     else:
         ids = None

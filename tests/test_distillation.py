@@ -82,6 +82,7 @@ def test_distill_from_model(
             pca_dims=pca_dims,
             apply_zipf=apply_zipf,
             use_subword=use_subword,
+            token_remove_pattern=None,
         )
 
         static_model2 = distill(
@@ -91,6 +92,7 @@ def test_distill_from_model(
             pca_dims=pca_dims,
             apply_zipf=apply_zipf,
             use_subword=use_subword,
+            token_remove_pattern=None,
         )
 
         assert static_model.embedding.shape == static_model2.embedding.shape

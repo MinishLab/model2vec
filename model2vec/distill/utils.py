@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from logging import getLogger
 
 import torch
@@ -26,3 +27,23 @@ def select_optimal_device(device: str | None) -> str:
         logger.info(f"Automatically selected device: {device}")
 
     return device
+
+
+def filter_vocabulary_by_regex(token_remove_regex: re.Pattern, tokens: list[tuple[str, int]]) -> list[int]:
+    """
+    Filter a sorted vocabulary by a regex pattern and return their ids.
+
+    :param token_remove_regex: The regex pattern to filter by.
+    :param tokens: The tokens to filter. This should be a list of tuples with the token and its id.
+    :return: The ids of the tokens left after filtering.
+    :raises ValueError: If no tokens are left after filtering.
+    """
+    id_list = []
+    for token, id in tokens:
+        if not token_remove_regex.match(token):
+            id_list.append(id)
+
+    if not id_list:
+        raise ValueError("No tokens left after filtering by regex.")
+
+    return id_list

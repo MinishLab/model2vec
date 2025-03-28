@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
+import numpy as np
 from tokenizers import Tokenizer
 from tokenizers.models import BPE, Unigram, WordPiece
 
 logger = logging.getLogger(__name__)
 
 
-def _get_unk_token(tokenizer: Tokenizer) -> str | None:
+def get_unk_token(tokenizer: Tokenizer) -> str | None:
     """
     Get the unknown token for a tokenizer.
 
@@ -32,33 +34,6 @@ def _get_unk_token(tokenizer: Tokenizer) -> str | None:
     else:
         logger.warning(f"Unknown model type {type(model)}")
         return None
-
-
-def _normalize_vocabulary(tokenizer: Tokenizer, vocabulary: list[str]) -> list[str]:
-    """
-    Normalize vocabulary tokens if a normalizer is present in the tokenizer.
-
-    Only normalizes tokens that are not already in the tokenizer's vocabulary,
-    to avoid normalizing tokens twice.
-
-    :param tokenizer: The tokenizer to use.
-    :param vocabulary: The vocabulary to normalize.
-    :return: The normalized vocabulary.
-    """
-    current_tokenizer_vocab = set(tokenizer.get_vocab())
-    normalized_tokens = []
-
-    if tokenizer.normalizer is not None:
-        for token in vocabulary:
-            # Don't normalize twice, because normalization might not be idempotent.
-            if token in current_tokenizer_vocab:
-                normalized_tokens.append(token)
-            else:
-                normalized_tokens.append(tokenizer.normalizer.normalize_str(token))
-    else:
-        normalized_tokens = vocabulary
-
-    return normalized_tokens
 
 
 def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[str]:
@@ -119,15 +94,11 @@ def replace_vocabulary(tokenizer: Tokenizer, new_vocabulary: list[str]) -> Token
     """Replace the vocabulary of a tokenizer with a new one."""
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
 
-    # Use the new function in the replace_vocabulary function
-    normalized_tokens = _normalize_vocabulary(tokenizer, new_vocabulary)
+    # NOTE: all tokens have been normalized before.
     # Very careful, we need to pretokenize words before adding them to the vocabulary.
     # But only if they are not subword tokens.
-    pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, normalized_tokens)
+    pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary)
 
-    # Only keep UNK token
-
-    # tokenizer_json.pop("special_tokens")
     model_type = tokenizer_json["model"]["type"]
 
     if model_type == "WordPiece":
