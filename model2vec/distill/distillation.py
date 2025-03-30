@@ -293,7 +293,7 @@ def _post_process_embeddings(
     return embeddings
 
 
-def _clean_vocabulary(tokenizer: Tokenizer, preprocessed_vocabulary: list[str], added_tokens: list[str]) -> list[str]:
+def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens: list[str]) -> list[str]:
     """Cleans a vocabulary by removing duplicates and tokens that were already in the vocabulary."""
     added_tokens_set = set(added_tokens)
     seen_tokens = set()
@@ -301,7 +301,7 @@ def _clean_vocabulary(tokenizer: Tokenizer, preprocessed_vocabulary: list[str], 
     n_empty = 0
     n_duplicates = 0
     n_multiword = 0
-    for token in preprocessed_vocabulary:
+    for token in vocabulary:
         if tokenizer.normalizer is not None:
             token = tokenizer.normalizer.normalize_str(token)
 
@@ -312,10 +312,13 @@ def _clean_vocabulary(tokenizer: Tokenizer, preprocessed_vocabulary: list[str], 
             n_duplicates += 1
             continue
 
-        if tokenizer.pre_tokenizer is not None:
-            pretokenized_tokens = tokenizer.pre_tokenizer.pre_tokenize_str(token)
+        pre_tokenizer = tokenizer.pre_tokenizer
+        if pre_tokenizer is not None:
+            pretokenized_tokens = pre_tokenizer.pre_tokenize_str(token)
             if len(pretokenized_tokens) != 1:
+                n_multiword += 1
                 continue
+
         seen_tokens.add(token)
         cleaned_vocabulary.append(token)
 
