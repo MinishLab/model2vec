@@ -6,21 +6,36 @@ import numpy as np
 import pytest
 import torch
 from tokenizers import Tokenizer
-from tokenizers.models import WordPiece
+from tokenizers.models import BPE, Unigram, WordPiece
 from tokenizers.pre_tokenizers import Whitespace
 from transformers import AutoModel, AutoTokenizer
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.train import StaticModelForClassification
 
+_TOKENIZER_TYPES = ["wordpiece", "bpe", "unigram"]
 
-@pytest.fixture(scope="session")
-def mock_tokenizer() -> Tokenizer:
+
+@pytest.fixture(scope="session", params=_TOKENIZER_TYPES, ids=_TOKENIZER_TYPES)
+def mock_tokenizer(request: pytest.FixtureRequest) -> Tokenizer:
     """Create a mock tokenizer."""
     vocab = ["[PAD]", "word1", "word2", "word3", "[UNK]"]
     unk_token = "[UNK]"
 
-    model = WordPiece(vocab={word: idx for idx, word in enumerate(vocab)}, unk_token=unk_token)
+    tokenizer_type = request.param
+
+    if tokenizer_type == "wordpiece":
+        model = WordPiece(vocab={token: idx for idx, token in enumerate(vocab)}, unk_token=unk_token)
+    elif tokenizer_type == "bpe":
+        model = BPE(
+            vocab={token: idx for idx, token in enumerate(vocab)},
+            merges=[],
+            unk_token=unk_token,
+            fuse_unk=True,
+            ignore_merges=True,
+        )
+    elif tokenizer_type == "unigram":
+        model = Unigram(vocab=[(token, 0.0) for token in vocab], unk_id=0)
     tokenizer = Tokenizer(model)
     tokenizer.pre_tokenizer = Whitespace()
 

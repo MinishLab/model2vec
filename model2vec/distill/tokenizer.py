@@ -23,14 +23,12 @@ def get_unk_token(tokenizer: Tokenizer) -> str | None:
     if isinstance(model, WordPiece):
         return model.unk_token
     elif isinstance(model, BPE):
-        return None
+        return model.unk_token
     elif isinstance(model, Unigram):
         unk_id: int | None = model.unk_id
         if unk_id is None:
             return None
-        vocab = tokenizer.get_vocab()
-        vocab_sorted = sorted(vocab.items(), key=lambda x: x[1])
-        return vocab_sorted[unk_id]
+        return tokenizer.id_to_token(unk_id)
     else:
         logger.warning(f"Unknown model type {type(model)}")
         return None
