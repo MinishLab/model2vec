@@ -56,7 +56,7 @@ def create_embeddings(
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
 
-    pad_token = 0
+    pad_token = tokenizer.pad_token_type_id
 
     out_tokens = []
     tokenized: list[torch.Tensor] = []
