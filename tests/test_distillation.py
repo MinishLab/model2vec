@@ -117,7 +117,8 @@ def test_distill_removal_pattern(
     # mock_auto_tokenizer.return_value = mock_berttokenizer
     mock_auto_model.return_value = mock_transformer
 
-    vocab_size = mock_berttokenizer.vocab_size
+    # The vocab size is 30522, but we remove 3 tokens: [CLS], [SEP], and [MASK]
+    expected_vocab_size = mock_berttokenizer.vocab_size - 3
 
     static_model = distill_from_model(
         model=mock_transformer,
@@ -127,7 +128,7 @@ def test_distill_removal_pattern(
         token_remove_pattern=None,
     )
 
-    assert len(static_model.embedding) == vocab_size
+    assert len(static_model.embedding) == expected_vocab_size
 
     # No tokens removed, nonsensical pattern
     static_model = distill_from_model(
@@ -138,8 +139,9 @@ def test_distill_removal_pattern(
         token_remove_pattern="£££££££££££££££££",
     )
 
-    assert len(static_model.embedding) == vocab_size
+    assert len(static_model.embedding) == expected_vocab_size
 
+    # Weird pattern.
     with pytest.raises(ValueError):
         static_model = distill_from_model(
             model=mock_transformer,
@@ -163,26 +165,26 @@ def test_distill_removal_pattern(
 @pytest.mark.parametrize(
     "vocabulary, use_subword, pca_dims, apply_zipf, sif_coefficient, expected_shape",
     [
-        (None, True, 256, True, None, (29528, 256)),  # Output vocab with subwords, PCA applied
+        (None, True, 256, True, None, (29525, 256)),  # Output vocab with subwords, PCA applied
         (
             ["wordA", "wordB"],
             False,
             2,
             False,
             None,
-            (3, 2),
+            (4, 2),
         ),  # Custom vocab without subword , PCA applied
-        (None, True, "auto", False, None, (29528, 768)),  # Subword, PCA set to 'auto'
-        (None, True, "auto", True, 1e-4, (29528, 768)),  # Subword, PCA set to 'auto'
-        (None, True, "auto", False, 1e-4, (29528, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", False, None, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", True, 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, True, "auto", False, 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
         (None, True, "auto", True, 0, None),  # Sif too low
         (None, True, "auto", True, 1, None),  # Sif too high
-        (None, True, "auto", False, 0, (29528, 768)),  # Sif too low, but apply_zipf is False
-        (None, True, "auto", False, 1, (29528, 768)),  # Sif too high, but apply_zipf is False
-        (None, True, 1024, False, None, (29528, 768)),  # Subword, PCA set to high number.
-        (["wordA", "wordB"], True, 4, False, None, (29530, 4)),  # Custom vocab with subword, PCA applied
-        (None, True, None, True, None, (29528, 768)),  # No PCA applied
-        (["wordA", "wordB"], False, 2, True, None, (3, 2)),  # Custom vocab without subwords PCA and Zipf applied
+        (None, True, "auto", False, 0, (29525, 768)),  # Sif too low, but apply_zipf is False
+        (None, True, "auto", False, 1, (29525, 768)),  # Sif too high, but apply_zipf is False
+        (None, True, 1024, False, None, (29525, 768)),  # Subword, PCA set to high number.
+        (["wordA", "wordB"], True, 4, False, None, (29527, 4)),  # Custom vocab with subword, PCA applied
+        (None, True, None, True, None, (29525, 768)),  # No PCA applied
+        (["wordA", "wordB"], False, 2, True, None, (4, 2)),  # Custom vocab without subwords PCA and Zipf applied
         (None, False, 256, True, None, None),  # use_subword = False without passing a vocabulary should raise an error
     ],
 )

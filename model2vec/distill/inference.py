@@ -14,7 +14,6 @@ from tqdm import tqdm
 from transformers import PreTrainedModel, PreTrainedTokenizerFast
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 
-from model2vec.distill.tokenizer import get_unk_token
 from model2vec.distill.utils import filter_vocabulary_by_regex
 
 logger = logging.getLogger(__name__)
@@ -56,24 +55,29 @@ def create_embeddings(
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
 
-    pad_token = tokenizer.pad_token_type_id
-
     out_tokens = []
     tokenized: list[torch.Tensor] = []
+    pad_token = tokenizer.special_tokens_map.get("pad_token")
+    pad_token_id = tokenizer.convert_tokens_to_ids(pad_token)
+    unk_token = tokenizer.special_tokens_map.get("unk_token")
+
+    tokens_to_keep = {pad_token, unk_token}
 
     if use_subword:
         if token_remove_regex is not None:
             # Sort the vocabulary by id, important for zipf.
             sorted_vocab = sorted(tokenizer.get_vocab().items(), key=lambda x: x[1])
             id_list = filter_vocabulary_by_regex(token_remove_regex, sorted_vocab)
-            ids = torch.Tensor(id_list).long()
         else:
             # If the token remove regex is None, just use all tokens.
-            ids = torch.arange(len(tokenizer.get_vocab()))
+            id_list = list(range(len(tokenizer.get_vocab())))
 
-    elif unk_token := get_unk_token(tokenizer.backend_tokenizer):
+        added_tokens_ids = [id for token, id in tokenizer.added_tokens_encoder.items() if token not in tokens_to_keep]
+        ids = torch.Tensor(sorted(set(id_list) - set(added_tokens_ids))).long()
+
+    elif unk_token:
         # Include unk token. This is necessary for some models.
-        ids = torch.Tensor(tokenizer.convert_tokens_to_ids([unk_token])).long()
+        ids = torch.Tensor(tokenizer.convert_tokens_to_ids([unk_token, pad_token])).long()
     else:
         ids = None
 
@@ -93,8 +97,8 @@ def create_embeddings(
         batch = tokenized[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]
 
         encoded = {}
-        encoded["input_ids"] = pad_sequence(batch, batch_first=True, padding_value=pad_token)
-        encoded["attention_mask"] = encoded["input_ids"] != pad_token
+        encoded["input_ids"] = pad_sequence(batch, batch_first=True, padding_value=pad_token_id)
+        encoded["attention_mask"] = encoded["input_ids"] != pad_token_id
 
         # Add token_type_ids only if the model supports it
         if "token_type_ids" in inspect.getfullargspec(model.forward).args:

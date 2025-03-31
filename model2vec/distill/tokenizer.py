@@ -2,36 +2,19 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from typing import Any
 
-import numpy as np
 from tokenizers import Tokenizer
-from tokenizers.models import BPE, Unigram, WordPiece
 
 logger = logging.getLogger(__name__)
 
 
-def get_unk_token(tokenizer: Tokenizer) -> str | None:
-    """
-    Get the unknown token for a tokenizer.
-
-    :param tokenizer: The tokenizer to extract the UNK token from
-    :return: The unknown token string or None if not found
-    """
-    model = tokenizer.model
-    if isinstance(model, WordPiece):
-        return model.unk_token
-    elif isinstance(model, BPE):
-        return model.unk_token
-    elif isinstance(model, Unigram):
-        unk_id: int | None = model.unk_id
-        if unk_id is None:
-            return None
-        return tokenizer.id_to_token(unk_id)
-    else:
-        logger.warning(f"Unknown model type {type(model)}")
-        return None
+_DEFAULT_POST_PROCESSOR_TEMPLATE = {
+    "type": "TemplateProcessing",
+    "single": [{"Sequence": {"id": "A", "type_id": 0}}],
+    "pair": [{"Sequence": {"id": "A", "type_id": 0}}, {"Sequence": {"id": "B", "type_id": 0}}],
+    "special_tokens": {},
+}
 
 
 def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[str]:
@@ -62,7 +45,31 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[st
     return pre_tokenized_tokens
 
 
-def _make_new_merges_from_vocab(merges: list[tuple[str, str]], tokens: list[str]) -> list[tuple[str, str]]:
+def _remap_added_tokens(
+    special_tokens: list[dict[str, Any]],
+    vocabulary: list[str],
+) -> list[dict[str, int]]:
+    """
+    Remap special tokens in the tokenizer.
+
+    This function updates the special tokens in the tokenizer based on a mapping provided.
+    It also ensures that the special tokens are present in the vocabulary.
+
+    :param special_tokens: The special tokens to remap.
+    :param vocabulary: The vocabulary as a list of tokens.
+    :return: The updated special tokens.
+    """
+    # Deepcopy
+    special_tokens = [{**x} for x in special_tokens]
+    for token in special_tokens:
+        token["id"] = vocabulary.index(token["content"])
+
+    return special_tokens
+
+
+def _make_new_merges_from_vocab(
+    merges: list[tuple[str, str]], tokens: list[str], special_tokens: set[str | None]
+) -> list[tuple[str, str]]:
     """
     Generate new merges (bigrams) from a vocabulary.
 
@@ -71,24 +78,36 @@ def _make_new_merges_from_vocab(merges: list[tuple[str, str]], tokens: list[str]
 
     :param merges: The list of existing merges in the form "first second" where first and second are tokens.
     :param tokens: The list of tokens (vocabulary) from which to generate new merges.
+    :param special_tokens: Tokens that are not merged.
     :return: The list of new merges in the form "first second" where first and second are tokens.
     """
     new_merges = merges.copy()
-    current_vocab = set(tokens)
+    current_vocab = set(tokens) - special_tokens
     already_merged = set("".join(merge) for merge in merges)
 
     for token in tokens:
+        if token in special_tokens:
+            continue
         if token in already_merged:
             continue
+        if len(token) == 1:
+            continue
+        merges = []
         for needle in range(1, len(token)):
             first, second = token[:needle], token[needle:]
             if first in current_vocab and second in current_vocab:
-                new_merges.append((first, second))
+                merges.append((first, second))
+        if not merges:
+            logger.warning(f"Token {token} has no merges.")
+            continue
+        new_merges.extend(merges)
 
     return new_merges
 
 
-def replace_vocabulary(tokenizer: Tokenizer, new_vocabulary: list[str]) -> Tokenizer:
+def replace_vocabulary(
+    tokenizer: Tokenizer, new_vocabulary: list[str], unk_token: str | None, pad_token: str | None
+) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
 
@@ -98,35 +117,41 @@ def replace_vocabulary(tokenizer: Tokenizer, new_vocabulary: list[str]) -> Token
     pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary)
 
     model_type = tokenizer_json["model"]["type"]
+    special_tokens = {unk_token, pad_token}
 
-    if model_type == "WordPiece":
+    if model_type in {"WordPiece", "BPE"}:
         # Easiest, just add the new vocab
-        unk_token = tokenizer_json["model"]["unk_token"]
-        if unk_token is None:
-            tokenizer_json["added_tokens"] = []
-        else:
-            tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] == unk_token]
-
+        unk_token = unk_token or tokenizer_json["model"]["unk_token"]
+        tokenizer_json["model"]["unk_token"] = unk_token
+        tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] in special_tokens]
         tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
+
+        if model_type == "BPE":
+            # Bit more difficult, we need to take into account merges.
+            merges = tokenizer_json["model"]["merges"]
+            merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, special_tokens)
+            tokenizer_json["model"]["merges"] = merges
+
     elif model_type == "Unigram":
         # Bit more difficult, we need to take into account probas.
         unk_id = tokenizer_json["model"]["unk_id"]
-        if unk_id is None:
-            tokenizer_json["added_tokens"] = []
-        else:
-            tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["id"] == unk_id]
+        tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] in special_tokens]
+        vocab = tokenizer_json["model"]["vocab"]
+        unk_token = vocab[unk_id][0] if unk_id is not None else None
         current_probas = dict(tokenizer_json["model"]["vocab"])
         lowest_proba = min(current_probas.values())
         new_probas = {word: current_probas.get(word, lowest_proba) for word in pre_tokenized_tokens}
-        tokenizer_json["model"]["vocab"] = list(new_probas.items())
-    elif model_type == "BPE":
-        # Bit more difficult, we need to take into account merges.
-        tokenizer_json["added_tokens"] = []
-        tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
-        merges = tokenizer_json["model"]["merges"]
-        merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens)
-        tokenizer_json["model"]["merges"] = merges
+        tokenizer_json["model"]["vocab"] = sorted(new_probas.items(), key=lambda x: x[1], reverse=True)
+
+        tokens, _ = zip(*tokenizer_json["model"]["vocab"])
+        tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token) if unk_token in tokens else None
+
     else:
         raise ValueError(f"Unknown model type {model_type}")
+
+    # Remap special tokens
+    added_tokens = tokenizer_json["added_tokens"]
+    tokenizer_json["added_tokens"] = _remap_added_tokens(added_tokens, pre_tokenized_tokens)
+    tokenizer_json["post_processor"] = _DEFAULT_POST_PROCESSOR_TEMPLATE
 
     return Tokenizer.from_str(json.dumps(tokenizer_json))
