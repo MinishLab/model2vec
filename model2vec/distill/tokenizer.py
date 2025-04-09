@@ -71,15 +71,15 @@ def _make_new_merges_from_vocab(
     merges: list[tuple[str, str]], tokens: list[str], special_tokens: set[str | None]
 ) -> list[tuple[str, str]]:
     """
-    Generate new merges (bigrams) from a vocabulary.
+    Generate new merges from a vocabulary.
 
-    This function creates new merge pairs (bigrams) from a given vocabulary of tokens.
+    This function creates new merge pairs from a given vocabulary of tokens.
     The merges are used to build or extend a tokenizer's merge table.
 
-    :param merges: The list of existing merges in the form "first second" where first and second are tokens.
+    :param merges: The list of existing merges in the form (first, second) where first and second are tokens.
     :param tokens: The list of tokens (vocabulary) from which to generate new merges.
-    :param special_tokens: Tokens that are not merged.
-    :return: The list of new merges in the form "first second" where first and second are tokens.
+    :param special_tokens: Tokens that should not be merged.
+    :return: The list of new merges in the form (first, second) where first and second are tokens.
     """
     new_merges = merges.copy()
     current_vocab = set(tokens) - special_tokens
@@ -93,8 +93,8 @@ def _make_new_merges_from_vocab(
         if len(token) == 1:
             continue
         merges = []
-        for needle in range(1, len(token)):
-            first, second = token[:needle], token[needle:]
+        for index in range(1, len(token)):
+            first, second = token[:index], token[index:]
             if first in current_vocab and second in current_vocab:
                 merges.append((first, second))
         if not merges:
