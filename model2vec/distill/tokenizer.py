@@ -9,114 +9,149 @@ from tokenizers import Tokenizer
 logger = logging.getLogger(__name__)
 
 
-def preprocess_vocabulary(tokenizer: Tokenizer, vocabulary: list[str]) -> list[str]:
-    """Preprocess a vocabulary with a tokenizer by doing a roundtrip encode/decode."""
-    encoded_ids: list[list[int]] = [
-        encoding.ids for encoding in tokenizer.encode_batch(vocabulary, add_special_tokens=False)
-    ]
-    return tokenizer.decode_batch(encoded_ids)
+_DEFAULT_POST_PROCESSOR_TEMPLATE = {
+    "type": "TemplateProcessing",
+    "single": [{"Sequence": {"id": "A", "type_id": 0}}],
+    "pair": [{"Sequence": {"id": "A", "type_id": 0}}, {"Sequence": {"id": "B", "type_id": 0}}],
+    "special_tokens": {},
+}
 
 
-def remove_tokens(tokenizer: Tokenizer, tokens_to_remove: list[str]) -> Tokenizer:
+def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[str]:
     """
-    Remove tokens from a tokenizer.
+    Apply pre-tokenization to vocabulary tokens if a pre-tokenizer is present.
 
-    :param tokenizer: The tokenizer to remove tokens from.
-    :param tokens_to_remove: The tokens to remove.
-    :return: The modified tokenizer.
-    :raises ValueError: If the tokenizer model type is not supported.
+    Only pre-tokenizes tokens that are not already in the tokenizer's vocabulary,
+    to avoid processing tokens twice.
+
+    :param tokenizer: The tokenizer to use.
+    :param tokens: The tokens to pre-tokenize.
+    :return: The pre-tokenized tokens.
     """
-    model_vocab = set(tokenizer.get_vocab())
-    # This triggers when tokens_to_remove is empty or when there is no overlap
-    # between the tokens to remove and the model vocabulary.
-    if not set(tokens_to_remove).intersection(model_vocab):
-        # NOTE: return a copy.
-        if tokens_to_remove:
-            logger.info("No tokens to remove, none of the tokens were in the vocabulary.")
-        else:
-            logger.info("No tokens to remove.")
-        return Tokenizer.from_str(tokenizer.to_str())
+    current_tokenizer_vocab = set(tokenizer.get_vocab())
+    pre_tokenized_tokens = []
 
-    tokenizer_data: dict[str, Any] = json.loads(tokenizer.to_str())
+    if tokenizer.pre_tokenizer is not None:
+        for token in tokens:
+            if token in current_tokenizer_vocab:
+                pre_tokenized_tokens.append(token)
+            else:
+                # We know 100% sure that all pretokenized tokens will have length 1.
+                pretokenized_tokens, _ = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(f" {token}"))
+                pre_tokenized_tokens.append(pretokenized_tokens[-1])
+    else:
+        pre_tokenized_tokens = tokens
 
-    # Find all added tokens
-    added_tokens: list[dict[str, Any]] = tokenizer_data.get("added_tokens", [])
-    added_tokens_str: set[str] = {token["content"] for token in added_tokens}
+    return pre_tokenized_tokens
 
-    # Remove all added tokens from the list of tokens to remove.
-    # Things will go bad if we keep them.
-    tokens_to_remove = [token for token in tokens_to_remove if token not in added_tokens_str]
 
-    # Load the vocabulary.
-    model_type = tokenizer_data["model"]["type"]
+def _remap_added_tokens(
+    special_tokens: list[dict[str, Any]],
+    vocabulary: list[str],
+) -> list[dict[str, int]]:
+    """
+    Remap special tokens in the tokenizer.
 
-    if model_type == "WordPiece":
-        # Vocab is a dictionary.
-        vocab: dict[str, int] = tokenizer_data["model"]["vocab"]
-        n_tokens = len(vocab)
+    This function updates the special tokens in the tokenizer based on a mapping provided.
+    It also ensures that the special tokens are present in the vocabulary.
 
-        # Remove the tokens.
-        for token in tokens_to_remove:
-            if vocab.pop(token, None) is None:
-                logger.warning(f"Token {token} was not in the vocabulary.")
+    :param special_tokens: The special tokens to remap.
+    :param vocabulary: The vocabulary as a list of tokens.
+    :return: The updated special tokens.
+    """
+    # Deepcopy
+    special_tokens = [{**x} for x in special_tokens]
+    for token in special_tokens:
+        token["id"] = vocabulary.index(token["content"])
 
-        n_removed = n_tokens - len(vocab)
-        logger.info(f"Removed {n_removed} tokens from the vocabulary.")
+    return special_tokens
 
-        # Reindex the vocabulary so that it is contiguous.
-        reindexed = {token: idx for idx, (token, _) in enumerate(sorted(vocab.items(), key=lambda x: x[1]))}
-        tokenizer_data["model"]["vocab"] = reindexed
+
+def _make_new_merges_from_vocab(
+    merges: list[tuple[str, str]], tokens: list[str], special_tokens: set[str | None]
+) -> list[tuple[str, str]]:
+    """
+    Generate new merges from a vocabulary.
+
+    This function creates new merge pairs from a given vocabulary of tokens.
+    The merges are used to build or extend a tokenizer's merge table.
+
+    :param merges: The list of existing merges in the form (first, second) where first and second are tokens.
+    :param tokens: The list of tokens (vocabulary) from which to generate new merges.
+    :param special_tokens: Tokens that should not be merged.
+    :return: The list of new merges in the form (first, second) where first and second are tokens.
+    """
+    new_merges = merges.copy()
+    current_vocab = set(tokens) - special_tokens
+    already_merged = set("".join(merge) for merge in merges)
+
+    for token in tokens:
+        if token in special_tokens:
+            continue
+        if token in already_merged:
+            continue
+        if len(token) == 1:
+            continue
+        merges = []
+        for index in range(1, len(token)):
+            first, second = token[:index], token[index:]
+            if first in current_vocab and second in current_vocab:
+                merges.append((first, second))
+        if not merges:
+            logger.warning(f"Token {token} has no merges.")
+            continue
+        new_merges.extend(merges)
+
+    return new_merges
+
+
+def replace_vocabulary(
+    tokenizer: Tokenizer, new_vocabulary: list[str], unk_token: str | None, pad_token: str | None
+) -> Tokenizer:
+    """Replace the vocabulary of a tokenizer with a new one."""
+    tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
+
+    # NOTE: all tokens have been normalized before.
+    # Very careful, we need to pretokenize words before adding them to the vocabulary.
+    # But only if they are not subword tokens.
+    pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary)
+
+    model_type = tokenizer_json["model"]["type"]
+    special_tokens = {unk_token, pad_token}
+
+    if model_type in {"WordPiece", "BPE"}:
+        # Easiest, just add the new vocab
+        unk_token = unk_token or tokenizer_json["model"]["unk_token"]
+        tokenizer_json["model"]["unk_token"] = unk_token
+        tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] in special_tokens]
+        tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
+
+        if model_type == "BPE":
+            # Bit more difficult, we need to take into account merges.
+            merges = tokenizer_json["model"]["merges"]
+            merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, special_tokens)
+            tokenizer_json["model"]["merges"] = merges
 
     elif model_type == "Unigram":
-        logger.warning("Removing tokens from a unigram tokenizer is not supported.")
-        return tokenizer
+        # Bit more difficult, we need to take into account probas.
+        unk_id = tokenizer_json["model"]["unk_id"]
+        tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] in special_tokens]
+        vocab = tokenizer_json["model"]["vocab"]
+        unk_token = vocab[unk_id][0] if unk_id is not None else None
+        current_probas = dict(tokenizer_json["model"]["vocab"])
+        lowest_proba = min(current_probas.values())
+        new_probas = {word: current_probas.get(word, lowest_proba) for word in pre_tokenized_tokens}
+        tokenizer_json["model"]["vocab"] = sorted(new_probas.items(), key=lambda x: x[1], reverse=True)
 
-    elif model_type == "BPE":
-        logger.warning("Removing tokens from a BPE tokenizer is not supported.")
-        return tokenizer
+        tokens, _ = zip(*tokenizer_json["model"]["vocab"])
+        tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token) if unk_token in tokens else None
 
     else:
         raise ValueError(f"Unknown model type {model_type}")
 
-    # Reindex the special tokens (i.e., CLS and SEP for BertTokenizers.)
-    added_tokens = tokenizer_data.get("added_tokens", [])
-    for token_data in added_tokens:
-        token_data["id"] = reindexed[token_data["content"]]
+    # Remap special tokens
+    added_tokens = tokenizer_json["added_tokens"]
+    tokenizer_json["added_tokens"] = _remap_added_tokens(added_tokens, pre_tokenized_tokens)
+    tokenizer_json["post_processor"] = _DEFAULT_POST_PROCESSOR_TEMPLATE
 
-    # Reinitialize the tokenizer from the json.
-    tokenizer = Tokenizer.from_str(json.dumps(tokenizer_data))
-
-    return tokenizer
-
-
-def add_tokens(tokenizer: Tokenizer, tokens_to_add: list[str]) -> Tokenizer:
-    """
-    Add tokens to a tokenizer.
-
-    :param tokenizer: The tokenizer to add tokens to.
-    :param tokens_to_add: The tokens to add.
-    :return: The modified tokenizer.
-    :raises ValueError: If the tokenizer model type is not supported.
-    """
-    data = json.loads(tokenizer.to_str())
-
-    model = data["model"]["type"]
-
-    if model == "WordPiece":
-        wordpiece_vocab: dict[str, int] = data["model"]["vocab"]
-        for token in tokens_to_add:
-            if token not in wordpiece_vocab:
-                wordpiece_vocab[token] = len(wordpiece_vocab)
-
-    elif model == "Unigram":
-        raise ValueError("Adding tokens to a unigram tokenizer is not supported.")
-
-    elif model == "BPE":
-        raise ValueError("Adding tokens to a BPE tokenizer is not supported.")
-
-    else:
-        raise ValueError(f"Unknown model type {model}")
-
-    tokenizer = Tokenizer.from_str(json.dumps(data))
-
-    return tokenizer
+    return Tokenizer.from_str(json.dumps(tokenizer_json))

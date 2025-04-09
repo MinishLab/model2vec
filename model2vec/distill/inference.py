@@ -3,14 +3,18 @@ from __future__ import annotations
 
 import inspect
 import logging
+import re
 from pathlib import Path
 from typing import Protocol, Union
 
 import numpy as np
 import torch
+from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
-from transformers import PreTrainedModel, PreTrainedTokenizer
+from transformers import PreTrainedModel, PreTrainedTokenizerFast
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+
+from model2vec.distill.utils import filter_vocabulary_by_regex
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +28,13 @@ class ModulewithWeights(Protocol):
     weight: torch.nn.Parameter
 
 
-def create_output_embeddings_from_model_and_tokens(
+def create_embeddings(
     model: PreTrainedModel,
-    tokenizer: PreTrainedTokenizer,
+    tokenizer: PreTrainedTokenizerFast,
+    use_subword: bool,
     tokens: list[str],
     device: str,
+    token_remove_regex: re.Pattern | None,
 ) -> tuple[list[str], np.ndarray]:
     """
     Create output embeddings for a bunch of tokens using a pretrained model.
@@ -38,8 +44,10 @@ def create_output_embeddings_from_model_and_tokens(
     :param model: The model to use.
         This should be a transformers model.
     :param tokenizer: The tokenizer to use.
+    :param use_subword: Whether to include subword tokens in the output.
     :param tokens: The tokens to use.
     :param device: The torch device to use.
+    :param token_remove_regex: A regex pattern to remove tokens from the vocabulary.
     :return: The tokens and output embeddings.
     """
     model = model.to(device)
@@ -47,17 +55,66 @@ def create_output_embeddings_from_model_and_tokens(
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
 
-    for batch_idx in tqdm(range(0, len(tokens), _DEFAULT_BATCH_SIZE)):
-        batch = tokens[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]
-        out = _encode_mean_using_model(model, tokenizer, batch)
+    out_tokens = []
+    tokenized: list[torch.Tensor] = []
+    pad_token = tokenizer.special_tokens_map.get("pad_token")
+    pad_token_id = tokenizer.convert_tokens_to_ids(pad_token)
+    unk_token = tokenizer.special_tokens_map.get("unk_token")
+
+    tokens_to_keep = {pad_token, unk_token}
+
+    if use_subword:
+        if token_remove_regex is not None:
+            # Sort the vocabulary by id, important for zipf.
+            sorted_vocab = sorted(tokenizer.get_vocab().items(), key=lambda x: x[1])
+            id_list = filter_vocabulary_by_regex(token_remove_regex, sorted_vocab)
+        else:
+            # If the token remove regex is None, just use all tokens.
+            id_list = list(range(len(tokenizer.get_vocab())))
+
+        added_tokens_ids = [id for token, id in tokenizer.added_tokens_encoder.items() if token not in tokens_to_keep]
+        ids = torch.Tensor(sorted(set(id_list) - set(added_tokens_ids))).long()
+
+    elif unk_token:
+        # Include unk token. This is necessary for some models.
+        ids = torch.Tensor(tokenizer.convert_tokens_to_ids([unk_token, pad_token])).long()
+    else:
+        ids = None
+
+    if ids is not None:
+        dummy_encoding = tokenizer.encode("A")
+        bos_token_id, eos_token_id = dummy_encoding[0], dummy_encoding[-1]
+
+        bos = torch.full([len(ids)], fill_value=bos_token_id)
+        eos = torch.full([len(ids)], fill_value=eos_token_id)
+
+        tokenized.extend(torch.stack([bos, ids, eos], dim=1))
+        out_tokens.extend(tokenizer.convert_ids_to_tokens(ids))
+
+    tokenized.extend([tokenizer.encode_plus(token, return_tensors="pt")["input_ids"][0] for token in tokens])
+
+    for batch_idx in tqdm(range(0, len(tokenized), _DEFAULT_BATCH_SIZE)):
+        batch = tokenized[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]
+
+        encoded = {}
+        encoded["input_ids"] = pad_sequence(batch, batch_first=True, padding_value=pad_token_id)
+        encoded["attention_mask"] = encoded["input_ids"] != pad_token_id
+
+        # Add token_type_ids only if the model supports it
+        if "token_type_ids" in inspect.getfullargspec(model.forward).args:
+            encoded["token_type_ids"] = torch.zeros_like(encoded["input_ids"])
+
+        out = _encode_mean_using_model(model, encoded)
         intermediate_weights.append(out.numpy())
+
+    out_tokens.extend(tokens)
     out_weights = np.concatenate(intermediate_weights)
 
-    return tokens, out_weights
+    return out_tokens, out_weights
 
 
 @torch.no_grad()
-def _encode_mean_using_model(model: PreTrainedModel, tokenizer: PreTrainedTokenizer, tokens: list[str]) -> torch.Tensor:
+def _encode_mean_using_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
     """
     Encode a batch of tokens using a model.
 
@@ -65,11 +122,10 @@ def _encode_mean_using_model(model: PreTrainedModel, tokenizer: PreTrainedTokeni
     So detection of these is necessary.
 
     :param model: The model to use.
-    :param tokenizer: The tokenizer to use.
-    :param tokens: The tokens to encode.
+    :param encodings: The encoded tokens to turn into features.
     :return: The mean of the output for each token.
     """
-    encodings = tokenizer(tokens, return_tensors="pt", padding=True, truncation=True).to(model.device)
+    encodings = {k: v.to(model.device) for k, v in encodings.items()}
     encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(**encodings)
     out: torch.Tensor = encoded.last_hidden_state.cpu()
     # NOTE: If the dtype is bfloat 16, we convert to float32,
@@ -78,90 +134,10 @@ def _encode_mean_using_model(model: PreTrainedModel, tokenizer: PreTrainedTokeni
     if out.dtype == torch.bfloat16:
         out = out.float()
 
-    mask = encodings["attention_mask"].cpu()
-    # NOTE: evil hack. For any batch, there will be a mask vector
-    # which has all 1s, because we pad to max_length. argmin returns 0
-    # in this case, which is wrong. But because we end up subtracting 1
-    # from it, we use -1, which is correct.
-    last_nonzero_index = mask.argmin(1) - 1
-    # NOTE: do not change the order of these calls. If you do, the hack
-    # above will no longer be evil (it will turn good), and will no longer work.
-    mask[torch.arange(mask.shape[0]), last_nonzero_index] = 0
-    mask[:, 0] = 0
+    # Take the mean by averaging over the attention mask.
+    mask = encodings["attention_mask"].cpu().float()
+    mask /= mask.sum(1)[:, None]
 
-    # We take the mean of embeddings by first summing
     result = torch.bmm(mask[:, None, :].float(), out).squeeze(1)
 
-    # Divide by the number of non-padding tokens, non-cls, etc. tokens.
-    divisor = mask.sum(1)
-    # Account for the case where divisor is 0.
-    divisor[divisor == 0] = 1
-
-    return result / divisor[:, None]
-
-
-def create_output_embeddings_from_model(
-    model: PreTrainedModel,
-    tokenizer: PreTrainedTokenizer,
-    device: str,
-) -> tuple[list[str], np.ndarray]:
-    """
-    Create output embeddings for a bunch of tokens using a pretrained model.
-
-    It does a forward pass for all tokens passed in the tokenizer vocabulary.
-
-    :param model: The model to use.
-        This should be a transformers model.
-    :param tokenizer: The tokenizer to use.
-    :param device: The torch device to use.
-    :return: The tokens and output embeddings.
-    """
-    model = model.to(device)
-
-    # Quick check to see if the tokenizer is consistent.
-    vocab_length = len(tokenizer.get_vocab())
-    if vocab_length != tokenizer.vocab_size:
-        logger.warning(
-            f"Reported vocab size {tokenizer.vocab_size} is inconsistent with the vocab size {vocab_length}."
-        )
-
-    ids = torch.arange(vocab_length)
-
-    # Work-around to get the eos and bos token ids without having to go into tokenizer internals.
-    dummy_encoding = tokenizer.encode("A")
-    bos_token_id, eos_token_id = dummy_encoding[0], dummy_encoding[-1]
-
-    bos = torch.full([len(ids)], fill_value=bos_token_id)
-    eos = torch.full([len(ids)], fill_value=eos_token_id)
-
-    # NOTE: reversing the bos and eos tokens works better on our benchmarks.
-    stacked = torch.stack([eos, ids, bos], dim=1)
-
-    intermediate_weights: list[np.ndarray] = []
-    for batch_idx in tqdm(range(0, len(stacked), _DEFAULT_BATCH_SIZE)):
-        batch = stacked[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE].to(model.device)
-        with torch.no_grad():
-            attention_mask = torch.ones_like(batch)
-            # Prepare model inputs
-            model_inputs = {"input_ids": batch.to(device), "attention_mask": attention_mask}
-
-            # Add token_type_ids only if the model supports it
-            if "token_type_ids" in inspect.getfullargspec(model.forward).args:
-                model_inputs["token_type_ids"] = torch.zeros_like(batch)
-
-            # Perform the forward pass
-            encoded_output: BaseModelOutputWithPoolingAndCrossAttentions = model(**model_inputs)
-            out: torch.Tensor = encoded_output.last_hidden_state
-            # NOTE: If the dtype is bfloat 16, we convert to float32,
-            # because numpy does not suport bfloat16
-            # See here: https://github.com/numpy/numpy/issues/19808
-            if out.dtype == torch.bfloat16:
-                out = out.float()
-
-        # Add the output to the intermediate weights
-        intermediate_weights.append(out.mean(1).detach().cpu().numpy())
-
-    # Concatenate the intermediate weights
-    out_weights = np.concatenate(intermediate_weights)
-
-    return tokenizer.convert_ids_to_tokens(ids), out_weights
+    return result
