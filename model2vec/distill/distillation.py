@@ -314,13 +314,6 @@ def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens:
             n_duplicates += 1
             continue
 
-        pre_tokenizer = tokenizer.pre_tokenizer
-        if pre_tokenizer is not None:
-            pretokenized_tokens = pre_tokenizer.pre_tokenize_str(token)
-            if len(pretokenized_tokens) != 1:
-                n_multiword += 1
-                continue
-
         seen_tokens.add(token)
         cleaned_vocabulary.append(token)
 
