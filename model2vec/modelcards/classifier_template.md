@@ -41,8 +41,8 @@ Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team c
 
 Please cite the [Model2Vec repository](https://github.com/MinishLab/model2vec) if you use this model in your work.
 ```
-@software{minishlab2024model2vec,
-  authors = {Stephan Tulkens and Thomas van Dongen},
+@article{minishlab2024model2vec,
+  author = {Tulkens, Stephan and {van Dongen}, Thomas},
   title = {Model2Vec: Fast State-of-the-Art Static Embeddings},
   year = {2024},
   url = {https://github.com/MinishLab/model2vec}
