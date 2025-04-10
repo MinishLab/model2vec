@@ -302,7 +302,6 @@ def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens:
     cleaned_vocabulary = []
     n_empty = 0
     n_duplicates = 0
-    n_multiword = 0
     for token in vocabulary:
         if tokenizer.normalizer is not None:
             token = tokenizer.normalizer.normalize_str(token)
@@ -321,7 +320,5 @@ def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens:
         logger.warning(f"Removed {n_duplicates} duplicate tokens.")
     if n_empty:
         logger.warning(f"Removed {n_empty} empty tokens.")
-    if n_multiword:
-        logger.warning(f"Removed {n_multiword} multiword tokens.")
 
     return cleaned_vocabulary
