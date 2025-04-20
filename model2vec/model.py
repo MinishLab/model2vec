@@ -12,6 +12,7 @@ from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
+from model2vec.quantization import DType, quantize_embeddings
 from model2vec.utils import ProgressParallel, load_local_model
 
 PathLike = Union[Path, str]
@@ -150,6 +151,7 @@ class StaticModel:
         path: PathLike,
         token: str | None = None,
         normalize: bool | None = None,
+        quantize_to: str | DType | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -159,11 +161,17 @@ class StaticModel:
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
         :param normalize: Whether to normalize the embeddings.
+        :param quantize_to: The dtype to quantize the model to. If None, no quantization is done.
+            If a string is passed, it is converted to a DType.
         :return: A StaticModel
         """
         from model2vec.hf_utils import load_pretrained
 
         embeddings, tokenizer, config, metadata = load_pretrained(path, token=token, from_sentence_transformers=False)
+
+        if quantize_to is not None:
+            quantize_to = DType(quantize_to)
+            embeddings = quantize_embeddings(embeddings, quantize_to)
 
         return cls(
             embeddings,

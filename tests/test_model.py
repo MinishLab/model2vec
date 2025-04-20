@@ -182,6 +182,37 @@ def test_load_pretrained(
     assert loaded_model.config == mock_config
 
 
+def test_load_pretrained_quantized(
+    tmp_path: Path, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test loading a pretrained model after saving it."""
+    # Save the model to a temporary path
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    save_path = tmp_path / "saved_model"
+    model.save_pretrained(save_path)
+
+    # Load the model back from the same path
+    loaded_model = StaticModel.from_pretrained(save_path, quantize_to="int8")
+
+    # Assert that the loaded model has the same properties as the original one
+    assert loaded_model.embedding.dtype == np.int8
+    assert loaded_model.embedding.shape == mock_vectors.shape
+
+    # Load the model back from the same path
+    loaded_model = StaticModel.from_pretrained(save_path, quantize_to="float16")
+
+    # Assert that the loaded model has the same properties as the original one
+    assert loaded_model.embedding.dtype == np.float16
+    assert loaded_model.embedding.shape == mock_vectors.shape
+
+    # Load the model back from the same path
+    loaded_model = StaticModel.from_pretrained(save_path, quantize_to="float32")
+
+    # Assert that the loaded model has the same properties as the original one
+    assert loaded_model.embedding.dtype == np.float32
+    assert loaded_model.embedding.shape == mock_vectors.shape
+
+
 def test_initialize_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Tests whether the normalization initialization is correct."""
     model = StaticModel(mock_vectors, mock_tokenizer, {}, normalize=None)
