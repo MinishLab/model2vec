@@ -150,6 +150,7 @@ class StaticModel:
         path: PathLike,
         token: str | None = None,
         normalize: bool | None = None,
+        dimensionality: int | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -159,11 +160,26 @@ class StaticModel:
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
         :param normalize: Whether to normalize the embeddings.
+        :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
+            This is useful if you want to load a model with a lower dimensionality.
+            Note that this only applies if you have trained your model using mrl or PCA.
         :return: A StaticModel
+        :raises: ValueError if the dimensionality is greater than the model dimensionality.
         """
         from model2vec.hf_utils import load_pretrained
 
         embeddings, tokenizer, config, metadata = load_pretrained(path, token=token, from_sentence_transformers=False)
+
+        if dimensionality is not None:
+            if dimensionality > embeddings.shape[1]:
+                raise ValueError(
+                    f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
+                )
+            embeddings = embeddings[:, :dimensionality]
+            if config.get("apply_pca", None) is None:
+                logger.warning(
+                    "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
+                )
 
         return cls(
             embeddings,
