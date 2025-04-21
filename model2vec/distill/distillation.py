@@ -120,6 +120,9 @@ def distill_from_model(
     if quantize_to is not None:
         embeddings = quantize_embeddings(embeddings, quantize_to)
 
+    # Quantize the embeddings.
+    embeddings = quantize_embeddings(embeddings, quantize_to)
+
     model_name = getattr(model, "name_or_path", "")
 
     config = {

@@ -26,7 +26,8 @@ def quantize_embeddings(embeddings: np.ndarray, quantize_to: DType) -> np.ndarra
     elif quantize_to == DType.Float64:
         return embeddings.astype(np.float64)
     elif quantize_to == DType.Int8:
-        # Normalize to [-127, 127] range for int8
+        # Normalize to [-128, 127] range for int8
+        # We normalize to -127 to 127 to keep symmetry.
         scale = np.max(np.abs(embeddings)) / 127.0
         quantized = np.round(embeddings / scale).astype(np.int8)
         return quantized
