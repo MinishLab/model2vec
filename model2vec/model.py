@@ -345,9 +345,7 @@ class StaticModel:
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
-                id_list_remapped = [
-                    self.token_mapping.get(token_id, token_id) for token_id in id_list
-                ]
+                id_list_remapped = [self.token_mapping.get(token_id, token_id) for token_id in id_list]
                 emb = (self.embedding[id_list_remapped] * self.weights[id_list]).mean(axis=0)
                 out.append(emb)
             else:
