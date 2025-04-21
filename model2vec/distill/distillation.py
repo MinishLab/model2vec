@@ -15,6 +15,7 @@ from model2vec.distill.inference import create_embeddings
 from model2vec.distill.tokenizer import replace_vocabulary
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
+from model2vec.quantization import DType, quantize_embeddings
 
 try:
     # For huggingface_hub>=0.25.0
@@ -40,6 +41,7 @@ def distill_from_model(
     sif_coefficient: float | None = 1e-4,
     use_subword: bool = True,
     token_remove_pattern: str | None = r"\[unused\d+\]",
+    quantize_to: DType | str = DType.Float16,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -64,9 +66,11 @@ def distill_from_model(
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
+    :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :return: A StaticModel
 
     """
+    quantize_to = DType(quantize_to)
     backend_tokenizer = tokenizer.backend_tokenizer
     sif_coefficient, token_remove_regex = _validate_parameters(
         vocabulary, apply_zipf, sif_coefficient, use_subword, token_remove_pattern
@@ -105,6 +109,9 @@ def distill_from_model(
 
     # Post process the embeddings by applying PCA and Zipf weighting.
     embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+
+    # Quantize the embeddings.
+    embeddings = quantize_embeddings(embeddings, quantize_to)
 
     model_name = getattr(model, "name_or_path", "")
 
@@ -209,6 +216,7 @@ def distill(
     use_subword: bool = True,
     token_remove_pattern: str | None = r"\[unused\d+\]",
     trust_remote_code: bool = False,
+    quantize_to: DType | str = DType.Float16,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -232,6 +240,7 @@ def distill(
     :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
     :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming from `transformers`. If this is True, we will load all components.
+    :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :return: A StaticModel
 
     """
@@ -248,6 +257,7 @@ def distill(
         use_subword=use_subword,
         token_remove_pattern=token_remove_pattern,
         sif_coefficient=sif_coefficient,
+        quantize_to=quantize_to,
     )
 
 
