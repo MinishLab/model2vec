@@ -95,12 +95,13 @@ class StaticModel:
             )
         self.config["normalize"] = value
 
-    def save_pretrained(self, path: PathLike, model_name: str | None = None) -> None:
+    def save_pretrained(self, path: PathLike, model_name: str | None = None, subfolder: str | None = None) -> None:
         """
         Save the pretrained model.
 
         :param path: The path to save to.
         :param model_name: The model name to use in the Model Card.
+        :param subfolder: The subfolder to save to.
         """
         from model2vec.hf_utils import save_pretrained
 
@@ -112,6 +113,7 @@ class StaticModel:
             base_model_name=self.base_model_name,
             language=self.language,
             model_name=model_name,
+            subfolder=subfolder,
         )
 
     def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[list[int]]:
@@ -150,6 +152,7 @@ class StaticModel:
         path: PathLike,
         token: str | None = None,
         normalize: bool | None = None,
+        subfolder: str | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -159,11 +162,14 @@ class StaticModel:
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
         :param normalize: Whether to normalize the embeddings.
+        :param subfolder: The subfolder to load from.
         :return: A StaticModel
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token, from_sentence_transformers=False)
+        embeddings, tokenizer, config, metadata = load_pretrained(
+            path, token=token, from_sentence_transformers=False, subfolder=subfolder
+        )
 
         return cls(
             embeddings,
@@ -352,7 +358,9 @@ class StaticModel:
         """Batch the sentences into equal-sized."""
         return (sentences[i : i + batch_size] for i in range(0, len(sentences), batch_size))
 
-    def push_to_hub(self, repo_id: str, private: bool = False, token: str | None = None) -> None:
+    def push_to_hub(
+        self, repo_id: str, private: bool = False, token: str | None = None, subfolder: str | None = None
+    ) -> None:
         """
         Push the model to the huggingface hub.
 
@@ -362,12 +370,13 @@ class StaticModel:
         :param private: Whether the repo, if created is set to private.
             If the repo already exists, this doesn't change the visibility.
         :param token: The huggingface token to use.
+        :param subfolder: The subfolder to push to.
         """
         from model2vec.hf_utils import push_folder_to_hub
 
         with TemporaryDirectory() as temp_dir:
             self.save_pretrained(temp_dir, model_name=repo_id)
-            push_folder_to_hub(Path(temp_dir), repo_id, private, token)
+            push_folder_to_hub(Path(temp_dir), subfolder=subfolder, repo_id=repo_id, private=private, token=token)
 
     @classmethod
     def load_local(cls: type[StaticModel], path: PathLike) -> StaticModel:

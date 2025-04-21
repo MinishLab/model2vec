@@ -23,6 +23,7 @@ def save_pretrained(
     tokenizer: Tokenizer,
     config: dict[str, Any],
     create_model_card: bool = True,
+    subfolder: str | None = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -33,8 +34,10 @@ def save_pretrained(
     :param tokenizer: The tokenizer.
     :param config: A metadata config.
     :param create_model_card: Whether to create a model card.
+    :param subfolder: The subfolder to save the model in.
     :param **kwargs: Any additional arguments.
     """
+    folder_path = folder_path / subfolder if subfolder else folder_path
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"))
@@ -92,7 +95,10 @@ def _create_model_card(
 
 
 def load_pretrained(
-    folder_or_repo_path: str | Path, token: str | None = None, from_sentence_transformers: bool = False
+    folder_or_repo_path: str | Path,
+    subfolder: str | None = None,
+    token: str | None = None,
+    from_sentence_transformers: bool = False,
 ) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any]]:
     """
     Loads a pretrained model from a folder.
@@ -100,6 +106,7 @@ def load_pretrained(
     :param folder_or_repo_path: The folder or repo path to load from.
         - If this is a local path, we will load from the local path.
         - If the local path is not found, we will attempt to load from the huggingface hub.
+    :param subfolder: The subfolder to load from.
     :param token: The huggingface token to use.
     :param from_sentence_transformers: Whether to load the model from a sentence transformers model.
     :raises: FileNotFoundError if the folder exists, but the file does not exist locally.
@@ -116,36 +123,47 @@ def load_pretrained(
         config_name = "config.json"
 
     folder_or_repo_path = Path(folder_or_repo_path)
-    if folder_or_repo_path.exists():
-        embeddings_path = folder_or_repo_path / model_file
+
+    local_folder = folder_or_repo_path / subfolder if subfolder else folder_or_repo_path
+
+    if local_folder.exists():
+        embeddings_path = local_folder / model_file
         if not embeddings_path.exists():
-            raise FileNotFoundError(f"Embeddings file does not exist in {folder_or_repo_path}")
+            raise FileNotFoundError(f"Embeddings file does not exist in {local_folder}")
 
-        config_path = folder_or_repo_path / config_name
+        config_path = local_folder / config_name
         if not config_path.exists():
-            raise FileNotFoundError(f"Config file does not exist in {folder_or_repo_path}")
+            raise FileNotFoundError(f"Config file does not exist in {local_folder}")
 
-        tokenizer_path = folder_or_repo_path / tokenizer_file
+        tokenizer_path = local_folder / tokenizer_file
         if not tokenizer_path.exists():
-            raise FileNotFoundError(f"Tokenizer file does not exist in {folder_or_repo_path}")
+            raise FileNotFoundError(f"Tokenizer file does not exist in {local_folder}")
 
         # README is optional, so this is a bit finicky.
-        readme_path = folder_or_repo_path / "README.md"
+        readme_path = local_folder / "README.md"
         metadata = _get_metadata_from_readme(readme_path)
 
     else:
         logger.info("Folder does not exist locally, attempting to use huggingface hub.")
-        embeddings_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), model_file, token=token)
+        embeddings_path = huggingface_hub.hf_hub_download(
+            folder_or_repo_path.as_posix(), model_file, token=token, subfolder=subfolder
+        )
 
         try:
-            readme_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), "README.md", token=token)
+            readme_path = huggingface_hub.hf_hub_download(
+                folder_or_repo_path.as_posix(), "README.md", token=token, subfolder=subfolder
+            )
             metadata = _get_metadata_from_readme(Path(readme_path))
         except huggingface_hub.utils.EntryNotFoundError:
             logger.info("No README found in the model folder. No model card loaded.")
             metadata = {}
 
-        config_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), config_name, token=token)
-        tokenizer_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), tokenizer_file, token=token)
+        config_path = huggingface_hub.hf_hub_download(
+            folder_or_repo_path.as_posix(), config_name, token=token, subfolder=subfolder
+        )
+        tokenizer_path = huggingface_hub.hf_hub_download(
+            folder_or_repo_path.as_posix(), tokenizer_file, token=token, subfolder=subfolder
+        )
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     if from_sentence_transformers:
@@ -176,11 +194,15 @@ def _get_metadata_from_readme(readme_path: Path) -> dict[str, Any]:
     return data
 
 
-def push_folder_to_hub(folder_path: Path, repo_id: str, private: bool, token: str | None) -> None:
+def push_folder_to_hub(
+    folder_path: Path, subfolder: str | None, repo_id: str, private: bool, token: str | None
+) -> None:
     """
     Push a model folder to the huggingface hub, including model card.
 
     :param folder_path: The path to the folder.
+    :param subfolder: The subfolder to push to.
+        If None, the folder will be pushed to the root of the repo.
     :param repo_id: The repo name.
     :param private: Whether the repo is private.
     :param token: The huggingface token.
@@ -189,15 +211,6 @@ def push_folder_to_hub(folder_path: Path, repo_id: str, private: bool, token: st
         huggingface_hub.create_repo(repo_id, token=token, private=private)
 
     # Push model card and all model files to the Hugging Face hub
-    huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=token)
-
-    # Check if the model card exists, and push it if available
-    model_card_path = folder_path / "README.md"
-    if model_card_path.exists():
-        card = ModelCard.load(model_card_path)
-        card.push_to_hub(repo_id=repo_id, token=token)
-        logger.info(f"Pushed model card to {repo_id}")
-    else:
-        logger.warning(f"Model card README.md not found in {folder_path}. Skipping model card upload.")
+    huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=token, path_in_repo=subfolder)
 
     logger.info(f"Pushed model to {repo_id}")
