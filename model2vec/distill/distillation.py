@@ -7,6 +7,7 @@ from typing import Literal, Union
 
 import numpy as np
 from huggingface_hub import model_info
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
@@ -108,10 +109,15 @@ def distill_from_model(
     backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens, unk_token=unk_token, pad_token=pad_token)
 
     # Post process the embeddings by applying PCA and Zipf weighting.
-    embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+    embeddings, weights = _post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
 
-    # Quantize the embeddings.
-    embeddings = quantize_embeddings(embeddings, quantize_to)
+    km = KMeans(n_clusters=4096, random_state=0)
+    clustered_embeddings = km.fit_predict(embeddings)
+    mapping = {idx: x for idx, x in enumerate(clustered_embeddings)}
+
+    embeddings = km.cluster_centers_
+    if quantize_to is not None:
+        embeddings = quantize_embeddings(embeddings, quantize_to)
 
     model_name = getattr(model, "name_or_path", "")
 
@@ -142,6 +148,8 @@ def distill_from_model(
 
     return StaticModel(
         vectors=embeddings,
+        weights=weights,
+        token_mapping=mapping,
         tokenizer=backend_tokenizer,
         config=config,
         base_model_name=model_name,
@@ -263,7 +271,7 @@ def distill(
 
 def _post_process_embeddings(
     embeddings: np.ndarray, pca_dims: PCADimType, sif_coefficient: float | None = 1e-4
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     """Post process embeddings by applying PCA and SIF weighting by estimating the frequencies through Zipf's law."""
     if pca_dims is not None:
         if pca_dims == "auto":
@@ -300,9 +308,11 @@ def _post_process_embeddings(
         logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
         inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
         proba = inv_rank / np.sum(inv_rank)
-        embeddings *= (sif_coefficient / (sif_coefficient + proba))[:, None]
+        weights = (sif_coefficient / (sif_coefficient + proba))[:, None]
+    else:
+        weights = np.ones(len(embeddings))[:, None]
 
-    return embeddings
+    return embeddings, weights
 
 
 def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens: list[str]) -> list[str]:

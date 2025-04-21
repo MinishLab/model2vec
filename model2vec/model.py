@@ -24,6 +24,8 @@ class StaticModel:
     def __init__(
         self,
         vectors: np.ndarray,
+        weights: np.ndarray,
+        token_mapping: dict[int, int],
         tokenizer: Tokenizer,
         config: dict[str, Any] | None = None,
         normalize: bool | None = None,
@@ -46,9 +48,8 @@ class StaticModel:
         self.tokens = tokens
 
         self.embedding = vectors
-
-        if len(tokens) != vectors.shape[0]:
-            raise ValueError(f"Number of tokens ({len(tokens)}) does not match number of vectors ({vectors.shape[0]})")
+        self.weights = weights
+        self.token_mapping = token_mapping
 
         self.tokenizer = tokenizer
         self.unk_token_id: int | None
@@ -344,7 +345,11 @@ class StaticModel:
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
-                out.append(self.embedding[id_list].mean(0))
+                id_list_remapped = [
+                    self.token_mapping.get(token_id, token_id) for token_id in id_list
+                ]
+                emb = (self.embedding[id_list_remapped] * self.weights[id_list]).mean(axis=0)
+                out.append(emb)
             else:
                 out.append(np.zeros(self.dim))
 
