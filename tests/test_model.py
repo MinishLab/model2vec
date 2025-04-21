@@ -207,10 +207,38 @@ def test_load_pretrained_quantized(
 
     # Load the model back from the same path
     loaded_model = StaticModel.from_pretrained(save_path, quantize_to="float32")
-
     # Assert that the loaded model has the same properties as the original one
     assert loaded_model.embedding.dtype == np.float32
     assert loaded_model.embedding.shape == mock_vectors.shape
+
+
+def test_load_pretrained_dim(
+    tmp_path: Path, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test loading a pretrained model with dimensionality."""
+    # Save the model to a temporary path
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    save_path = tmp_path / "saved_model"
+    model.save_pretrained(save_path)
+
+    loaded_model = StaticModel.from_pretrained(save_path, dimensionality=2)
+
+    # Assert that the loaded model has the same properties as the original one
+    np.testing.assert_array_equal(loaded_model.embedding, mock_vectors[:, :2])
+    assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
+    assert loaded_model.config == mock_config
+
+    # Load the model back from the same path
+    loaded_model = StaticModel.from_pretrained(save_path, dimensionality=None)
+
+    # Assert that the loaded model has the same properties as the original one
+    np.testing.assert_array_equal(loaded_model.embedding, mock_vectors)
+    assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
+    assert loaded_model.config == mock_config
+
+    # Load the model back from the same path
+    with pytest.raises(ValueError):
+        StaticModel.from_pretrained(save_path, dimensionality=3000)
 
 
 def test_initialize_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:

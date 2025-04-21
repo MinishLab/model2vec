@@ -152,6 +152,7 @@ class StaticModel:
         token: str | None = None,
         normalize: bool | None = None,
         quantize_to: str | DType | None = None,
+        dimensionality: int | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -163,7 +164,11 @@ class StaticModel:
         :param normalize: Whether to normalize the embeddings.
         :param quantize_to: The dtype to quantize the model to. If None, no quantization is done.
             If a string is passed, it is converted to a DType.
+        :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
+            This is useful if you want to load a model with a lower dimensionality.
+            Note that this only applies if you have trained your model using mrl or PCA.
         :return: A StaticModel
+        :raises: ValueError if the dimensionality is greater than the model dimensionality.
         """
         from model2vec.hf_utils import load_pretrained
 
@@ -172,6 +177,16 @@ class StaticModel:
         if quantize_to is not None:
             quantize_to = DType(quantize_to)
             embeddings = quantize_embeddings(embeddings, quantize_to)
+        if dimensionality is not None:
+            if dimensionality > embeddings.shape[1]:
+                raise ValueError(
+                    f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
+                )
+            embeddings = embeddings[:, :dimensionality]
+            if config.get("apply_pca", None) is None:
+                logger.warning(
+                    "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
+                )
 
         return cls(
             embeddings,
