@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import huggingface_hub
 import numpy as np
@@ -33,9 +33,31 @@ class StaticModelPipeline:
         # Different classifiers, such as OVR wrappers, support multilabel output natively, so we
         # can just use predict.
         self.multilabel = False
+        self.token_logits_cache: dict[int, np.ndarray] = {}
+
         if isinstance(classifier, MLPClassifier):
             if classifier.out_activation_ == "logistic":
                 self.multilabel = True
+
+    @property
+    def normalize(self) -> bool:
+        """Get the normalization setting of the model."""
+        return self.model.normalize
+
+    @normalize.setter
+    def normalize(self, value: bool) -> None:
+        """Set the normalization of the model."""
+        self.model.normalize = value
+
+    @property
+    def tokenizer(self) -> str:
+        """Get the tokenizer of the model."""
+        return self.model.tokenizer
+
+    @property
+    def embeddings(self) -> np.ndarray:
+        """Get the embedding matrix of the model."""
+        return self.model.embedding
 
     @property
     def classes_(self) -> np.ndarray:
@@ -192,6 +214,27 @@ class StaticModelPipeline:
 
         return report
 
+    def predict_logits(self, token_ids: list[int]) -> np.ndarray:
+        """Predict the logits for the specified token IDs."""
+        # Extract embeddings for the specified token IDs.
+        token_embeddings = self.embeddings[token_ids]
+        mlp = self.head[-1]
+        original_activation = mlp.out_activation_
+        # Set the activation function to identity to get the logits
+        mlp.out_activation_ = "identity"
+        logits = self.head.predict_proba(token_embeddings)
+        mlp.out_activation_ = original_activation
+        return logits
+
+    def get_most_important_tokens(self, text: str) -> list[tuple[str, float]]:
+        """
+        Get the text tokens that are most important for the predicted class.
+
+        :param text: The input text.
+        :return: A list of (token, score) tuples sorted by descending importance.
+        """
+        return get_most_important_tokens(self, text=text)
+
 
 def _load_pipeline(
     folder_or_repo_path: PathLike, token: str | None = None, trust_remote_code: bool = False
@@ -305,3 +348,46 @@ def evaluate_single_or_multi_label(
     )
 
     return report
+
+
+def get_most_important_tokens(model: Any, text: str) -> list[tuple[str, float]]:
+    """
+    Get the most important tokens for the predicted class.
+
+    :param model: The model to get the most important tokens for.
+    :param text: The text to get the most important tokens for.
+    :return: A list of (token, score) tuples sorted by descending importance.
+    """
+    # Use the model's tokenizer to convert the text to token IDs
+    if isinstance(model, StaticModelPipeline):
+        input_ids = model.model.tokenize([text])
+    else:
+        input_ids = model.tokenize([text]).tolist()
+    unique_ids = set(input_ids[0])
+
+    # Identify tokens that are not yet cached and compute their logits
+    tokens_to_compute = [token_id for token_id in unique_ids if token_id not in model.token_logits_cache]
+    if tokens_to_compute:
+        computed_logits = model.predict_logits(token_ids=tokens_to_compute)
+        # Update the cache with the computed logits
+        for token_id, logit in zip(tokens_to_compute, computed_logits):
+            model.token_logits_cache[token_id] = logit
+
+    # Determine the predicted label for the text
+    probs = model.predict_proba([text])[0]
+    label_idx = int(np.argmax(probs))
+
+    results = []
+    for token_id in unique_ids:
+        # Get the token string and logit
+        token_str = model.tokenizer.id_to_token(token_id)
+        token_logit = model.token_logits_cache.get(token_id)
+        if token_logit is None:
+            continue
+        # Get the logit for the predicted label
+        score = float(token_logit[label_idx])
+        results.append((token_str, score))
+
+    # Sort tokens by descending score
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results

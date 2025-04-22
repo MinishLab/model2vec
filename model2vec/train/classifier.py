@@ -19,7 +19,11 @@ from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
 
-from model2vec.inference import StaticModelPipeline, evaluate_single_or_multi_label
+from model2vec.inference import (
+    StaticModelPipeline,
+    evaluate_single_or_multi_label,
+    get_most_important_tokens,
+)
 from model2vec.train.base import FinetunableStaticModel, TextDataset
 
 logger = logging.getLogger(__name__)
@@ -46,6 +50,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.classes_: list[str] = [str(x) for x in range(out_dim)]
         # multilabel flag will be set based on the type of `y` passed to fit.
         self.multilabel: bool = False
+        self.token_logits_cache: dict[int, np.ndarray] = {}
         super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
 
     @property
@@ -112,8 +117,14 @@ class StaticModelForClassification(FinetunableStaticModel):
         """
         Predict probabilities for each class.
 
-        In single-label mode, returns softmax probabilities.
-        In multilabel mode, returns sigmoid probabilities.
+        This function outputs:
+        - Softmax probabilities in single-label mode.
+        - Sigmoid probabilities in multilabel mode.
+
+        :param X: The texts to predict on.
+        :param show_progress_bar: Whether to show a progress bar.
+        :param batch_size: The batch size.
+        :return: The probabilities.
         """
         pred = []
         for batch in trange(0, len(X), batch_size, disable=not show_progress_bar):
@@ -123,6 +134,16 @@ class StaticModelForClassification(FinetunableStaticModel):
             else:
                 pred.append(torch.softmax(logits, dim=1).cpu().numpy())
         return np.concatenate(pred, axis=0)
+
+    def predict_logits(self, token_ids: list[int]) -> torch.Tensor:
+        """Predict the logits for the specified token IDs."""
+        # Extract embeddings for the given token IDs.
+        token_embeddings = self.embeddings.weight[token_ids]
+        # Scale each embedding by its corresponding learned weight
+        scale = torch.sigmoid(self.w[token_ids]).unsqueeze(1)
+        scaled_embeddings = token_embeddings * scale
+        # Compute and return the logits
+        return self.head(scaled_embeddings)
 
     def fit(
         self,
@@ -245,6 +266,15 @@ class StaticModelForClassification(FinetunableStaticModel):
         report = evaluate_single_or_multi_label(predictions=predictions, y=y, output_dict=output_dict)
 
         return report
+
+    def get_most_important_tokens(self, text: str) -> list[tuple[str, float]]:
+        """
+        Get the text tokens that are most important for the predicted class.
+
+        :param text: The input text.
+        :return: A list of (token, score) tuples sorted by descending importance.
+        """
+        return get_most_important_tokens(self, text=text)
 
     def _initialize(self, y: LabelType) -> None:
         """
@@ -379,7 +409,7 @@ class _ClassifierLightningModule(pl.LightningModule):
         if self.model.multilabel:
             preds = (torch.sigmoid(head_out) > 0.5).float()
             # Multilabel accuracy is defined as the Jaccard score averaged over samples.
-            accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples")
+            accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples", zero_division=0)
         else:
             accuracy = (head_out.argmax(dim=1) == y).float().mean()
         self.log("val_loss", loss)
