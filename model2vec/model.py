@@ -148,6 +148,51 @@ class StaticModel:
         return encodings_ids
 
     @classmethod
+    def _load_model(
+        cls: type[StaticModel],
+        path: PathLike,
+        token: str | None,
+        normalize: bool | None,
+        quantize_to: str | DType | None,
+        dimensionality: int | None,
+        from_sentence_transformers: bool,
+        subfolder: str | None = None,
+    ) -> StaticModel:
+        """Helper function to load a model from a path and optionally quantize it/reduce the dimensionality."""
+        from model2vec.hf_utils import load_pretrained
+
+        embeddings, tokenizer, config, metadata = load_pretrained(
+            folder_or_repo_path=path,
+            token=token,
+            from_sentence_transformers=from_sentence_transformers,
+            subfolder=subfolder,
+        )
+
+        if quantize_to is not None:
+            quantize_to = DType(quantize_to)
+            embeddings = quantize_embeddings(embeddings, quantize_to)
+
+        if dimensionality is not None:
+            if dimensionality > embeddings.shape[1]:
+                raise ValueError(
+                    f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
+                )
+            embeddings = embeddings[:, :dimensionality]
+            if config.get("apply_pca") is None:
+                logger.warning(
+                    "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
+                )
+
+        return cls(
+            embeddings,
+            tokenizer,
+            config,
+            normalize=normalize,
+            base_model_name=metadata.get("base_model") if metadata else None,
+            language=metadata.get("language") if metadata else None,
+        )
+
+    @classmethod
     def from_pretrained(
         cls: type[StaticModel],
         path: PathLike,
@@ -171,36 +216,16 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
-        :return: A StaticModel
-        :raises: ValueError if the dimensionality is greater than the model dimensionality.
+        :return: A StaticModel.
         """
-        from model2vec.hf_utils import load_pretrained
-
-        embeddings, tokenizer, config, metadata = load_pretrained(
-            path, token=token, from_sentence_transformers=False, subfolder=subfolder
-        )
-
-        if quantize_to is not None:
-            quantize_to = DType(quantize_to)
-            embeddings = quantize_embeddings(embeddings, quantize_to)
-        if dimensionality is not None:
-            if dimensionality > embeddings.shape[1]:
-                raise ValueError(
-                    f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
-                )
-            embeddings = embeddings[:, :dimensionality]
-            if config.get("apply_pca", None) is None:
-                logger.warning(
-                    "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
-                )
-
-        return cls(
-            embeddings,
-            tokenizer,
-            config,
+        return cls._load_model(
+            path=path,
+            token=token,
             normalize=normalize,
-            base_model_name=metadata.get("base_model"),
-            language=metadata.get("language"),
+            quantize_to=quantize_to,
+            dimensionality=dimensionality,
+            from_sentence_transformers=False,
+            subfolder=subfolder,
         )
 
     @classmethod
@@ -209,6 +234,8 @@ class StaticModel:
         path: PathLike,
         token: str | None = None,
         normalize: bool | None = None,
+        quantize_to: str | DType | None = None,
+        dimensionality: int | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
@@ -218,13 +245,21 @@ class StaticModel:
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
         :param normalize: Whether to normalize the embeddings.
-        :return: A StaticModel
+        :param quantize_to: The dtype to quantize the model to. If None, no quantization is done.
+            If a string is passed, it is converted to a DType.
+        :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
+            This is useful if you want to load a model with a lower dimensionality.
+            Note that this only applies if you have trained your model using mrl or PCA.
+        :return: A StaticModel.
         """
-        from model2vec.hf_utils import load_pretrained
-
-        embeddings, tokenizer, config, _ = load_pretrained(path, token=token, from_sentence_transformers=True)
-
-        return cls(embeddings, tokenizer, config, normalize=normalize, base_model_name=None, language=None)
+        return cls._load_model(
+            path=path,
+            token=token,
+            normalize=normalize,
+            quantize_to=quantize_to,
+            dimensionality=dimensionality,
+            from_sentence_transformers=True,
+        )
 
     def encode_as_sequence(
         self,
