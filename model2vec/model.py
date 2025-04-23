@@ -178,7 +178,7 @@ class StaticModel:
                     f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
                 )
             embeddings = embeddings[:, :dimensionality]
-            if config.get("apply_pca") is None:
+            if config.get("apply_pca", None) is None:
                 logger.warning(
                     "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
                 )
@@ -188,8 +188,8 @@ class StaticModel:
             tokenizer,
             config,
             normalize=normalize,
-            base_model_name=metadata.get("base_model") if metadata else None,
-            language=metadata.get("language") if metadata else None,
+            base_model_name=metadata.get("base_model"),
+            language=metadata.get("language"),
         )
 
     @classmethod
