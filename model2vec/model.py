@@ -12,7 +12,7 @@ from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.quantization import DType, quantize_embeddings
+from model2vec.quantization import DType, quantize_and_reduce_dim
 from model2vec.utils import ProgressParallel, load_local_model
 
 PathLike = Union[Path, str]
@@ -171,28 +171,22 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
-        :return: A StaticModel
-        :raises: ValueError if the dimensionality is greater than the model dimensionality.
+        :return: A StaticModel.
         """
         from model2vec.hf_utils import load_pretrained
 
         embeddings, tokenizer, config, metadata = load_pretrained(
-            path, token=token, from_sentence_transformers=False, subfolder=subfolder
+            folder_or_repo_path=path,
+            token=token,
+            from_sentence_transformers=False,
+            subfolder=subfolder,
         )
 
-        if quantize_to is not None:
-            quantize_to = DType(quantize_to)
-            embeddings = quantize_embeddings(embeddings, quantize_to)
-        if dimensionality is not None:
-            if dimensionality > embeddings.shape[1]:
-                raise ValueError(
-                    f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
-                )
-            embeddings = embeddings[:, :dimensionality]
-            if config.get("apply_pca", None) is None:
-                logger.warning(
-                    "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
-                )
+        embeddings = quantize_and_reduce_dim(
+            embeddings=embeddings,
+            quantize_to=quantize_to,
+            dimensionality=dimensionality,
+        )
 
         return cls(
             embeddings,
@@ -209,6 +203,8 @@ class StaticModel:
         path: PathLike,
         token: str | None = None,
         normalize: bool | None = None,
+        quantize_to: str | DType | None = None,
+        dimensionality: int | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
@@ -218,13 +214,36 @@ class StaticModel:
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
         :param normalize: Whether to normalize the embeddings.
-        :return: A StaticModel
+        :param quantize_to: The dtype to quantize the model to. If None, no quantization is done.
+            If a string is passed, it is converted to a DType.
+        :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
+            This is useful if you want to load a model with a lower dimensionality.
+            Note that this only applies if you have trained your model using mrl or PCA.
+        :return: A StaticModel.
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, _ = load_pretrained(path, token=token, from_sentence_transformers=True)
+        embeddings, tokenizer, config, metadata = load_pretrained(
+            folder_or_repo_path=path,
+            token=token,
+            from_sentence_transformers=True,
+            subfolder=None,
+        )
 
-        return cls(embeddings, tokenizer, config, normalize=normalize, base_model_name=None, language=None)
+        embeddings = quantize_and_reduce_dim(
+            embeddings=embeddings,
+            quantize_to=quantize_to,
+            dimensionality=dimensionality,
+        )
+
+        return cls(
+            embeddings,
+            tokenizer,
+            config,
+            normalize=normalize,
+            base_model_name=metadata.get("base_model"),
+            language=metadata.get("language"),
+        )
 
     def encode_as_sequence(
         self,
