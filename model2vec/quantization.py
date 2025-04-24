@@ -33,3 +33,29 @@ def quantize_embeddings(embeddings: np.ndarray, quantize_to: DType) -> np.ndarra
         return quantized
     else:
         raise ValueError("Not a valid enum member of DType.")
+
+
+def quantize_and_reduce_dim(
+    embeddings: np.ndarray, quantize_to: DType | str | None, dimensionality: int | None
+) -> np.ndarray:
+    """
+    Quantize embeddings to a datatype and reduce dimensionality.
+
+    :param embeddings: The embeddings to quantize and reduce, as a numpy array.
+    :param quantize_to: The data type to quantize to. If None, no quantization is performed.
+    :param dimensionality: The number of dimensions to keep. If None, no dimensionality reduction is performed.
+    :return: The quantized and reduced embeddings.
+    :raises ValueError: If the passed dimensionality is not None and greater than the model dimensionality.
+    """
+    if quantize_to is not None:
+        quantize_to = DType(quantize_to)
+        embeddings = quantize_embeddings(embeddings, quantize_to)
+
+    if dimensionality is not None:
+        if dimensionality > embeddings.shape[1]:
+            raise ValueError(
+                f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
+            )
+        embeddings = embeddings[:, :dimensionality]
+
+    return embeddings

@@ -12,7 +12,7 @@ from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.quantization import DType, quantize_embeddings
+from model2vec.quantization import DType, quantize_and_reduce_dim
 from model2vec.utils import ProgressParallel, load_local_model
 
 PathLike = Union[Path, str]
@@ -148,51 +148,6 @@ class StaticModel:
         return encodings_ids
 
     @classmethod
-    def _load_model(
-        cls: type[StaticModel],
-        path: PathLike,
-        token: str | None,
-        normalize: bool | None,
-        quantize_to: str | DType | None,
-        dimensionality: int | None,
-        from_sentence_transformers: bool,
-        subfolder: str | None = None,
-    ) -> StaticModel:
-        """Helper function to load a model from a path and optionally quantize it/reduce the dimensionality."""
-        from model2vec.hf_utils import load_pretrained
-
-        embeddings, tokenizer, config, metadata = load_pretrained(
-            folder_or_repo_path=path,
-            token=token,
-            from_sentence_transformers=from_sentence_transformers,
-            subfolder=subfolder,
-        )
-
-        if quantize_to is not None:
-            quantize_to = DType(quantize_to)
-            embeddings = quantize_embeddings(embeddings, quantize_to)
-
-        if dimensionality is not None:
-            if dimensionality > embeddings.shape[1]:
-                raise ValueError(
-                    f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
-                )
-            embeddings = embeddings[:, :dimensionality]
-            if config.get("apply_pca", None) is None:
-                logger.warning(
-                    "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
-                )
-
-        return cls(
-            embeddings,
-            tokenizer,
-            config,
-            normalize=normalize,
-            base_model_name=metadata.get("base_model"),
-            language=metadata.get("language"),
-        )
-
-    @classmethod
     def from_pretrained(
         cls: type[StaticModel],
         path: PathLike,
@@ -218,14 +173,28 @@ class StaticModel:
             Note that this only applies if you have trained your model using mrl or PCA.
         :return: A StaticModel.
         """
-        return cls._load_model(
-            path=path,
+        from model2vec.hf_utils import load_pretrained
+
+        embeddings, tokenizer, config, metadata = load_pretrained(
+            folder_or_repo_path=path,
             token=token,
-            normalize=normalize,
-            quantize_to=quantize_to,
-            dimensionality=dimensionality,
             from_sentence_transformers=False,
             subfolder=subfolder,
+        )
+
+        embeddings = quantize_and_reduce_dim(
+            embeddings=embeddings,
+            quantize_to=quantize_to,
+            dimensionality=dimensionality,
+        )
+
+        return cls(
+            embeddings,
+            tokenizer,
+            config,
+            normalize=normalize,
+            base_model_name=metadata.get("base_model"),
+            language=metadata.get("language"),
         )
 
     @classmethod
@@ -252,13 +221,28 @@ class StaticModel:
             Note that this only applies if you have trained your model using mrl or PCA.
         :return: A StaticModel.
         """
-        return cls._load_model(
-            path=path,
+        from model2vec.hf_utils import load_pretrained
+
+        embeddings, tokenizer, config, metadata = load_pretrained(
+            folder_or_repo_path=path,
             token=token,
-            normalize=normalize,
+            from_sentence_transformers=True,
+            subfolder=None,
+        )
+
+        embeddings = quantize_and_reduce_dim(
+            embeddings=embeddings,
             quantize_to=quantize_to,
             dimensionality=dimensionality,
-            from_sentence_transformers=True,
+        )
+
+        return cls(
+            embeddings,
+            tokenizer,
+            config,
+            normalize=normalize,
+            base_model_name=metadata.get("base_model"),
+            language=metadata.get("language"),
         )
 
     def encode_as_sequence(
