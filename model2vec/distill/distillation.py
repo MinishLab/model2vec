@@ -116,7 +116,7 @@ def distill_from_model(
 
     embeddings = km.cluster_centers_
     embeddings, _ = _post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
-    
+
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
