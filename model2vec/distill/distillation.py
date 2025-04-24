@@ -7,7 +7,7 @@ from typing import Literal, Union
 
 import numpy as np
 from huggingface_hub import model_info
-from sklearn.cluster import BisectingKMeans
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from tokenizers import Tokenizer
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
@@ -108,18 +108,15 @@ def distill_from_model(
     # Add the cleaned vocabulary to the tokenizer.
     backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens, unk_token=unk_token, pad_token=pad_token)
 
-    # Post process the embeddings by applying PCA and Zipf weighting.
-    embeddings, weights = _post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
-
-    km = BisectingKMeans(n_clusters=4096, random_state=0)
-    km.fit(embeddings[:30000])
+    _, weights = _post_process_embeddings(np.asarray(embeddings), None, sif_coefficient=sif_coefficient)
+    km = KMeans(4096, random_state=42)
+    km.fit(embeddings)
     clustered_embeddings = km.predict(embeddings)
     mapping = {idx: x for idx, x in enumerate(clustered_embeddings)}
 
     embeddings = km.cluster_centers_
-    if quantize_to is not None:
-        embeddings = quantize_embeddings(embeddings, quantize_to)
-
+    embeddings, _ = _post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
+    
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
