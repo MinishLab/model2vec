@@ -12,6 +12,7 @@ from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
+from model2vec.quantization import DType, quantize_embeddings
 from model2vec.utils import ProgressParallel, load_local_model
 
 PathLike = Union[Path, str]
@@ -95,12 +96,13 @@ class StaticModel:
             )
         self.config["normalize"] = value
 
-    def save_pretrained(self, path: PathLike, model_name: str | None = None) -> None:
+    def save_pretrained(self, path: PathLike, model_name: str | None = None, subfolder: str | None = None) -> None:
         """
         Save the pretrained model.
 
         :param path: The path to save to.
         :param model_name: The model name to use in the Model Card.
+        :param subfolder: The subfolder to save to.
         """
         from model2vec.hf_utils import save_pretrained
 
@@ -112,6 +114,7 @@ class StaticModel:
             base_model_name=self.base_model_name,
             language=self.language,
             model_name=model_name,
+            subfolder=subfolder,
         )
 
     def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[list[int]]:
@@ -150,6 +153,9 @@ class StaticModel:
         path: PathLike,
         token: str | None = None,
         normalize: bool | None = None,
+        subfolder: str | None = None,
+        quantize_to: str | DType | None = None,
+        dimensionality: int | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -159,11 +165,34 @@ class StaticModel:
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
         :param normalize: Whether to normalize the embeddings.
+        :param subfolder: The subfolder to load from.
+        :param quantize_to: The dtype to quantize the model to. If None, no quantization is done.
+            If a string is passed, it is converted to a DType.
+        :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
+            This is useful if you want to load a model with a lower dimensionality.
+            Note that this only applies if you have trained your model using mrl or PCA.
         :return: A StaticModel
+        :raises: ValueError if the dimensionality is greater than the model dimensionality.
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, metadata = load_pretrained(path, token=token, from_sentence_transformers=False)
+        embeddings, tokenizer, config, metadata = load_pretrained(
+            path, token=token, from_sentence_transformers=False, subfolder=subfolder
+        )
+
+        if quantize_to is not None:
+            quantize_to = DType(quantize_to)
+            embeddings = quantize_embeddings(embeddings, quantize_to)
+        if dimensionality is not None:
+            if dimensionality > embeddings.shape[1]:
+                raise ValueError(
+                    f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
+                )
+            embeddings = embeddings[:, :dimensionality]
+            if config.get("apply_pca", None) is None:
+                logger.warning(
+                    "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
+                )
 
         return cls(
             embeddings,
@@ -352,7 +381,9 @@ class StaticModel:
         """Batch the sentences into equal-sized."""
         return (sentences[i : i + batch_size] for i in range(0, len(sentences), batch_size))
 
-    def push_to_hub(self, repo_id: str, private: bool = False, token: str | None = None) -> None:
+    def push_to_hub(
+        self, repo_id: str, private: bool = False, token: str | None = None, subfolder: str | None = None
+    ) -> None:
         """
         Push the model to the huggingface hub.
 
@@ -362,12 +393,13 @@ class StaticModel:
         :param private: Whether the repo, if created is set to private.
             If the repo already exists, this doesn't change the visibility.
         :param token: The huggingface token to use.
+        :param subfolder: The subfolder to push to.
         """
         from model2vec.hf_utils import push_folder_to_hub
 
         with TemporaryDirectory() as temp_dir:
             self.save_pretrained(temp_dir, model_name=repo_id)
-            push_folder_to_hub(Path(temp_dir), repo_id, private, token)
+            push_folder_to_hub(Path(temp_dir), subfolder=subfolder, repo_id=repo_id, private=private, token=token)
 
     @classmethod
     def load_local(cls: type[StaticModel], path: PathLike) -> StaticModel:

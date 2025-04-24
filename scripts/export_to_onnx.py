@@ -27,7 +27,9 @@ class TorchStaticModel(torch.nn.Module):
         """Initialize the TorchStaticModel with a StaticModel instance."""
         super().__init__()
         # Convert NumPy embeddings to a torch.nn.EmbeddingBag
-        embeddings = torch.tensor(model.embedding, dtype=torch.float32)
+        embeddings = torch.from_numpy(model.embedding)
+        if embeddings.dtype in {torch.int8, torch.uint8}:
+            embeddings = embeddings.to(torch.float16)
         self.embedding_bag = torch.nn.EmbeddingBag.from_pretrained(embeddings, mode="mean", freeze=True)
         self.normalize = model.normalize
         # Save tokenizer attributes
