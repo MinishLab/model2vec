@@ -323,8 +323,8 @@ def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens:
 
         pre_tokenizer = tokenizer.pre_tokenizer
         if pre_tokenizer is not None:
-            pretokenized_tokens = pre_tokenizer.pre_tokenize_str(token)
-            new_token = " ".join(pretokenized_tokens[1])
+            pretokenized_tokens, _ = zip(*pre_tokenizer.pre_tokenize_str(token))
+            new_token = " ".join(pretokenized_tokens)
         else:
             new_token = token
 
