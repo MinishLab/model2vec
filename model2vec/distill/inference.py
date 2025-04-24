@@ -14,7 +14,7 @@ from tqdm import tqdm
 from transformers import PreTrainedModel, PreTrainedTokenizerFast
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 
-from model2vec.distill.utils import filter_vocabulary_by_regex
+from model2vec.distill.utils import Token, filter_vocabulary_by_regex
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def create_embeddings(
     tokens: list[str],
     device: str,
     token_remove_regex: re.Pattern | None,
-) -> tuple[list[str], np.ndarray]:
+) -> tuple[list[Token], np.ndarray]:
     """
     Create output embeddings for a bunch of tokens using a pretrained model.
 
@@ -55,7 +55,7 @@ def create_embeddings(
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
 
-    out_tokens = []
+    out_tokens: list[Token] = []
     tokenized: list[torch.Tensor] = []
     pad_token = tokenizer.special_tokens_map.get("pad_token")
     pad_token_id = tokenizer.convert_tokens_to_ids(pad_token)
@@ -89,7 +89,8 @@ def create_embeddings(
         eos = torch.full([len(ids)], fill_value=eos_token_id)
 
         tokenized.extend(torch.stack([bos, ids, eos], dim=1))
-        out_tokens.extend(tokenizer.convert_ids_to_tokens(ids))
+        subword_tokens = [Token(x, True) for x in tokenizer.convert_ids_to_tokens(ids.tolist())]
+        out_tokens.extend(subword_tokens)
 
     tokenized.extend([tokenizer.encode_plus(token, return_tensors="pt")["input_ids"][0] for token in tokens])
 
@@ -119,7 +120,7 @@ def create_embeddings(
 
     # Sort the output back to the original order
     intermediate_weights = [intermediate_weights[i] for i in np.argsort(sort_order)]
-    out_tokens.extend(tokens)
+    out_tokens.extend([Token(x, False) for x in tokens])
     out_weights = np.stack(intermediate_weights)
 
     return out_tokens, out_weights
