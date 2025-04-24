@@ -323,7 +323,6 @@ def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens:
     cleaned_vocabulary = []
     n_empty = 0
     n_duplicates = 0
-    n_multiword = 0
     for token in vocabulary:
         normalizer = tokenizer.normalizer
         if normalizer is not None:
@@ -334,13 +333,9 @@ def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens:
             continue
 
         pre_tokenizer = tokenizer.pre_tokenizer
-        # We need to check whether the pretokenized token is a single word or not.
         if pre_tokenizer is not None:
-            pretokenized_tokens = pre_tokenizer.pre_tokenize_str(token)
-            if len(pretokenized_tokens) != 1:
-                n_multiword += 1
-                continue
-            new_token = pretokenized_tokens[-1][0]
+            pretokenized_tokens, _ = zip(*pre_tokenizer.pre_tokenize_str(token))
+            new_token = " ".join(pretokenized_tokens)
         else:
             new_token = token
 
@@ -360,7 +355,5 @@ def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens:
         logger.warning(f"Removed {n_duplicates} duplicate tokens.")
     if n_empty:
         logger.warning(f"Removed {n_empty} empty tokens.")
-    if n_multiword:
-        logger.warning(f"Removed {n_multiword} multiword tokens.")
 
     return cleaned_vocabulary
