@@ -36,7 +36,7 @@ def quantize_embeddings(embeddings: np.ndarray, quantize_to: DType) -> np.ndarra
 
 
 def quantize_and_reduce_dim(
-    embeddings: np.ndarray, quantize_to: DType | str | None, dimensionality: int | None
+    embeddings: np.ndarray, quantize_to: str | DType | None, dimensionality: int | None
 ) -> np.ndarray:
     """
     Quantize embeddings to a datatype and reduce dimensionality.
