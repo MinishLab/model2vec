@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 PathLike = Union[Path, str]
 
-_DEFAULT_BATCH_SIZE = 1024
+_DEFAULT_BATCH_SIZE = 256
 
 
 class ModulewithWeights(Protocol):
@@ -93,22 +93,34 @@ def create_embeddings(
 
     tokenized.extend([tokenizer.encode_plus(token, return_tensors="pt")["input_ids"][0] for token in tokens])
 
-    for batch_idx in tqdm(range(0, len(tokenized), _DEFAULT_BATCH_SIZE)):
-        batch = tokenized[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]
+    # Add token_type_ids only if the model supports it
+    add_token_type_ids = "token_type_ids" in inspect.getfullargspec(model.forward).args
+
+    lengths = np.asarray([len(sequence) for sequence in tokenized])
+    sort_order = np.argsort(lengths)
+
+    sorted_tokenized = [tokenized[i] for i in sort_order]
+
+    pbar = tqdm(total=len(sorted_tokenized), desc="Encoding tokens", unit=" tokens")
+
+    for batch_idx in range(0, len(sorted_tokenized), _DEFAULT_BATCH_SIZE):
+        batch = sorted_tokenized[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]
 
         encoded = {}
         encoded["input_ids"] = pad_sequence(batch, batch_first=True, padding_value=pad_token_id)
         encoded["attention_mask"] = encoded["input_ids"] != pad_token_id
 
-        # Add token_type_ids only if the model supports it
-        if "token_type_ids" in inspect.getfullargspec(model.forward).args:
+        if add_token_type_ids:
             encoded["token_type_ids"] = torch.zeros_like(encoded["input_ids"])
 
         out = _encode_mean_using_model(model, encoded)
-        intermediate_weights.append(out.numpy())
+        intermediate_weights.extend(out.numpy())
+        pbar.update(len(batch))
 
+    # Sort the output back to the original order
+    intermediate_weights = [intermediate_weights[i] for i in np.argsort(sort_order)]
     out_tokens.extend(tokens)
-    out_weights = np.concatenate(intermediate_weights)
+    out_weights = np.stack(intermediate_weights)
 
     return out_tokens, out_weights
 
