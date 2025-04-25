@@ -30,7 +30,6 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token]) -> list[
     :param tokens: The tokens to pre-tokenize.
     :return: The pre-tokenized tokens.
     """
-    current_tokenizer_vocab = set(tokenizer.get_vocab())
     pre_tokenized_tokens = []
 
     if tokenizer.pre_tokenizer is not None:
@@ -50,7 +49,7 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token]) -> list[
 def _remap_added_tokens(
     special_tokens: list[dict[str, Any]],
     vocabulary: list[str],
-) -> list[dict[str, int]]:
+) -> list[dict[str, Any]]:
     """
     Remap special tokens in the tokenizer.
 
@@ -119,25 +118,33 @@ def replace_vocabulary(
     pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary)
 
     model_type = tokenizer_json["model"]["type"]
-    special_tokens = {unk_token, pad_token}
+    added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
+    original_added_tokens = {x["content"] for x in added_tokens} - {"[UNK]", "[PAD]"}
+    added_tokens = _rename_added_token(unk_token, "[UNK]", added_tokens, pre_tokenized_tokens)
+    added_tokens = _rename_added_token(pad_token, "[PAD]", added_tokens, pre_tokenized_tokens)
+
+    # Remove old special tokens
+    added_tokens = [x for x in added_tokens if x["content"] not in original_added_tokens]
+    # Remove other special tokens from the vocabulary
+    pre_tokenized_tokens = [x for x in pre_tokenized_tokens if x not in original_added_tokens]
+    tokenizer_json["added_tokens"] = added_tokens
+    all_added_tokens = {x["content"] for x in added_tokens} | original_added_tokens
 
     if model_type in {"WordPiece", "BPE"}:
         # Easiest, just add the new vocab
         unk_token = unk_token or tokenizer_json["model"]["unk_token"]
-        tokenizer_json["model"]["unk_token"] = unk_token
-        tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] in special_tokens]
+        tokenizer_json["model"]["unk_token"] = "[UNK]"
         tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
 
         if model_type == "BPE":
             # Bit more difficult, we need to take into account merges.
             merges = tokenizer_json["model"]["merges"]
-            merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, special_tokens)
+            merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, all_added_tokens)
             tokenizer_json["model"]["merges"] = merges
 
     elif model_type == "Unigram":
         # Bit more difficult, we need to take into account probas.
         unk_id = tokenizer_json["model"]["unk_id"]
-        tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] in special_tokens]
         vocab = tokenizer_json["model"]["vocab"]
         unk_token = vocab[unk_id][0] if unk_id is not None else None
         current_probas = dict(tokenizer_json["model"]["vocab"])
@@ -152,8 +159,27 @@ def replace_vocabulary(
         raise ValueError(f"Unknown model type {model_type}")
 
     # Remap special tokens
-    added_tokens = tokenizer_json["added_tokens"]
-    tokenizer_json["added_tokens"] = _remap_added_tokens(added_tokens, pre_tokenized_tokens)
+    tokenizer_json["added_tokens"] = _remap_added_tokens(
+        special_tokens=tokenizer_json["added_tokens"],
+        vocabulary=pre_tokenized_tokens,
+    )
     tokenizer_json["post_processor"] = _DEFAULT_POST_PROCESSOR_TEMPLATE
 
     return Tokenizer.from_str(json.dumps(tokenizer_json))
+
+
+def _rename_added_token(
+    form: str | None, new_form: str, added_tokens: list[dict[str, Any]], vocabulary: list[str]
+) -> list[dict[str, Any]]:
+    """Rename special tokens in the tokenizer."""
+    if form is None:
+        return added_tokens
+
+    idx = vocabulary.index(form)
+    added_token = [x for x in added_tokens if x["content"] == form]
+    if added_token:
+        added_token[0]["id"] = idx
+        added_token[0]["content"] = new_form
+        vocabulary[idx] = new_form
+
+    return added_tokens
