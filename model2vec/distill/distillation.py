@@ -66,7 +66,7 @@ def distill_from_model(
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
-    :param use_subword: Deprecated. If this is not set to None, we show a warning. It doesn't do anything.
+    :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :return: A StaticModel
 
     """
@@ -229,7 +229,7 @@ def distill(
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
     :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming from `transformers`. If this is True, we will load all components.
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
-    :param use_subword: Deprecated. If this is not set to None, we show a warning. It doesn't do anything.
+    :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :return: A StaticModel
 
     """
