@@ -31,7 +31,6 @@ class ModulewithWeights(Protocol):
 def create_embeddings(
     model: PreTrainedModel,
     tokenizer: PreTrainedTokenizerFast,
-    use_subword: bool,
     tokens: list[str],
     device: str,
     token_remove_regex: re.Pattern | None,
@@ -44,7 +43,6 @@ def create_embeddings(
     :param model: The model to use.
         This should be a transformers model.
     :param tokenizer: The tokenizer to use.
-    :param use_subword: Whether to include subword tokens in the output.
     :param tokens: The tokens to use.
     :param device: The torch device to use.
     :param token_remove_regex: A regex pattern to remove tokens from the vocabulary.
@@ -63,23 +61,16 @@ def create_embeddings(
 
     tokens_to_keep = {pad_token, unk_token}
 
-    if use_subword:
-        if token_remove_regex is not None:
-            # Sort the vocabulary by id, important for zipf.
-            sorted_vocab = sorted(tokenizer.get_vocab().items(), key=lambda x: x[1])
-            id_list = filter_vocabulary_by_regex(token_remove_regex, sorted_vocab)
-        else:
-            # If the token remove regex is None, just use all tokens.
-            id_list = list(range(len(tokenizer.get_vocab())))
-
-        added_tokens_ids = [id for token, id in tokenizer.added_tokens_encoder.items() if token not in tokens_to_keep]
-        ids = torch.Tensor(sorted(set(id_list) - set(added_tokens_ids))).long()
-
-    elif unk_token:
-        # Include unk token. This is necessary for some models.
-        ids = torch.Tensor(tokenizer.convert_tokens_to_ids([unk_token, pad_token])).long()
+    if token_remove_regex is not None:
+        # Sort the vocabulary by id, important for zipf.
+        sorted_vocab = sorted(tokenizer.get_vocab().items(), key=lambda x: x[1])
+        id_list = filter_vocabulary_by_regex(token_remove_regex, sorted_vocab)
     else:
-        ids = None
+        # If the token remove regex is None, just use all tokens.
+        id_list = list(range(len(tokenizer.get_vocab())))
+
+    added_tokens_ids = [id for token, id in tokenizer.added_tokens_encoder.items() if token not in tokens_to_keep]
+    ids = torch.Tensor(sorted(set(id_list) - set(added_tokens_ids))).long()
 
     if ids is not None:
         dummy_encoding = tokenizer.encode("A")

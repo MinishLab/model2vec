@@ -133,7 +133,7 @@ def replace_vocabulary(
     if model_type in {"WordPiece", "BPE"}:
         # Easiest, just add the new vocab
         unk_token = unk_token or tokenizer_json["model"]["unk_token"]
-        tokenizer_json["model"]["unk_token"] = "[UNK]"
+        tokenizer_json["model"]["unk_token"] = "[UNK]" if unk_token else None
         tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
 
         if model_type == "BPE":
