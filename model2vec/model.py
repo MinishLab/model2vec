@@ -5,7 +5,7 @@ import os
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator, Union
+from typing import Any, Iterator, Sequence, Union, overload
 
 import numpy as np
 from joblib import delayed
@@ -117,7 +117,7 @@ class StaticModel:
             subfolder=subfolder,
         )
 
-    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[list[int]]:
+    def tokenize(self, sentences: Sequence[str], max_length: int | None = None) -> list[list[int]]:
         """
         Tokenize a list of sentences.
 
@@ -245,9 +245,31 @@ class StaticModel:
             language=metadata.get("language"),
         )
 
+    @overload
     def encode_as_sequence(
         self,
-        sentences: list[str] | str,
+        sentences: str,
+        max_length: int | None = None,
+        batch_size: int = 1024,
+        show_progress_bar: bool = False,
+        use_multiprocessing: bool = True,
+        multiprocessing_threshold: int = 10_000,
+    ) -> np.ndarray: ...
+
+    @overload
+    def encode_as_sequence(
+        self,
+        sentences: list[str],
+        max_length: int | None = None,
+        batch_size: int = 1024,
+        show_progress_bar: bool = False,
+        use_multiprocessing: bool = True,
+        multiprocessing_threshold: int = 10_000,
+    ) -> list[np.ndarray]: ...
+
+    def encode_as_sequence(
+        self,
+        sentences: str | list[str],
         max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
@@ -262,6 +284,9 @@ class StaticModel:
         Note that if you just want the mean, you should use the `encode` method.
         This is about twice as slow.
         Sentences that do not contain any tokens will be turned into an empty array.
+
+        NOTE: the input type is currently underspecified. The actual input type is `Sequence[str] | str`, but this
+            is not possible to implement in python typing currently.
 
         :param sentences: The list of sentences to encode.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
@@ -320,7 +345,7 @@ class StaticModel:
 
     def encode(
         self,
-        sentences: list[str] | str,
+        sentences: Sequence[str],
         show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
@@ -333,6 +358,9 @@ class StaticModel:
 
         This function encodes a list of sentences by averaging the word embeddings of the tokens in the sentence.
         For ease of use, we don't batch sentences together.
+
+        NOTE: the return type is currently underspecified. In the case of a single string, this returns a 1D array,
+            but in the case of a list of strings, this returns a 2D array. Not possible to implement in numpy currently.
 
         :param sentences: The list of sentences to encode. You can also pass a single sentence.
         :param show_progress_bar: Whether to show the progress bar.
@@ -378,7 +406,7 @@ class StaticModel:
             return out_array[0]
         return out_array
 
-    def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
+    def _encode_batch(self, sentences: Sequence[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
         ids = self.tokenize(sentences=sentences, max_length=max_length)
         out: list[np.ndarray] = []
@@ -396,7 +424,7 @@ class StaticModel:
         return out_array
 
     @staticmethod
-    def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:
+    def _batch(sentences: Sequence[str], batch_size: int) -> Iterator[Sequence[str]]:
         """Batch the sentences into equal-sized."""
         return (sentences[i : i + batch_size] for i in range(0, len(sentences), batch_size))
 
