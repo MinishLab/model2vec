@@ -186,7 +186,7 @@ class StaticModel:
         weights = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32
         embeddings = embeddings / weights
 
-        '''from sklearn.cluster import KMeans
+        """from sklearn.cluster import KMeans
         from sklearn.decomposition import PCA
         km = KMeans(n_clusters=4096, random_state=0)
         km.fit(embeddings)
@@ -196,8 +196,8 @@ class StaticModel:
 
         p = PCA(n_components=dimensionality)
         embeddings = p.fit_transform(embeddings)
-        
-        token_mapping = {i: x for i, x in enumerate(assignments)}'''
+
+        token_mapping = {i: x for i, x in enumerate(assignments)}"""
         token_mapping = {i: i for i in range(len(embeddings))}
 
         embeddings = quantize_and_reduce_dim(
