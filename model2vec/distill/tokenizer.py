@@ -34,7 +34,8 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token]) -> list[
 
     if tokenizer.pre_tokenizer is not None:
         for token in tokens:
-            if token.is_subword:
+            if token.is_original:
+                # Original tokens do not need to be pre-tokenized.
                 pre_tokenized_tokens.append(token.form)
             else:
                 # We know 100% sure that all pretokenized tokens will have length 1.
@@ -114,21 +115,21 @@ def replace_vocabulary(
 
     # NOTE: all tokens have been normalized before.
     # Very careful, we need to pretokenize words before adding them to the vocabulary.
-    # But only if they are not subword tokens.
+    # But only if they are not part of the original vocabulary.
     pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary)
 
     model_type = tokenizer_json["model"]["type"]
     added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
-    original_added_tokens = {x["content"] for x in added_tokens} - {"[UNK]", "[PAD]"}
+
+    # NOTE: all added tokens but the unk and pad tokens are removed already.
+    # We only need this for BPE.
+    added_token_forms = {x["content"] for x in added_tokens} | {"[UNK]", "[PAD]"}
+    # We need to remove the added tokens but keep [UNK] and [PAD] tokens.
     added_tokens = _rename_added_token(unk_token, "[UNK]", added_tokens, pre_tokenized_tokens)
     added_tokens = _rename_added_token(pad_token, "[PAD]", added_tokens, pre_tokenized_tokens)
 
-    # Remove old special tokens
-    added_tokens = [x for x in added_tokens if x["content"] not in original_added_tokens]
-    # Remove other special tokens from the vocabulary
-    pre_tokenized_tokens = [x for x in pre_tokenized_tokens if x not in original_added_tokens]
-    tokenizer_json["added_tokens"] = added_tokens
-    all_added_tokens = {x["content"] for x in added_tokens} | original_added_tokens
+    # Remove old added tokens from added tokens
+    tokenizer_json["added_tokens"] = [x for x in added_tokens if x["content"] in {"[UNK]", "[PAD]"}]
 
     if model_type in {"WordPiece", "BPE"}:
         # Easiest, just add the new vocab
@@ -139,7 +140,7 @@ def replace_vocabulary(
         if model_type == "BPE":
             # Bit more difficult, we need to take into account merges.
             merges = tokenizer_json["model"]["merges"]
-            merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, all_added_tokens)
+            merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, added_token_forms)
             tokenizer_json["model"]["merges"] = merges
 
     elif model_type == "Unigram":

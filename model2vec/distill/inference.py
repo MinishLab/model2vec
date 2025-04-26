@@ -56,10 +56,12 @@ def create_embeddings(
     out_tokens: list[Token] = []
     tokenized: list[torch.Tensor] = []
     pad_token = tokenizer.special_tokens_map.get("pad_token")
+    # We need to use the pad token id for padding below.
     pad_token_id = tokenizer.convert_tokens_to_ids(pad_token)
     unk_token = tokenizer.special_tokens_map.get("unk_token")
 
-    tokens_to_keep = {pad_token, unk_token}
+    # Empty set if no pad or unk token is set.
+    tokens_to_keep = {pad_token, unk_token} - {None}
 
     if token_remove_regex is not None:
         # Sort the vocabulary by id, important for zipf.
