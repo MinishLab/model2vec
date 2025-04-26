@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TypeVar
+from typing import Sequence, TypeVar
 
 import huggingface_hub
 import numpy as np
@@ -65,11 +65,12 @@ class StaticModelPipeline:
         """Save the model to a folder."""
         save_pipeline(self, path)
 
-    def push_to_hub(self, repo_id: str, token: str | None = None, private: bool = False) -> None:
+    def push_to_hub(self, repo_id: str, subfolder: str, token: str | None = None, private: bool = False) -> None:
         """
         Save a model to a folder, and then push that folder to the hf hub.
 
         :param repo_id: The id of the repository to push to.
+        :param subfolder: The subfolder to push to.
         :param token: The token to use to push to the hub.
         :param private: Whether the repository should be private.
         """
@@ -78,11 +79,11 @@ class StaticModelPipeline:
         with TemporaryDirectory() as temp_dir:
             save_pipeline(self, temp_dir)
             self.model.save_pretrained(temp_dir)
-            push_folder_to_hub(Path(temp_dir), repo_id, private, token)
+            push_folder_to_hub(Path(temp_dir), subfolder, repo_id, private, token)
 
     def _encode_and_coerce_to_2d(
         self,
-        X: list[str] | str,
+        X: Sequence[str],
         show_progress_bar: bool,
         max_length: int | None,
         batch_size: int,
@@ -105,7 +106,7 @@ class StaticModelPipeline:
 
     def predict(
         self,
-        X: list[str] | str,
+        X: Sequence[str],
         show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
@@ -145,7 +146,7 @@ class StaticModelPipeline:
 
     def predict_proba(
         self,
-        X: list[str] | str,
+        X: Sequence[str],
         show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
@@ -175,7 +176,7 @@ class StaticModelPipeline:
         return self.head.predict_proba(encoded)
 
     def evaluate(
-        self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
+        self, X: Sequence[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
     ) -> str | dict[str, dict[str, float]]:
         """
         Evaluate the classifier on a given dataset using scikit-learn's classification report.

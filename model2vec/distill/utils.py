@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from logging import getLogger
 
 import torch
 
 logger = getLogger(__name__)
+
+
+@dataclass
+class Token:
+    """A class to represent a token."""
+
+    form: str
+    is_subword: bool
 
 
 def select_optimal_device(device: str | None) -> str:

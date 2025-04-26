@@ -32,6 +32,8 @@ _FORBIDDEN_PRETOKENIZERS = (
 )
 
 
+from model2vec.distill.utils import Token
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +45,7 @@ _DEFAULT_POST_PROCESSOR_TEMPLATE = {
 }
 
 
-def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[str]:
+def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token]) -> list[str]:
     """
     Apply pre-tokenization to vocabulary tokens if a pre-tokenizer is present.
 
@@ -59,14 +61,14 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[st
 
     if tokenizer.pre_tokenizer is not None:
         for token in tokens:
-            if token in current_tokenizer_vocab:
-                pre_tokenized_tokens.append(token)
+            if token.is_subword:
+                pre_tokenized_tokens.append(token.form)
             else:
                 # Join tokens just to be sure.
-                pretokenized_tokens, _ = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(token))
+                pretokenized_tokens, _ = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(f" {token.form}"))
                 pre_tokenized_tokens.append(" ".join(pretokenized_tokens))
     else:
-        pre_tokenized_tokens = tokens
+        pre_tokenized_tokens = [token.form for token in tokens]
 
     return pre_tokenized_tokens
 
@@ -156,7 +158,7 @@ def _make_new_merges_from_vocab(
 
 
 def replace_vocabulary(
-    tokenizer: Tokenizer, new_vocabulary: list[str], unk_token: str | None, pad_token: str | None
+    tokenizer: Tokenizer, new_vocabulary: list[Token], unk_token: str | None, pad_token: str | None
 ) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
     tokenizer.pre_tokenizer = _fix_pretokenizer_for_super(tokenizer.pre_tokenizer)
@@ -210,8 +212,8 @@ def replace_vocabulary(
         vocab = tokenizer_json["model"]["vocab"]
         unk_token = vocab[unk_id][0] if unk_id is not None else None
         current_probas = dict(tokenizer_json["model"]["vocab"])
-        lowest_proba = min(current_probas.values())
-        new_probas = {word: current_probas.get(word, lowest_proba) for word in pre_tokenized_tokens}
+        avg_proba = sum(current_probas.values()) / len(current_probas)
+        new_probas = {word: current_probas.get(word, avg_proba) for word in pre_tokenized_tokens}
         tokenizer_json["model"]["vocab"] = sorted(new_probas.items(), key=lambda x: x[1], reverse=True)
 
         tokens, _ = zip(*tokenizer_json["model"]["vocab"])

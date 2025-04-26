@@ -5,14 +5,14 @@ import os
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator, Union
+from typing import Any, Iterator, Sequence, Union, overload
 
 import numpy as np
 from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.quantization import DType, quantize_embeddings
+from model2vec.quantization import DType, quantize_and_reduce_dim
 from model2vec.utils import ProgressParallel, load_local_model
 
 PathLike = Union[Path, str]
@@ -118,7 +118,7 @@ class StaticModel:
             subfolder=subfolder,
         )
 
-    def tokenize(self, sentences: list[str], max_length: int | None = None) -> list[list[int]]:
+    def tokenize(self, sentences: Sequence[str], max_length: int | None = None) -> list[list[int]]:
         """
         Tokenize a list of sentences.
 
@@ -172,28 +172,22 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
-        :return: A StaticModel
-        :raises: ValueError if the dimensionality is greater than the model dimensionality.
+        :return: A StaticModel.
         """
         from model2vec.hf_utils import load_pretrained
 
         embeddings, tokenizer, config, metadata = load_pretrained(
-            path, token=token, from_sentence_transformers=False, subfolder=subfolder
+            folder_or_repo_path=path,
+            token=token,
+            from_sentence_transformers=False,
+            subfolder=subfolder,
         )
 
-        if quantize_to is not None:
-            quantize_to = DType(quantize_to)
-            embeddings = quantize_embeddings(embeddings, quantize_to)
-        if dimensionality is not None:
-            if dimensionality > embeddings.shape[1]:
-                raise ValueError(
-                    f"Dimensionality {dimensionality} is greater than the model dimensionality {embeddings.shape[1]}"
-                )
-            embeddings = embeddings[:, :dimensionality]
-            if config.get("apply_pca", None) is None:
-                logger.warning(
-                    "You are reducing the dimensionality of the model, but we can't find a pca key in the model config. This might not work as expected."
-                )
+        embeddings = quantize_and_reduce_dim(
+            embeddings=embeddings,
+            quantize_to=quantize_to,
+            dimensionality=dimensionality,
+        )
 
         return cls(
             embeddings,
@@ -210,6 +204,8 @@ class StaticModel:
         path: PathLike,
         token: str | None = None,
         normalize: bool | None = None,
+        quantize_to: str | DType | None = None,
+        dimensionality: int | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
@@ -219,17 +215,62 @@ class StaticModel:
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
         :param normalize: Whether to normalize the embeddings.
-        :return: A StaticModel
+        :param quantize_to: The dtype to quantize the model to. If None, no quantization is done.
+            If a string is passed, it is converted to a DType.
+        :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
+            This is useful if you want to load a model with a lower dimensionality.
+            Note that this only applies if you have trained your model using mrl or PCA.
+        :return: A StaticModel.
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, _ = load_pretrained(path, token=token, from_sentence_transformers=True)
+        embeddings, tokenizer, config, metadata = load_pretrained(
+            folder_or_repo_path=path,
+            token=token,
+            from_sentence_transformers=True,
+            subfolder=None,
+        )
 
-        return cls(embeddings, tokenizer, config, normalize=normalize, base_model_name=None, language=None)
+        embeddings = quantize_and_reduce_dim(
+            embeddings=embeddings,
+            quantize_to=quantize_to,
+            dimensionality=dimensionality,
+        )
+
+        return cls(
+            embeddings,
+            tokenizer,
+            config,
+            normalize=normalize,
+            base_model_name=metadata.get("base_model"),
+            language=metadata.get("language"),
+        )
+
+    @overload
+    def encode_as_sequence(
+        self,
+        sentences: str,
+        max_length: int | None = None,
+        batch_size: int = 1024,
+        show_progress_bar: bool = False,
+        use_multiprocessing: bool = True,
+        multiprocessing_threshold: int = 10_000,
+    ) -> np.ndarray: ...
+
+    @overload
+    def encode_as_sequence(
+        self,
+        sentences: list[str],
+        max_length: int | None = None,
+        batch_size: int = 1024,
+        show_progress_bar: bool = False,
+        use_multiprocessing: bool = True,
+        multiprocessing_threshold: int = 10_000,
+    ) -> list[np.ndarray]: ...
 
     def encode_as_sequence(
         self,
-        sentences: list[str] | str,
+        sentences: str | list[str],
         max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
@@ -244,6 +285,9 @@ class StaticModel:
         Note that if you just want the mean, you should use the `encode` method.
         This is about twice as slow.
         Sentences that do not contain any tokens will be turned into an empty array.
+
+        NOTE: the input type is currently underspecified. The actual input type is `Sequence[str] | str`, but this
+            is not possible to implement in python typing currently.
 
         :param sentences: The list of sentences to encode.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
@@ -302,7 +346,7 @@ class StaticModel:
 
     def encode(
         self,
-        sentences: list[str] | str,
+        sentences: Sequence[str],
         show_progress_bar: bool = False,
         max_length: int | None = 512,
         batch_size: int = 1024,
@@ -315,6 +359,9 @@ class StaticModel:
 
         This function encodes a list of sentences by averaging the word embeddings of the tokens in the sentence.
         For ease of use, we don't batch sentences together.
+
+        NOTE: the return type is currently underspecified. In the case of a single string, this returns a 1D array,
+            but in the case of a list of strings, this returns a 2D array. Not possible to implement in numpy currently.
 
         :param sentences: The list of sentences to encode. You can also pass a single sentence.
         :param show_progress_bar: Whether to show the progress bar.
@@ -360,7 +407,7 @@ class StaticModel:
             return out_array[0]
         return out_array
 
-    def _encode_batch(self, sentences: list[str], max_length: int | None) -> np.ndarray:
+    def _encode_batch(self, sentences: Sequence[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
         ids = self.tokenize(sentences=sentences, max_length=max_length)
         out: list[np.ndarray] = []
@@ -380,7 +427,7 @@ class StaticModel:
         return out_array
 
     @staticmethod
-    def _batch(sentences: list[str], batch_size: int) -> Iterator[list[str]]:
+    def _batch(sentences: Sequence[str], batch_size: int) -> Iterator[Sequence[str]]:
         """Batch the sentences into equal-sized."""
         return (sentences[i : i + batch_size] for i in range(0, len(sentences), batch_size))
 
