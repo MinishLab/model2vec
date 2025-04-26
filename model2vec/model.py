@@ -183,6 +183,23 @@ class StaticModel:
             subfolder=subfolder,
         )
 
+        weights = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32
+        embeddings = embeddings / weights
+
+        '''from sklearn.cluster import KMeans
+        from sklearn.decomposition import PCA
+        km = KMeans(n_clusters=4096, random_state=0)
+        km.fit(embeddings)
+        # Do PCA again?
+        assignments = km.predict(embeddings)
+        embeddings = km.cluster_centers_
+
+        p = PCA(n_components=dimensionality)
+        embeddings = p.fit_transform(embeddings)
+        
+        token_mapping = {i: x for i, x in enumerate(assignments)}'''
+        token_mapping = {i: i for i in range(len(embeddings))}
+
         embeddings = quantize_and_reduce_dim(
             embeddings=embeddings,
             quantize_to=quantize_to,
@@ -191,6 +208,8 @@ class StaticModel:
 
         return cls(
             embeddings,
+            weights,
+            token_mapping,
             tokenizer,
             config,
             normalize=normalize,
@@ -237,8 +256,14 @@ class StaticModel:
             dimensionality=dimensionality,
         )
 
+        weights = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32
+        embeddings = embeddings / weights
+        token_mapping = {i: i for i in range(len(embeddings))}
+
         return cls(
             embeddings,
+            weights,
+            token_mapping,
             tokenizer,
             config,
             normalize=normalize,
