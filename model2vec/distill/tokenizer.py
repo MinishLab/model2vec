@@ -107,6 +107,45 @@ def _make_new_merges_from_vocab(
     return new_merges
 
 
+def _process_wordpiece(
+    tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
+) -> dict[str, Any]:
+    """Process the WordPiece tokenizer JSON."""
+    unk_token = unk_token or tokenizer_json["model"]["unk_token"]
+    tokenizer_json["model"]["unk_token"] = "[UNK]" if unk_token else None
+    tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
+
+    return tokenizer_json
+
+
+def _process_bpe(tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str]) -> dict[str, Any]:
+    """Process the BPE tokenizer JSON."""
+    tokenizer_json = _process_wordpiece(tokenizer_json, pre_tokenized_tokens, None)
+    merges = tokenizer_json["model"]["merges"]
+    merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, {"[UNK]", "[PAD]"})
+    tokenizer_json["model"]["merges"] = merges
+
+    return tokenizer_json
+
+
+def _process_unigram(
+    tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
+) -> dict[str, Any]:
+    """Process the Unigram tokenizer JSON."""
+    unk_id = tokenizer_json["model"]["unk_id"]
+    vocab = tokenizer_json["model"]["vocab"]
+    unk_token = vocab[unk_id][0] if unk_id is not None else None
+    current_probas = dict(tokenizer_json["model"]["vocab"])
+    avg_proba = sum(current_probas.values()) / len(current_probas)
+    new_probas = {word: current_probas.get(word, avg_proba) for word in pre_tokenized_tokens}
+    tokenizer_json["model"]["vocab"] = sorted(new_probas.items(), key=lambda x: x[1], reverse=True)
+
+    tokens, _ = zip(*tokenizer_json["model"]["vocab"])
+    tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token) if unk_token in tokens else None
+
+    return tokenizer_json
+
+
 def replace_vocabulary(
     tokenizer: Tokenizer, new_vocabulary: list[Token], unk_token: str | None, pad_token: str | None
 ) -> Tokenizer:
@@ -121,9 +160,6 @@ def replace_vocabulary(
     model_type = tokenizer_json["model"]["type"]
     added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
 
-    # NOTE: all added tokens but the unk and pad tokens are removed already.
-    # We only need this for BPE.
-    added_token_forms = {x["content"] for x in added_tokens} | {"[UNK]", "[PAD]"}
     # We need to remove the added tokens but keep [UNK] and [PAD] tokens.
     added_tokens = _rename_added_token(unk_token, "[UNK]", added_tokens, pre_tokenized_tokens)
     added_tokens = _rename_added_token(pad_token, "[PAD]", added_tokens, pre_tokenized_tokens)
@@ -131,31 +167,12 @@ def replace_vocabulary(
     # Remove old added tokens from added tokens
     tokenizer_json["added_tokens"] = [x for x in added_tokens if x["content"] in {"[UNK]", "[PAD]"}]
 
-    if model_type in {"WordPiece", "BPE"}:
-        # Easiest, just add the new vocab
-        unk_token = unk_token or tokenizer_json["model"]["unk_token"]
-        tokenizer_json["model"]["unk_token"] = "[UNK]" if unk_token else None
-        tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
-
-        if model_type == "BPE":
-            # Bit more difficult, we need to take into account merges.
-            merges = tokenizer_json["model"]["merges"]
-            merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, added_token_forms)
-            tokenizer_json["model"]["merges"] = merges
-
+    if model_type == "WordPiece":
+        tokenizer_json = _process_wordpiece(tokenizer_json, pre_tokenized_tokens, unk_token)
+    elif model_type == "BPE":
+        tokenizer_json = _process_bpe(tokenizer_json, pre_tokenized_tokens)
     elif model_type == "Unigram":
-        # Bit more difficult, we need to take into account probas.
-        unk_id = tokenizer_json["model"]["unk_id"]
-        vocab = tokenizer_json["model"]["vocab"]
-        unk_token = vocab[unk_id][0] if unk_id is not None else None
-        current_probas = dict(tokenizer_json["model"]["vocab"])
-        avg_proba = sum(current_probas.values()) / len(current_probas)
-        new_probas = {word: current_probas.get(word, avg_proba) for word in pre_tokenized_tokens}
-        tokenizer_json["model"]["vocab"] = sorted(new_probas.items(), key=lambda x: x[1], reverse=True)
-
-        tokens, _ = zip(*tokenizer_json["model"]["vocab"])
-        tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token) if unk_token in tokens else None
-
+        tokenizer_json = _process_unigram(tokenizer_json, pre_tokenized_tokens, unk_token)
     else:
         raise ValueError(f"Unknown model type {model_type}")
 
