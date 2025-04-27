@@ -23,22 +23,14 @@ rng = np.random.default_rng()
 
 
 @pytest.mark.parametrize(
-    "vocabulary, use_subword, pca_dims, apply_zipf",
+    "vocabulary, pca_dims, apply_zipf",
     [
-        (None, True, 256, True),  # Output vocab with subwords, PCA applied
-        (
-            ["wordA", "wordB"],
-            False,
-            4,
-            False,
-        ),  # Custom vocab without subword , PCA applied
-        (["wordA", "wordB"], True, 4, False),  # Custom vocab with subword, PCA applied
-        (None, True, "auto", False),  # Subword, PCA set to 'auto'
-        (None, True, 1024, False),  # Subword, PCA set to high number.
-        (None, True, None, True),  # No PCA applied
-        (None, True, 0.9, True),  # PCA as float applied
-        (["wordA", "wordB"], False, 4, True),  # Custom vocab without subwords PCA and Zipf applied
-        (None, False, 256, True),  # use_subword = False without passing a vocabulary should raise an error
+        (None, 256, True),  # Output vocab with subwords, PCA applied
+        (["wordA", "wordB"], 4, False),  # Custom vocab with subword, PCA applied
+        (None, "auto", False),  # Subword, PCA set to 'auto'
+        (None, 1024, False),  # Subword, PCA set to high number.
+        (None, None, True),  # No PCA applied
+        (None, 0.9, True),  # PCA as float applied
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -49,7 +41,6 @@ def test_distill_from_model(
     mock_berttokenizer: BertTokenizerFast,
     mock_transformer: AutoModel,
     vocabulary: list[str] | None,
-    use_subword: bool,
     pca_dims: int | None,
     apply_zipf: bool,
 ) -> None:
@@ -61,44 +52,30 @@ def test_distill_from_model(
     # mock_auto_tokenizer.return_value = mock_berttokenizer
     mock_auto_model.return_value = mock_transformer
 
-    if vocabulary is None and not use_subword:
-        with pytest.raises(ValueError):
-            static_model = distill_from_model(
-                model=mock_transformer,
-                tokenizer=mock_berttokenizer,
-                vocabulary=vocabulary,
-                device="cpu",
-                pca_dims=pca_dims,
-                apply_zipf=apply_zipf,
-                use_subword=use_subword,
-            )
-    else:
-        # Call the distill function with the parametrized inputs
-        static_model = distill_from_model(
-            model=mock_transformer,
-            tokenizer=mock_berttokenizer,
-            vocabulary=vocabulary,
-            device="cpu",
-            pca_dims=pca_dims,
-            apply_zipf=apply_zipf,
-            use_subword=use_subword,
-            token_remove_pattern=None,
-        )
+    # Call the distill function with the parametrized inputs
+    static_model = distill_from_model(
+        model=mock_transformer,
+        tokenizer=mock_berttokenizer,
+        vocabulary=vocabulary,
+        device="cpu",
+        pca_dims=pca_dims,
+        apply_zipf=apply_zipf,
+        token_remove_pattern=None,
+    )
 
-        static_model2 = distill(
-            model_name="tests/data/test_tokenizer",
-            vocabulary=vocabulary,
-            device="cpu",
-            pca_dims=pca_dims,
-            apply_zipf=apply_zipf,
-            use_subword=use_subword,
-            token_remove_pattern=None,
-        )
+    static_model2 = distill(
+        model_name="tests/data/test_tokenizer",
+        vocabulary=vocabulary,
+        device="cpu",
+        pca_dims=pca_dims,
+        apply_zipf=apply_zipf,
+        token_remove_pattern=None,
+    )
 
-        assert static_model.embedding.shape == static_model2.embedding.shape
-        assert static_model.config == static_model2.config
-        assert json.loads(static_model.tokenizer.to_str()) == json.loads(static_model2.tokenizer.to_str())
-        assert static_model.base_model_name == static_model2.base_model_name
+    assert static_model.embedding.shape == static_model2.embedding.shape
+    assert static_model.config == static_model2.config
+    assert json.loads(static_model.tokenizer.to_str()) == json.loads(static_model2.tokenizer.to_str())
+    assert static_model.base_model_name == static_model2.base_model_name
 
 
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -163,29 +140,19 @@ def test_distill_removal_pattern(
 
 
 @pytest.mark.parametrize(
-    "vocabulary, use_subword, pca_dims, apply_zipf, sif_coefficient, expected_shape",
+    "vocabulary, pca_dims, apply_zipf, sif_coefficient, expected_shape",
     [
-        (None, True, 256, True, None, (29525, 256)),  # Output vocab with subwords, PCA applied
-        (
-            ["wordA", "wordB"],
-            False,
-            2,
-            False,
-            None,
-            (4, 2),
-        ),  # Custom vocab without subword , PCA applied
-        (None, True, "auto", False, None, (29525, 768)),  # Subword, PCA set to 'auto'
-        (None, True, "auto", True, 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
-        (None, True, "auto", False, 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
-        (None, True, "auto", True, 0, None),  # Sif too low
-        (None, True, "auto", True, 1, None),  # Sif too high
-        (None, True, "auto", False, 0, (29525, 768)),  # Sif too low, but apply_zipf is False
-        (None, True, "auto", False, 1, (29525, 768)),  # Sif too high, but apply_zipf is False
-        (None, True, 1024, False, None, (29525, 768)),  # Subword, PCA set to high number.
-        (["wordA", "wordB"], True, 4, False, None, (29527, 4)),  # Custom vocab with subword, PCA applied
-        (None, True, None, True, None, (29525, 768)),  # No PCA applied
-        (["wordA", "wordB"], False, 2, True, None, (4, 2)),  # Custom vocab without subwords PCA and Zipf applied
-        (None, False, 256, True, None, None),  # use_subword = False without passing a vocabulary should raise an error
+        (None, 256, True, None, (29525, 256)),  # Output vocab with subwords, PCA applied
+        (None, "auto", False, None, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, "auto", True, 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, "auto", False, 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, "auto", True, 0, None),  # Sif too low
+        (None, "auto", True, 1, None),  # Sif too high
+        (None, "auto", False, 0, (29525, 768)),  # Sif too low, but apply_zipf is False
+        (None, "auto", False, 1, (29525, 768)),  # Sif too high, but apply_zipf is False
+        (None, 1024, False, None, (29525, 768)),  # Subword, PCA set to high number.
+        (["wordA", "wordB"], 4, False, None, (29527, 4)),  # Custom vocab with subword, PCA applied
+        (None, None, True, None, (29525, 768)),  # No PCA applied
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -195,7 +162,6 @@ def test_distill(
     mock_model_info: MagicMock,
     mock_transformer: AutoModel,
     vocabulary: list[str] | None,
-    use_subword: bool,
     pca_dims: int | None,
     apply_zipf: bool,
     sif_coefficient: float | None,
@@ -210,18 +176,7 @@ def test_distill(
 
     model_name = "tests/data/test_tokenizer"
 
-    if vocabulary is None and not use_subword:
-        with pytest.raises(ValueError):
-            static_model = distill(
-                model_name=model_name,
-                vocabulary=vocabulary,
-                device="cpu",
-                pca_dims=pca_dims,
-                apply_zipf=apply_zipf,
-                use_subword=use_subword,
-                sif_coefficient=sif_coefficient,
-            )
-    elif (
+    if (
         apply_zipf is not None
         and apply_zipf
         and sif_coefficient is not None
@@ -234,7 +189,6 @@ def test_distill(
                 device="cpu",
                 pca_dims=pca_dims,
                 apply_zipf=apply_zipf,
-                use_subword=use_subword,
                 sif_coefficient=sif_coefficient,
             )
 
@@ -246,7 +200,6 @@ def test_distill(
             device="cpu",
             pca_dims=pca_dims,
             apply_zipf=apply_zipf,
-            use_subword=use_subword,
             sif_coefficient=sif_coefficient,
         )
 
