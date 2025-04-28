@@ -299,8 +299,6 @@ def evaluate_single_or_multi_label(
     report = classification_report(
         y,
         predictions,
-        labels=np.arange(len(classes)),
-        target_names=[str(c) for c in classes],
         output_dict=output_dict,
         zero_division=0,
     )
