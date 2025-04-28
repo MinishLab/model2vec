@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, TypeVar
 
 import numpy as np
@@ -10,6 +11,8 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 
 from model2vec import StaticModel
+
+logger = logging.getLogger(__name__)
 
 
 class FinetunableStaticModel(nn.Module):
@@ -26,9 +29,16 @@ class FinetunableStaticModel(nn.Module):
         self.pad_id = pad_id
         self.out_dim = out_dim
         self.embed_dim = vectors.shape[1]
-        self.vectors = vectors
 
-        self.embeddings = nn.Embedding.from_pretrained(vectors.clone().float(), freeze=False, padding_idx=pad_id)
+        self.vectors = vectors
+        if self.vectors.dtype != torch.float32:
+            dtype = str(self.vectors.dtype)
+            logger.warning(
+                f"Your vectors are {dtype} precision, converting to to torch.float32 to avoid compatibility issues."
+            )
+            self.vectors = vectors.float()
+
+        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
         self.head = self.construct_head()
         self.w = self.construct_weights()
         self.tokenizer = tokenizer
