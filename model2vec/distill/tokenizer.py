@@ -32,6 +32,8 @@ _FORBIDDEN_PRETOKENIZERS = (
 )
 
 
+from model2vec.distill.utils import Token
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +45,7 @@ _DEFAULT_POST_PROCESSOR_TEMPLATE = {
 }
 
 
-def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[str]:
+def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token]) -> list[str]:
     """
     Apply pre-tokenization to vocabulary tokens if a pre-tokenizer is present.
 
@@ -54,19 +56,19 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[st
     :param tokens: The tokens to pre-tokenize.
     :return: The pre-tokenized tokens.
     """
-    current_tokenizer_vocab = set(tokenizer.get_vocab())
     pre_tokenized_tokens = []
 
     if tokenizer.pre_tokenizer is not None:
         for token in tokens:
-            if token in current_tokenizer_vocab:
-                pre_tokenized_tokens.append(token)
+            if token.is_original:
+                # Original tokens do not need to be pre-tokenized.
+                pre_tokenized_tokens.append(token.form)
             else:
                 # Join tokens just to be sure.
                 pretokenized_tokens, _ = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(token))
                 pre_tokenized_tokens.append(" ".join(pretokenized_tokens))
     else:
-        pre_tokenized_tokens = tokens
+        pre_tokenized_tokens = [token.form for token in tokens]
 
     return pre_tokenized_tokens
 
@@ -74,7 +76,7 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[str]) -> list[st
 def _remap_added_tokens(
     special_tokens: list[dict[str, Any]],
     vocabulary: list[str],
-) -> list[dict[str, int]]:
+) -> list[dict[str, Any]]:
     """
     Remap special tokens in the tokenizer.
 
@@ -155,8 +157,41 @@ def _make_new_merges_from_vocab(
     return new_merges
 
 
+def _process_wordpiece(
+    tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
+) -> dict[str, Any]:
+    """Process the WordPiece tokenizer JSON."""
+    tokenizer_json["model"]["unk_token"] = unk_token
+    tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
+
+    return tokenizer_json
+
+
+def _process_bpe(tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str]) -> dict[str, Any]:
+    """Process the BPE tokenizer JSON."""
+    tokenizer_json = _process_wordpiece(tokenizer_json, pre_tokenized_tokens, None)
+    merges = tokenizer_json["model"]["merges"]
+    merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, {"[UNK]", "[PAD]"})
+    tokenizer_json["model"]["merges"] = merges
+
+    return tokenizer_json
+
+
+def _process_unigram(tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str) -> dict[str, Any]:
+    """Process the Unigram tokenizer JSON."""
+    current_probas = dict(tokenizer_json["model"]["vocab"])
+    avg_proba = sum(current_probas.values()) / len(current_probas)
+    new_probas = {word: current_probas.get(word, avg_proba) for word in pre_tokenized_tokens}
+    tokenizer_json["model"]["vocab"] = sorted(new_probas.items(), key=lambda x: x[1], reverse=True)
+
+    tokens, _ = zip(*tokenizer_json["model"]["vocab"])
+    tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token)
+
+    return tokenizer_json
+
+
 def replace_vocabulary(
-    tokenizer: Tokenizer, new_vocabulary: list[str], unk_token: str | None, pad_token: str | None
+    tokenizer: Tokenizer, new_vocabulary: list[Token], unk_token: str | None, pad_token: str | None
 ) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
     tokenizer.pre_tokenizer = _fix_pretokenizer_for_super(tokenizer.pre_tokenizer)
@@ -164,66 +199,50 @@ def replace_vocabulary(
 
     # NOTE: all tokens have been normalized before.
     # Very careful, we need to pretokenize words before adding them to the vocabulary.
-    # But only if they are not subword tokens.
+    # But only if they are not part of the original vocabulary.
     pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary)
 
     model_type = tokenizer_json["model"]["type"]
-    special_tokens = {unk_token, pad_token}
+    added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
 
-    if model_type in {"WordPiece", "BPE"}:
-        # Easiest, just add the new vocab
-        unk_token = unk_token or tokenizer_json["model"]["unk_token"]
-        tokenizer_json["model"]["unk_token"] = unk_token
-        tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] in special_tokens]
+    # We need to remove the added tokens but keep [UNK] and [PAD] tokens.
+    added_tokens = _rename_added_token(unk_token, "[UNK]", added_tokens, pre_tokenized_tokens)
+    added_tokens = _rename_added_token(pad_token, "[PAD]", added_tokens, pre_tokenized_tokens)
 
-        if model_type == "WordPiece":
-            subword_prefix = tokenizer_json["model"]["continuing_subword_prefix"]
-            new_vocab = {}
-            for idx, token in enumerate(pre_tokenized_tokens):
-                if token in special_tokens:
-                    # We need to remove the prefix from the token
-                    pass
-                elif token.startswith(subword_prefix):
-                    # We need to remove the prefix from the token
-                    token = token.removeprefix(subword_prefix)
-                elif token.startswith("Ġ"):
-                    pass
-                else:
-                    # We need to add the prefix to the token
-                    token = f"Ġ{token}"
-                new_vocab[token] = idx
-            tokenizer_json["model"]["continuing_subword_prefix"] = ""
-            tokenizer_json["model"]["max_input_chars_per_word"] = 10_000
-            tokenizer_json["model"]["vocab"] = new_vocab
+    # Remove old added tokens from added tokens
+    tokenizer_json["added_tokens"] = [x for x in added_tokens if x["content"] in {"[UNK]", "[PAD]"}]
 
-        if model_type == "BPE":
-            # Bit more difficult, we need to take into account merges.
-            tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
-            merges = tokenizer_json["model"]["merges"]
-            merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, special_tokens)
-            tokenizer_json["model"]["merges"] = merges
-
+    if model_type == "WordPiece":
+        tokenizer_json = _process_wordpiece(tokenizer_json, pre_tokenized_tokens, "[UNK]")
+    elif model_type == "BPE":
+        tokenizer_json = _process_bpe(tokenizer_json, pre_tokenized_tokens)
     elif model_type == "Unigram":
-        # Bit more difficult, we need to take into account probas.
-        unk_id = tokenizer_json["model"]["unk_id"]
-        tokenizer_json["added_tokens"] = [x for x in tokenizer_json["added_tokens"] if x["content"] in special_tokens]
-        vocab = tokenizer_json["model"]["vocab"]
-        unk_token = vocab[unk_id][0] if unk_id is not None else None
-        current_probas = dict(tokenizer_json["model"]["vocab"])
-        lowest_proba = min(current_probas.values())
-        new_probas = {word: current_probas.get(word, lowest_proba) for word in pre_tokenized_tokens}
-        tokenizer_json["model"]["vocab"] = sorted(new_probas.items(), key=lambda x: x[1], reverse=True)
-
-        tokens, _ = zip(*tokenizer_json["model"]["vocab"])
-        tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token) if unk_token in tokens else None
-
+        tokenizer_json = _process_unigram(tokenizer_json, pre_tokenized_tokens, "[UNK]")
     else:
         raise ValueError(f"Unknown model type {model_type}")
 
     # Remap special tokens
-    added_tokens = tokenizer_json["added_tokens"]
-    tokenizer_json["added_tokens"] = _remap_added_tokens(added_tokens, pre_tokenized_tokens)
+    tokenizer_json["added_tokens"] = _remap_added_tokens(
+        special_tokens=tokenizer_json["added_tokens"],
+        vocabulary=pre_tokenized_tokens,
+    )
     tokenizer_json["post_processor"] = _DEFAULT_POST_PROCESSOR_TEMPLATE
 
-    tokenizer = Tokenizer.from_str(json.dumps(tokenizer_json))
-    return tokenizer
+    return Tokenizer.from_str(json.dumps(tokenizer_json))
+
+
+def _rename_added_token(
+    form: str | None, new_form: str, added_tokens: list[dict[str, Any]], vocabulary: list[str]
+) -> list[dict[str, Any]]:
+    """Rename special tokens in the tokenizer."""
+    if form is None:
+        return added_tokens
+
+    idx = vocabulary.index(form)
+    added_token = [x for x in added_tokens if x["content"] == form]
+    if added_token:
+        added_token[0]["id"] = idx
+        added_token[0]["content"] = new_form
+        vocabulary[idx] = new_form
+
+    return added_tokens

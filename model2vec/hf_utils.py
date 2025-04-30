@@ -90,7 +90,7 @@ def _create_model_card(
         library_name="model2vec",
         **kwargs,
     )
-    model_card = ModelCard.from_template(model_card_data, template_path=full_path)
+    model_card = ModelCard.from_template(model_card_data, template_path=str(full_path))
     model_card.save(folder_path / "README.md")
 
 
@@ -145,24 +145,32 @@ def load_pretrained(
 
     else:
         logger.info("Folder does not exist locally, attempting to use huggingface hub.")
-        embeddings_path = huggingface_hub.hf_hub_download(
-            folder_or_repo_path.as_posix(), model_file, token=token, subfolder=subfolder
+        embeddings_path = Path(
+            huggingface_hub.hf_hub_download(
+                folder_or_repo_path.as_posix(), model_file, token=token, subfolder=subfolder
+            )
         )
 
         try:
-            readme_path = huggingface_hub.hf_hub_download(
-                folder_or_repo_path.as_posix(), "README.md", token=token, subfolder=subfolder
+            readme_path = Path(
+                huggingface_hub.hf_hub_download(
+                    folder_or_repo_path.as_posix(), "README.md", token=token, subfolder=subfolder
+                )
             )
             metadata = _get_metadata_from_readme(Path(readme_path))
         except huggingface_hub.utils.EntryNotFoundError:
             logger.info("No README found in the model folder. No model card loaded.")
             metadata = {}
 
-        config_path = huggingface_hub.hf_hub_download(
-            folder_or_repo_path.as_posix(), config_name, token=token, subfolder=subfolder
+        config_path = Path(
+            huggingface_hub.hf_hub_download(
+                folder_or_repo_path.as_posix(), config_name, token=token, subfolder=subfolder
+            )
         )
-        tokenizer_path = huggingface_hub.hf_hub_download(
-            folder_or_repo_path.as_posix(), tokenizer_file, token=token, subfolder=subfolder
+        tokenizer_path = Path(
+            huggingface_hub.hf_hub_download(
+                folder_or_repo_path.as_posix(), tokenizer_file, token=token, subfolder=subfolder
+            )
         )
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
