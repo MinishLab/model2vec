@@ -126,6 +126,54 @@ m2v_model = distill(model_name=model_name, vocabulary=vocabulary, use_subword=Fa
 
 **Important note:** we assume the passed vocabulary is sorted in rank frequency. i.e., we don't care about the actual word frequencies, but do assume that the most frequent word is first, and the least frequent word is last. If you're not sure whether this is case, set `apply_zipf` to `False`. This disables the weighting, but will also make performance a little bit worse.
 
+### Quantization
+
+Models can be quantized to `float16` (default) or `int8` during distillation, or when loading from disk.
+
+```python
+from model2vec.distill import distill
+
+# Distill a Sentence Transformer model and quantize is to int8
+m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", quantize_to="int8")
+
+# Save the model. This model is now 25% of the size of a normal model.
+m2v_model.save_pretrained("m2v_model")
+```
+
+You can also quantize during loading.
+
+```python
+from model2vec import StaticModel
+
+model = StaticModel.from_pretrained("minishlab/potion-base-8m", quantize_to="int8")
+```
+
+### Dimensionality reduction
+
+Because almost all Model2Vec models have been distilled using PCA, and because PCA explicitly orders dimensions from most informative to least informative, we can perform dimensionality reduction during loading. This is very similar to how matryoshka embeddings work.
+
+```python
+from model2vec import StaticModel
+
+model = StaticModel.from_pretrained("minishlab/potion-base-8m", dimensionality=32)
+
+print(model.embedding.shape)
+# (29528, 32)
+```
+
+### Combining quantization and dimensionality reduction
+
+Combining these tricks can lead to extremely small models. For example, using this, we can reduce the size of `potion-base-8m`, which is now 30MB, to only 1MB:
+
+```python
+model = StaticModel.from_pretrained("minishlab/potion-base-8m",
+                                    dimensionality=32,
+                                    quantize_to="int8")
+print(model.embedding.nbytes)
+# 944896 bytes = 944kb
+```
+
+This should be enough to satisfy even the strongest hardware constraints.
 
 ## Training
 
