@@ -158,7 +158,7 @@ from model2vec import StaticModel
 model = StaticModel.from_pretrained("minishlab/potion-base-8m", dimensionality=32)
 
 print(model.embedding.shape)
-
+# (29528, 32)
 ```
 
 ### Combining quantization and dimensionality reduction
