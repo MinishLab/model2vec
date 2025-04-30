@@ -27,11 +27,15 @@ class FinetunableStaticModel(nn.Module):
         self.out_dim = out_dim
         self.embed_dim = vectors.shape[1]
         self.vectors = vectors
-
-        self.embeddings = nn.Embedding.from_pretrained(vectors.clone().float(), freeze=False, padding_idx=pad_id)
-        self.head = self.construct_head()
-        self.w = self.construct_weights()
         self.tokenizer = tokenizer
+        self._initialize_model()
+
+    def _initialize_model(self, **kwargs: Any) -> None:
+        """Initialize the model. This is called by the constructor."""
+        self.head = self.construct_head()
+        self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
+        self.w = self.construct_weights()
+        self.train()
 
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""

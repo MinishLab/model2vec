@@ -4,7 +4,7 @@ import logging
 from collections import Counter
 from itertools import chain
 from tempfile import TemporaryDirectory
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import lightning as pl
 import numpy as np
@@ -164,7 +164,7 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         # Determine whether the task is multilabel based on the type of y.
 
-        self._initialize(y)
+        self._initialize(y=y)
 
         train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
             X,
@@ -246,13 +246,15 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         return report
 
-    def _initialize(self, y: LabelType) -> None:
+    def _initialize(self, *, y: LabelType, **kwargs: Any) -> None:
         """
         Sets the output dimensionality, the classes, and initializes the head.
 
-        :param y: The labels.
+        :param y: The labels. This should not be None, but can be due to typing.
+        :param **kwargs: Other keyword arguments.
         :raises ValueError: If the labels are inconsistent.
         """
+        super()._initialize_model(**kwargs)
         if isinstance(y[0], (str, int)):
             # Check if all labels are strings or integers.
             if not all(isinstance(label, (str, int)) for label in y):
@@ -265,13 +267,8 @@ class StaticModelForClassification(FinetunableStaticModel):
                 raise ValueError("Inconsistent label types in y. All labels must be lists or tuples.")
             self.multilabel = True
             classes = sorted(set(chain.from_iterable(y)))
-
         self.classes_ = classes
         self.out_dim = len(self.classes_)  # Update output dimension
-        self.head = self.construct_head()
-        self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
-        self.w = self.construct_weights()
-        self.train()
 
     def _prepare_dataset(self, X: list[str], y: LabelType, max_length: int = 512) -> TextDataset:
         """
