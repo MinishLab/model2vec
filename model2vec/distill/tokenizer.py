@@ -65,7 +65,7 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token]) -> list[
                 pre_tokenized_tokens.append(token.form)
             else:
                 # Join tokens just to be sure.
-                pretokenized_tokens, _ = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(token))
+                pretokenized_tokens, _ = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(token.form))
                 pre_tokenized_tokens.append(" ".join(pretokenized_tokens))
     else:
         pre_tokenized_tokens = [token.form for token in tokens]
