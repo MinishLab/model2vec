@@ -107,10 +107,8 @@ def distill_from_model(
     pad_token = tokenizer.special_tokens_map.get("pad_token")
     # Add the cleaned vocabulary to the tokenizer.
     backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens, unk_token=unk_token, pad_token=pad_token)
-
     # Post process the embeddings by applying PCA and Zipf weighting.
     embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
-
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 

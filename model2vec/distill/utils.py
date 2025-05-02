@@ -14,7 +14,13 @@ class Token:
     """A class to represent a token."""
 
     form: str
-    is_original: bool
+    # Whether the word is a continuing subword.
+    is_subword: bool
+    # Whether it should be pretokenized.
+    # This is independent of is_subword, because some
+    # tokenizer models like BPE and Unigram do not have a
+    # continuing subword prefix, but instead prefix nonsubwords.
+    should_be_pretokenized: bool
 
 
 def select_optimal_device(device: str | None) -> str:

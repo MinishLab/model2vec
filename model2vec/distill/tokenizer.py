@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import json
 import logging
+from string import punctuation
 from typing import Any
 
-from tokenizers import Tokenizer
+from tokenizers import Regex, Tokenizer
+from tokenizers.normalizers import Lowercase, Normalizer, Replace, Strip
+from tokenizers.normalizers import Sequence as NormalizerSequence
 from tokenizers.pre_tokenizers import (
     BertPreTokenizer,
     ByteLevel,
     CharDelimiterSplit,
-    Digits,
     Metaspace,
     PreTokenizer,
     Punctuation,
@@ -45,7 +47,7 @@ _DEFAULT_POST_PROCESSOR_TEMPLATE = {
 }
 
 
-def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token]) -> list[str]:
+def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token], subword_prefix: str) -> list[str]:
     """
     Apply pre-tokenization to vocabulary tokens if a pre-tokenizer is present.
 
@@ -54,19 +56,28 @@ def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token]) -> list[
 
     :param tokenizer: The tokenizer to use.
     :param tokens: The tokens to pre-tokenize.
+    :param subword_prefix: The prefix for subwords.
     :return: The pre-tokenized tokens.
     """
     pre_tokenized_tokens = []
 
     if tokenizer.pre_tokenizer is not None:
         for token in tokens:
-            if token.is_original:
+            if token.is_subword:
                 # Original tokens do not need to be pre-tokenized.
-                pre_tokenized_tokens.append(token.form)
-            else:
+                form = token.form
+                if subword_prefix is not None:
+                    form = token.form.removeprefix(subword_prefix)
+                pre_tokenized_tokens.append(form)
+            elif token.should_be_pretokenized:
                 # Join tokens just to be sure.
+                token.form = tokenizer.normalizer.normalize_str(token.form).rstrip()
                 pretokenized_tokens, _ = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(token.form))
-                pre_tokenized_tokens.append(" ".join(pretokenized_tokens))
+                form = " ".join(pretokenized_tokens)
+                pre_tokenized_tokens.append(form)
+            else:
+                token.form = tokenizer.normalizer.normalize_str(token.form).rstrip()
+                pre_tokenized_tokens.append(token.form)
     else:
         pre_tokenized_tokens = [token.form for token in tokens]
 
@@ -95,12 +106,38 @@ def _remap_added_tokens(
     return special_tokens
 
 
+def _prepare_normalizer(
+    normalizer: Normalizer,
+) -> Normalizer:
+    """
+    Prepare the normalizer for the tokenizer.
+
+    This function sets the normalizer for the tokenizer based on the provided normalizer type.
+    If no normalizer is provided, it uses the default one.
+
+    :param normalizer: The tokenizer to prepare.
+    :return: The prepared tokenizer.
+    """
+    new_normalizers = []
+    for char in punctuation:
+        new_normalizers.append(Replace(char, f" {char} "))
+    new_normalizers.append(Replace(Regex(r"\s+"), " "))
+    new_normalizers.append(Strip(right=True))
+    if normalizer is None:
+        return NormalizerSequence(new_normalizers)
+
+    return NormalizerSequence([normalizer] + new_normalizers)
+
+
 def _fix_single_pretokenizer(pretokenizer: PreTokenizer) -> PreTokenizer | None:
     """Fixes a single pretokenizer to allow multiword units."""
+    if isinstance(pretokenizer, Metaspace):
+        return Metaspace(split=False, replacement=pretokenizer.replacement, prepend_scheme=pretokenizer.prepend_scheme)
     if isinstance(pretokenizer, _FORBIDDEN_PRETOKENIZERS):
-        return Metaspace(split=False, replacement="Ġ")
+        return Metaspace(split=False, replacement="▁")
     elif isinstance(pretokenizer, ByteLevel):
         pretokenizer.use_regex = False
+        pretokenizer.add_prefix_space = True
 
     return pretokenizer
 
@@ -111,68 +148,29 @@ def _fix_pretokenizer_for_super(pre: PreTokenizer | None) -> Tokenizer:
         return pre
 
     if isinstance(pre, Sequence):
-        new_pretokenizers = []
-        for pretokenizer in pre:
-            new_pretokenizers.append(_fix_single_pretokenizer(pretokenizer))
-        return Sequence(new_pretokenizers)
+        return Metaspace(split=False)
 
     return _fix_single_pretokenizer(pre)
-
-
-def _make_new_merges_from_vocab(
-    merges: list[tuple[str, str]], tokens: list[str], special_tokens: set[str | None]
-) -> list[tuple[str, str]]:
-    """
-    Generate new merges from a vocabulary.
-
-    This function creates new merge pairs from a given vocabulary of tokens.
-    The merges are used to build or extend a tokenizer's merge table.
-
-    :param merges: The list of existing merges in the form (first, second) where first and second are tokens.
-    :param tokens: The list of tokens (vocabulary) from which to generate new merges.
-    :param special_tokens: Tokens that should not be merged.
-    :return: The list of new merges in the form (first, second) where first and second are tokens.
-    """
-    new_merges = merges.copy()
-    current_vocab = set(tokens) - special_tokens
-    already_merged = set("".join(merge) for merge in merges)
-
-    for token in tokens:
-        if token in special_tokens:
-            continue
-        if token in already_merged:
-            continue
-        if len(token) == 1:
-            continue
-        merges = []
-        for index in range(1, len(token)):
-            first, second = token[:index], token[index:]
-            if first in current_vocab and second in current_vocab:
-                merges.append((first, second))
-        if not merges:
-            logger.warning(f"Token {token} has no merges.")
-            continue
-        new_merges.extend(merges)
-
-    return new_merges
 
 
 def _process_wordpiece(
     tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
 ) -> dict[str, Any]:
     """Process the WordPiece tokenizer JSON."""
-    tokenizer_json["model"]["unk_token"] = unk_token
-    tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
+    tokenizer_json["model"]["type"] = "Unigram"
+    tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
+    tokenizer_json["model"]["vocab"] = [(token, 0.0) for token in pre_tokenized_tokens]
 
     return tokenizer_json
 
 
-def _process_bpe(tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str]) -> dict[str, Any]:
+def _process_bpe(
+    tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
+) -> dict[str, Any]:
     """Process the BPE tokenizer JSON."""
-    tokenizer_json = _process_wordpiece(tokenizer_json, pre_tokenized_tokens, None)
-    merges = tokenizer_json["model"]["merges"]
-    merges = _make_new_merges_from_vocab(merges, pre_tokenized_tokens, {"[UNK]", "[PAD]"})
-    tokenizer_json["model"]["merges"] = merges
+    tokenizer_json["model"]["type"] = "Unigram"
+    tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
+    tokenizer_json["model"]["vocab"] = [(token, 0.0) for token in pre_tokenized_tokens]
 
     return tokenizer_json
 
@@ -194,13 +192,16 @@ def replace_vocabulary(
     tokenizer: Tokenizer, new_vocabulary: list[Token], unk_token: str | None, pad_token: str | None
 ) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
+    tokenizer.normalizer = _prepare_normalizer(tokenizer.normalizer)
     tokenizer.pre_tokenizer = _fix_pretokenizer_for_super(tokenizer.pre_tokenizer)
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
 
     # NOTE: all tokens have been normalized before.
     # Very careful, we need to pretokenize words before adding them to the vocabulary.
     # But only if they are not part of the original vocabulary.
-    pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary)
+    subword_prefix = tokenizer_json["model"].get("continuing_subword_prefix", "")
+
+    pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary, subword_prefix=subword_prefix)
 
     model_type = tokenizer_json["model"]["type"]
     added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
@@ -215,7 +216,7 @@ def replace_vocabulary(
     if model_type == "WordPiece":
         tokenizer_json = _process_wordpiece(tokenizer_json, pre_tokenized_tokens, "[UNK]")
     elif model_type == "BPE":
-        tokenizer_json = _process_bpe(tokenizer_json, pre_tokenized_tokens)
+        tokenizer_json = _process_bpe(tokenizer_json, pre_tokenized_tokens, "[UNK]")
     elif model_type == "Unigram":
         tokenizer_json = _process_unigram(tokenizer_json, pre_tokenized_tokens, "[UNK]")
     else:

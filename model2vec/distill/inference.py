@@ -9,6 +9,7 @@ from typing import Protocol, Union
 
 import numpy as np
 import torch
+from tokenizers.models import BPE, Unigram, WordPiece
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 from transformers import PreTrainedModel, PreTrainedTokenizerFast
@@ -71,6 +72,23 @@ def create_embeddings(
         # If the token remove regex is None, just use all tokens.
         id_list = list(range(len(tokenizer.get_vocab())))
 
+    id_set = set(id_list)
+    new_id_list = []
+    for token, idx in tokenizer.get_vocab().items():
+        if idx not in id_set:
+            continue
+
+        if (
+            tokenizer.backend_tokenizer.pre_tokenizer is not None
+            and not token.startswith("##")
+            and not token in tokens_to_keep
+        ):
+            pre_token = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(token)
+            if len(pre_token) > 1:
+                continue
+        new_id_list.append(idx)
+    id_list = new_id_list
+
     added_tokens_ids = [id for token, id in tokenizer.added_tokens_encoder.items() if token not in tokens_to_keep]
     ids = torch.Tensor(sorted(set(id_list) - set(added_tokens_ids))).long()
 
@@ -82,7 +100,28 @@ def create_embeddings(
         eos = torch.full([len(ids)], fill_value=eos_token_id)
 
         tokenized.extend(torch.stack([bos, ids, eos], dim=1))
-        subword_tokens = [Token(x, True) for x in tokenizer.convert_ids_to_tokens(ids.tolist())]
+
+        subword_tokens = []
+        for token in tokenizer.convert_ids_to_tokens(ids.tolist()):
+            is_subword = False
+            should_be_pretokenized = True
+            if token == unk_token or token == pad_token:
+                is_subword = True
+            elif isinstance(tokenizer.backend_tokenizer.model, WordPiece):
+                prefix_char = tokenizer.backend_tokenizer.model.continuing_subword_prefix
+                if token.startswith(prefix_char):
+                    is_subword = True
+            elif isinstance(tokenizer.backend_tokenizer.model, Unigram):
+                if not token.startswith("▁"):
+                    is_subword = True
+            elif isinstance(tokenizer.backend_tokenizer.model, BPE):
+                if not token.startswith("Ġ"):
+                    is_subword = True
+                    should_be_pretokenized = False
+                else:
+                    should_be_pretokenized = False
+            subword_tokens.append(Token(token, is_subword, should_be_pretokenized))
+
         out_tokens.extend(subword_tokens)
 
     tokenized.extend([tokenizer.encode_plus(token, return_tensors="pt")["input_ids"][0] for token in tokens])
@@ -113,7 +152,7 @@ def create_embeddings(
 
     # Sort the output back to the original order
     intermediate_weights = [intermediate_weights[i] for i in np.argsort(sort_order)]
-    out_tokens.extend([Token(x, False) for x in tokens])
+    out_tokens.extend([Token(x, False, True) for x in tokens])
     out_weights = np.stack(intermediate_weights)
 
     return out_tokens, out_weights
