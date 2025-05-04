@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-from string import punctuation
 from typing import Any
 
 from tokenizers import Regex, Tokenizer
@@ -267,19 +266,24 @@ def _process_internal_tokens(
     # Figure out whether token is a subword or not.
     encoded = backend_tokenizer.encode(f" {'a' * 25}", add_special_tokens=False)
     first_token, second_token, *_ = encoded.tokens
-    # Remove the space prefix if exists.
+    # Isolate the prefix. We can't do first_token[0] because we don't know
+    # how long the prefix is.
     # e.g., "Ġaaaa" -> "Ġ"
-    word_prefix, _ = first_token.split("a", maxsplit=1)
+    a_index = 0 if "a" not in first_token else first_token.index("a")
+    word_prefix = first_token[:a_index]
     is_byte_prefix = word_prefix == "Ġ"
     second_token = encoded.tokens[1]
     # The second token is the first subword token.
     # If a tokenizer uses subwords, this token will have been prefixed.
-    subword_prefix, _ = second_token.split("a", maxsplit=1)
+    # We don't know how long the prefix is.
+    a_index = 0 if "a" not in second_token else second_token.index("a")
+    subword_prefix = second_token[:a_index]
 
     pre_tokenizer: PreTokenizer | None = backend_tokenizer.pre_tokenizer
 
     for token in internal_tokens:
-        token_object = _create_single_internal_token(
+        # Create the token objects. If this returns None, it was unsucessful for some reason.
+        if token_object := _create_single_internal_token(
             token=token,
             subword_prefix=subword_prefix,
             word_prefix=word_prefix,
@@ -288,8 +292,7 @@ def _process_internal_tokens(
             token_remove_regex=token_remove_regex,
             added_tokens_to_keep=added_tokens_to_keep,
             added_tokens_to_remove=added_tokens_to_remove,
-        )
-        if token_object:
+        ):
             cleaned_internal_tokens.append(token_object)
 
     return cleaned_internal_tokens
@@ -307,23 +310,38 @@ def _create_single_internal_token(
 ) -> Token | None:
     """Create a token object from a string."""
     if token in added_tokens_to_remove:
+        # We remove any tokens that are added tokens that aren't [UNK] or [PAD].
         return None
     if token in added_tokens_to_keep:
-        # Don't put special tokens through the regular motions.
+        # Don't put added tokens through the regular motions.
         return Token(form=token, normalized_form=token, is_subword=False, is_internal=True)
     if token_remove_regex and token_remove_regex.match(token):
+        # If the regex matches, remove the token.
         return None
+
+    # A token is a subword if there is a subword prefix and the word
+    # starts with a subword prefix, or if there is a WORD prefix, and the word
+    # does not start with this prefix. For metaspace tokenizers, for example:
+    # "doghouse" -> ["_dog", "house"]
+    # So we can only tell that "house" is a subword by knowing that it is not prefixed
+    # and word-initial tokens are.
     is_subword = False
     if subword_prefix:
         is_subword = bool(token.startswith(subword_prefix))
     if word_prefix:
         is_subword = not bool(token.startswith(word_prefix))
 
+    # Byte prefixed tokenizers don't need to be checked.
     if pre_tokenizer is not None and not is_byte_prefix:
+        # We need to check the thing without prefixes. If we have a word prefix,
+        # we need to check tokens that have are subwords. Other way around for subword
+        # prefixes.
         if (subword_prefix and not is_subword) or (word_prefix and is_subword):
+            # If this is True, the token is unreachable, even though it is a subword token.
             if len(pre_tokenizer.pre_tokenize_str(token)) > 1:
                 return None
 
+    # Turn a token into a normalized form for later processing.
     normalized_form = _create_normalized_form(token, subword_prefix, word_prefix, is_byte_prefix, is_subword)
 
     return Token(form=token, normalized_form=normalized_form, is_subword=is_subword, is_internal=True)
@@ -345,20 +363,26 @@ def _create_normalized_form(
     return f"▁{token}"
 
 
-def turn_tokens_into_ids(tokens: list[Token], tokenizer: PreTrainedTokenizerFast) -> list[list[int]]:
+def turn_tokens_into_ids(tokens: list[Token], tokenizer: PreTrainedTokenizerFast, unk_token: str) -> list[list[int]]:
     """
     Convert a list of Token objects to their corresponding token ID sequences.
 
     :param tokens: List of Token objects to convert
     :param tokenizer: The tokenizer to use for converting tokens to IDs
+    :param unk_token: The string form of the unk token.
     :return: List of token IDs corresponding to the input tokens
     """
-    # Implementation will be added later
+    unk_id = tokenizer.convert_tokens_to_ids(unk_token)
     bos, _, eos = tokenizer.encode("a", add_special_tokens=True)
     token_ids = []
     for token in tokens:
         if token.is_internal:
-            token_ids.append([bos, tokenizer.convert_tokens_to_ids(token.form), eos])
+            # Careful. Any incorrect tokens will just get `[UNK]``, so this could go horribly wrong
+            token_id = tokenizer.convert_tokens_to_ids(token.form)
+            # Explicitly check and warn if `unk_id` appears, but don't crash.
+            if token_id == unk_id and token.form != unk_token:
+                logger.warning(f"Token {token.form} was set to unk. This is wrong.")
+            token_ids.append([bos, token_id, eos])
         else:
             token_ids.append(tokenizer.encode(token.form))
 
@@ -366,11 +390,19 @@ def turn_tokens_into_ids(tokens: list[Token], tokenizer: PreTrainedTokenizerFast
 
 
 def _normalize_vocabulary_token(token: str, pre_tokenizer: PreTokenizer) -> str:
-    # Add prefix space for byte-level tokenizers.
+    """Normalize a token that is not in the initial token vocabulary."""
+    # Add prefix space for byte tokenizers.
     prefixed_token = f" {token}"
     pretokenized_tokens, offsets = zip(*pre_tokenizer.pre_tokenize_str(prefixed_token))
+    # The first item is always the start of the token.
     new_token = [pretokenized_tokens[0]]
+    # Loop over the subtokens and offsets.
     for t, (s, _) in zip(pretokenized_tokens[1:], offsets[1:]):
+        # If the character before the subtoken is a space, we have a
+        # multiword token. e.g., "room for the moon", which is split into
+        # ["room", "for", "the", "moon"].
+        # If it doesn't have a space, it is part of a complex multiword token,
+        # e.g., "chat-gpt", which is split into ["chat", "-", "gpt"].
         if prefixed_token[s - 1] == " ":
             new_token.append(f" {t}")
         else:

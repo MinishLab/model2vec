@@ -89,12 +89,13 @@ def distill_from_model(
     if not all_tokens:
         raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")
 
-    # Convert tokens to IDs
-    token_ids = turn_tokens_into_ids(all_tokens, tokenizer)
-
     # Create the embeddings.
     unk_token = tokenizer.special_tokens_map.get("unk_token")
     pad_token = tokenizer.special_tokens_map.get("pad_token")
+
+    # Convert tokens to IDs
+    token_ids = turn_tokens_into_ids(all_tokens, tokenizer, unk_token)
+
     embeddings = create_embeddings(
         tokenized=token_ids, model=model, device=device, pad_token_id=tokenizer.get_vocab()[pad_token]
     )
