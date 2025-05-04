@@ -269,14 +269,14 @@ def _process_internal_tokens(
     # Isolate the prefix. We can't do first_token[0] because we don't know
     # how long the prefix is.
     # e.g., "Ġaaaa" -> "Ġ"
-    a_index = 0 if "a" not in first_token else first_token.index("a")
+    a_index = None if "a" not in first_token else first_token.index("a")
     word_prefix = first_token[:a_index]
     is_byte_prefix = word_prefix == "Ġ"
     second_token = encoded.tokens[1]
     # The second token is the first subword token.
     # If a tokenizer uses subwords, this token will have been prefixed.
     # We don't know how long the prefix is.
-    a_index = 0 if "a" not in second_token else second_token.index("a")
+    a_index = None if "a" not in second_token else second_token.index("a")
     subword_prefix = second_token[:a_index]
 
     pre_tokenizer: PreTokenizer | None = backend_tokenizer.pre_tokenizer
@@ -355,12 +355,10 @@ def _create_normalized_form(
     if is_byte_prefix:
         return token
     # We need to check if the token is a subword or not and remove the prefix.
-    if is_subword and subword_prefix:
+    if is_subword:
         return token.removeprefix(subword_prefix)
     # If the token is not a subword, we need to remove the word prefix, and add metaspace.
-    if word_prefix:
-        token = token.removeprefix(word_prefix)
-    return f"▁{token}"
+    return f"▁{token.removeprefix(word_prefix)}"
 
 
 def turn_tokens_into_ids(tokens: list[Token], tokenizer: PreTrainedTokenizerFast, unk_token: str) -> list[list[int]]:
