@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from string import punctuation
 from typing import Any
 
 from tokenizers import Regex, Tokenizer
-from tokenizers.normalizers import Lowercase, Normalizer, Replace, Strip
+from tokenizers.normalizers import Normalizer, Replace, Strip
 from tokenizers.normalizers import Sequence as NormalizerSequence
 from tokenizers.pre_tokenizers import (
     BertPreTokenizer,
@@ -21,12 +22,14 @@ from tokenizers.pre_tokenizers import (
     Whitespace,
     WhitespaceSplit,
 )
+from transformers import PreTrainedTokenizerFast
 
 _FORBIDDEN_PRETOKENIZERS = (
     BertPreTokenizer,
     CharDelimiterSplit,
     Metaspace,
     Punctuation,
+    Sequence,
     Split,
     UnicodeScripts,
     Whitespace,
@@ -45,43 +48,6 @@ _DEFAULT_POST_PROCESSOR_TEMPLATE = {
     "pair": [{"Sequence": {"id": "A", "type_id": 0}}, {"Sequence": {"id": "B", "type_id": 0}}],
     "special_tokens": {},
 }
-
-
-def _pre_tokenize_vocabulary(tokenizer: Tokenizer, tokens: list[Token], subword_prefix: str) -> list[str]:
-    """
-    Apply pre-tokenization to vocabulary tokens if a pre-tokenizer is present.
-
-    Only pre-tokenizes tokens that are not already in the tokenizer's vocabulary,
-    to avoid processing tokens twice.
-
-    :param tokenizer: The tokenizer to use.
-    :param tokens: The tokens to pre-tokenize.
-    :param subword_prefix: The prefix for subwords.
-    :return: The pre-tokenized tokens.
-    """
-    pre_tokenized_tokens = []
-
-    if tokenizer.pre_tokenizer is not None:
-        for token in tokens:
-            if token.is_subword:
-                # Original tokens do not need to be pre-tokenized.
-                form = token.form
-                if subword_prefix is not None:
-                    form = token.form.removeprefix(subword_prefix)
-                pre_tokenized_tokens.append(form)
-            elif token.should_be_pretokenized:
-                # Join tokens just to be sure.
-                token.form = tokenizer.normalizer.normalize_str(token.form).rstrip()
-                pretokenized_tokens, _ = zip(*tokenizer.pre_tokenizer.pre_tokenize_str(token.form))
-                form = " ".join(pretokenized_tokens)
-                pre_tokenized_tokens.append(form)
-            else:
-                token.form = tokenizer.normalizer.normalize_str(token.form).rstrip()
-                pre_tokenized_tokens.append(token.form)
-    else:
-        pre_tokenized_tokens = [token.form for token in tokens]
-
-    return pre_tokenized_tokens
 
 
 def _remap_added_tokens(
@@ -119,8 +85,6 @@ def _prepare_normalizer(
     :return: The prepared tokenizer.
     """
     new_normalizers = []
-    for char in punctuation:
-        new_normalizers.append(Replace(char, f" {char} "))
     new_normalizers.append(Replace(Regex(r"\s+"), " "))
     new_normalizers.append(Strip(right=True))
     if normalizer is None:
@@ -129,7 +93,7 @@ def _prepare_normalizer(
     return NormalizerSequence([normalizer] + new_normalizers)
 
 
-def _fix_single_pretokenizer(pretokenizer: PreTokenizer) -> PreTokenizer | None:
+def _fix_pretokenizer(pretokenizer: PreTokenizer) -> PreTokenizer | None:
     """Fixes a single pretokenizer to allow multiword units."""
     if isinstance(pretokenizer, Metaspace):
         return Metaspace(split=False, replacement=pretokenizer.replacement, prepend_scheme=pretokenizer.prepend_scheme)
@@ -142,32 +106,10 @@ def _fix_single_pretokenizer(pretokenizer: PreTokenizer) -> PreTokenizer | None:
     return pretokenizer
 
 
-def _fix_pretokenizer_for_super(pre: PreTokenizer | None) -> Tokenizer:
-    """Fixes the pretokenizer to allow multiword units."""
-    if pre is None:
-        return pre
-
-    if isinstance(pre, Sequence):
-        return Metaspace(split=False)
-
-    return _fix_single_pretokenizer(pre)
-
-
-def _process_wordpiece(
+def _process_tokenizer(
     tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
 ) -> dict[str, Any]:
     """Process the WordPiece tokenizer JSON."""
-    tokenizer_json["model"]["type"] = "Unigram"
-    tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
-    tokenizer_json["model"]["vocab"] = [(token, 0.0) for token in pre_tokenized_tokens]
-
-    return tokenizer_json
-
-
-def _process_bpe(
-    tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
-) -> dict[str, Any]:
-    """Process the BPE tokenizer JSON."""
     tokenizer_json["model"]["type"] = "Unigram"
     tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
     tokenizer_json["model"]["vocab"] = [(token, 0.0) for token in pre_tokenized_tokens]
@@ -192,19 +134,15 @@ def replace_vocabulary(
     tokenizer: Tokenizer, new_vocabulary: list[Token], unk_token: str | None, pad_token: str | None
 ) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
+    tokenizer = tokenizer.from_str(tokenizer.to_str())
     tokenizer.normalizer = _prepare_normalizer(tokenizer.normalizer)
-    tokenizer.pre_tokenizer = _fix_pretokenizer_for_super(tokenizer.pre_tokenizer)
+    tokenizer.pre_tokenizer = _fix_pretokenizer(tokenizer.pre_tokenizer)
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
-
-    # NOTE: all tokens have been normalized before.
-    # Very careful, we need to pretokenize words before adding them to the vocabulary.
-    # But only if they are not part of the original vocabulary.
-    subword_prefix = tokenizer_json["model"].get("continuing_subword_prefix", "")
-
-    pre_tokenized_tokens = _pre_tokenize_vocabulary(tokenizer, new_vocabulary, subword_prefix=subword_prefix)
 
     model_type = tokenizer_json["model"]["type"]
     added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
+
+    pre_tokenized_tokens = [x.normalized_form for x in new_vocabulary]
 
     # We need to remove the added tokens but keep [UNK] and [PAD] tokens.
     added_tokens = _rename_added_token(unk_token, "[UNK]", added_tokens, pre_tokenized_tokens)
@@ -213,10 +151,8 @@ def replace_vocabulary(
     # Remove old added tokens from added tokens
     tokenizer_json["added_tokens"] = [x for x in added_tokens if x["content"] in {"[UNK]", "[PAD]"}]
 
-    if model_type == "WordPiece":
-        tokenizer_json = _process_wordpiece(tokenizer_json, pre_tokenized_tokens, "[UNK]")
-    elif model_type == "BPE":
-        tokenizer_json = _process_bpe(tokenizer_json, pre_tokenized_tokens, "[UNK]")
+    if model_type == "WordPiece" or model_type == "BPE":
+        tokenizer_json = _process_tokenizer(tokenizer_json, pre_tokenized_tokens, "[UNK]")
     elif model_type == "Unigram":
         tokenizer_json = _process_unigram(tokenizer_json, pre_tokenized_tokens, "[UNK]")
     else:
@@ -247,3 +183,198 @@ def _rename_added_token(
         vocabulary[idx] = new_form
 
     return added_tokens
+
+
+def clean_and_create_vocabulary(
+    tokenizer: PreTrainedTokenizerFast,
+    vocabulary: list[str],
+    token_remove_regex: re.Pattern | None,
+) -> list[Token]:
+    """Cleans a vocabulary by removing duplicates and tokens that were already in the vocabulary."""
+    seen_tokens = set()
+    n_empty = 0
+    n_duplicates = 0
+
+    backend_tokenizer = tokenizer.backend_tokenizer
+
+    # Make a base list of tokens.
+    internal_vocab: dict[str, int] = tokenizer.get_vocab()
+    internal_tokens: list[str] = [k for k, _ in sorted(internal_vocab.items(), key=lambda x: x[1])]
+
+    cleaned_vocabulary = _process_internal_tokens(tokenizer, internal_tokens, token_remove_regex)
+    internal_tokens_set = {token.form for token in cleaned_vocabulary}
+
+    for token in vocabulary:
+        normalizer: Normalizer | None = backend_tokenizer.normalizer
+        if normalizer is not None:
+            token = normalizer.normalize_str(token)
+
+        if not token:
+            n_empty += 1
+            continue
+
+        pre_tokenizer: PreTokenizer | None = backend_tokenizer.pre_tokenizer
+        if pre_tokenizer is not None:
+            normalized_token = _normalize_vocabulary_token(
+                token=token,
+                pre_tokenizer=pre_tokenizer,
+            )
+        else:
+            normalized_token = token
+
+        # We need to check whether the pretokenized token is in the vocabulary.
+        # But we need to return the original token, because that will be tokenized
+        # again by the tokenizer during featurization.
+        if normalized_token in seen_tokens or normalized_token in internal_tokens_set:
+            n_duplicates += 1
+            continue
+
+        # After checking the token exists, we need to future-normalize it.
+        if not normalized_token.startswith(("▁", "Ġ")):
+            normalized_token = normalized_token.replace(" ", "▁")
+            normalized_token = f"▁{normalized_token}"
+        else:
+            normalized_token = normalized_token.replace(" ", normalized_token[0])
+
+        # Add the possibly pretokenized token to _seen_
+        seen_tokens.add(normalized_token)
+        # Add the original string to the vocabulary.
+        cleaned_vocabulary.append(
+            Token(form=token, normalized_form=normalized_token, is_subword=False, is_internal=False)
+        )
+
+    if n_duplicates:
+        logger.warning(f"Removed {n_duplicates} duplicate tokens.")
+    if n_empty:
+        logger.warning(f"Removed {n_empty} empty tokens.")
+
+    return cleaned_vocabulary
+
+
+def _process_internal_tokens(
+    tokenizer: PreTrainedTokenizerFast, internal_tokens: list[str], token_remove_regex: re.Pattern | None
+) -> list[Token]:
+    """Clean internal tokens."""
+    # Get the pad and unk token from the tokenizer.
+    pad_token = tokenizer.special_tokens_map.get("pad_token")
+    unk_token = tokenizer.special_tokens_map.get("unk_token")
+    # Empty set if no pad or unk token is set.
+    added_tokens_to_keep = {pad_token, unk_token} - {None}
+    added_tokens_to_remove = set(tokenizer.added_tokens_encoder) - added_tokens_to_keep
+    cleaned_internal_tokens: list[Token] = []
+
+    backend_tokenizer = tokenizer.backend_tokenizer
+    # Figure out whether token is a subword or not.
+    encoded = backend_tokenizer.encode(f" {'a' * 25}", add_special_tokens=False)
+    first_token, second_token, *_ = encoded.tokens
+    # Remove the space prefix if exists.
+    # e.g., "Ġaaaa" -> "Ġ"
+    word_prefix, _ = first_token.split("a", maxsplit=1)
+    is_byte_prefix = word_prefix == "Ġ"
+    second_token = encoded.tokens[1]
+    # The second token is the first subword token.
+    # If a tokenizer uses subwords, this token will have been prefixed.
+    subword_prefix, _ = second_token.split("a", maxsplit=1)
+
+    pre_tokenizer: PreTokenizer | None = backend_tokenizer.pre_tokenizer
+
+    for token in internal_tokens:
+        token_object = _create_single_internal_token(
+            token=token,
+            subword_prefix=subword_prefix,
+            word_prefix=word_prefix,
+            pre_tokenizer=pre_tokenizer,
+            is_byte_prefix=is_byte_prefix,
+            token_remove_regex=token_remove_regex,
+            added_tokens_to_keep=added_tokens_to_keep,
+            added_tokens_to_remove=added_tokens_to_remove,
+        )
+        if token_object:
+            cleaned_internal_tokens.append(token_object)
+
+    return cleaned_internal_tokens
+
+
+def _create_single_internal_token(
+    token: str,
+    subword_prefix: str,
+    word_prefix: str,
+    pre_tokenizer: PreTokenizer | None,
+    is_byte_prefix: bool,
+    token_remove_regex: re.Pattern | None,
+    added_tokens_to_keep: set[str],
+    added_tokens_to_remove: set[str],
+) -> Token | None:
+    """Create a token object from a string."""
+    if token in added_tokens_to_remove:
+        return None
+    if token in added_tokens_to_keep:
+        # Don't put special tokens through the regular motions.
+        return Token(form=token, normalized_form=token, is_subword=False, is_internal=True)
+    if token_remove_regex and token_remove_regex.match(token):
+        return None
+    is_subword = False
+    if subword_prefix:
+        is_subword = bool(token.startswith(subword_prefix))
+    if word_prefix:
+        is_subword = not bool(token.startswith(word_prefix))
+
+    if pre_tokenizer is not None and not is_byte_prefix:
+        if (subword_prefix and not is_subword) or (word_prefix and is_subword):
+            if len(pre_tokenizer.pre_tokenize_str(token)) > 1:
+                return None
+
+    normalized_form = _create_normalized_form(token, subword_prefix, word_prefix, is_byte_prefix, is_subword)
+
+    return Token(form=token, normalized_form=normalized_form, is_subword=is_subword, is_internal=True)
+
+
+def _create_normalized_form(
+    token: str, subword_prefix: str, word_prefix: str, is_byte_prefix: bool, is_subword: bool
+) -> str:
+    """Turn an internal token string into a normalized form."""
+    # We don't need to check byte prefixed strings.
+    if is_byte_prefix:
+        return token
+    # We need to check if the token is a subword or not and remove the prefix.
+    if is_subword and subword_prefix:
+        return token.removeprefix(subword_prefix)
+    # If the token is not a subword, we need to remove the word prefix, and add metaspace.
+    if word_prefix:
+        token = token.removeprefix(word_prefix)
+    return f"▁{token}"
+
+
+def turn_tokens_into_ids(tokens: list[Token], tokenizer: PreTrainedTokenizerFast) -> list[list[int]]:
+    """
+    Convert a list of Token objects to their corresponding token ID sequences.
+
+    :param tokens: List of Token objects to convert
+    :param tokenizer: The tokenizer to use for converting tokens to IDs
+    :return: List of token IDs corresponding to the input tokens
+    """
+    # Implementation will be added later
+    bos, _, eos = tokenizer.encode("a", add_special_tokens=True)
+    token_ids = []
+    for token in tokens:
+        if token.is_internal:
+            token_ids.append([bos, tokenizer.convert_tokens_to_ids(token.form), eos])
+        else:
+            token_ids.append(tokenizer.encode(token.form))
+
+    return token_ids
+
+
+def _normalize_vocabulary_token(token: str, pre_tokenizer: PreTokenizer) -> str:
+    # Add prefix space for byte-level tokenizers.
+    prefixed_token = f" {token}"
+    pretokenized_tokens, offsets = zip(*pre_tokenizer.pre_tokenize_str(prefixed_token))
+    new_token = [pretokenized_tokens[0]]
+    for t, (s, _) in zip(pretokenized_tokens[1:], offsets[1:]):
+        if prefixed_token[s - 1] == " ":
+            new_token.append(f" {t}")
+        else:
+            new_token.append(t)
+    normalized_token = "".join(new_token)
+
+    return normalized_token
