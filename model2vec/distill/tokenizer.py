@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 from typing import Any
 
@@ -111,7 +112,7 @@ def _process_tokenizer(
     """Process the WordPiece tokenizer JSON."""
     tokenizer_json["model"]["type"] = "Unigram"
     tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
-    tokenizer_json["model"]["vocab"] = [(token, 0.0) for token in pre_tokenized_tokens]
+    tokenizer_json["model"]["vocab"] = [(token, min(0.0, math.log(0.1 * len(token)))) for token in pre_tokenized_tokens]
 
     return tokenizer_json
 
@@ -170,7 +171,7 @@ def replace_vocabulary(
 def _rename_added_token(
     form: str | None, new_form: str, added_tokens: list[dict[str, Any]], vocabulary: list[str]
 ) -> list[dict[str, Any]]:
-    """Rename special tokens in the tokenizer."""
+    """Rename added tokens in the tokenizer."""
     if form is None:
         return added_tokens
 
@@ -228,7 +229,11 @@ def clean_and_create_vocabulary(
             n_duplicates += 1
             continue
 
-        # After checking the token exists, we need to future-normalize it.
+        # After checking the token exists, we need to normalize it into the token
+        # it will become. For byte tokens, this means we don't do anything. For
+        # other types of tokens, we will insert a metaspace.
+        # In the case of multiword tokens, we replace any spaces with the metaspace
+        # or byte prefix token.
         if not normalized_token.startswith(("▁", "Ġ")):
             normalized_token = normalized_token.replace(" ", "▁")
             normalized_token = f"▁{normalized_token}"
