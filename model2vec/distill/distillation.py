@@ -82,9 +82,10 @@ def distill_from_model(
     # Clean the vocabulary by removing duplicate tokens and tokens that are in the internal vocabulary.
     all_tokens = clean_and_create_vocabulary(tokenizer, vocabulary, token_remove_regex=token_remove_regex)
     n_tokens_after = len([token for token in all_tokens if not token.is_internal])
-    logger.info(
-        f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
-    )
+    if n_tokens_before:
+        logger.info(
+            f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
+        )
 
     if not all_tokens:
         raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")

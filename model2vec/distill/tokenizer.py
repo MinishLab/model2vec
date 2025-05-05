@@ -192,6 +192,7 @@ def clean_and_create_vocabulary(
 ) -> list[Token]:
     """Cleans a vocabulary by removing duplicates and tokens that were already in the vocabulary."""
     seen_tokens = set()
+    post_normalize_seen_tokens = set()
     n_empty = 0
     n_duplicates = 0
 
@@ -202,6 +203,8 @@ def clean_and_create_vocabulary(
     internal_tokens: list[str] = [k for k, _ in sorted(internal_vocab.items(), key=lambda x: x[1])]
 
     cleaned_vocabulary = _process_internal_tokens(tokenizer, internal_tokens, token_remove_regex)
+    if len(cleaned_vocabulary) < len(internal_tokens):
+        logger.info(f"Removed {len(internal_tokens) - len(cleaned_vocabulary)} internal tokens.")
     internal_tokens_set = {token.form for token in cleaned_vocabulary}
 
     for token in vocabulary:
@@ -229,6 +232,9 @@ def clean_and_create_vocabulary(
             n_duplicates += 1
             continue
 
+        # Add the possibly pretokenized token to _seen_
+        seen_tokens.add(normalized_token)
+
         # After checking the token exists, we need to normalize it into the token
         # it will become. For byte tokens, this means we don't do anything. For
         # other types of tokens, we will insert a metaspace.
@@ -240,8 +246,11 @@ def clean_and_create_vocabulary(
         else:
             normalized_token = normalized_token.replace(" ", normalized_token[0])
 
-        # Add the possibly pretokenized token to _seen_
-        seen_tokens.add(normalized_token)
+        if normalized_token in post_normalize_seen_tokens:
+            n_duplicates += 1
+            continue
+
+        post_normalize_seen_tokens.add(normalized_token)
         # Add the original string to the vocabulary.
         cleaned_vocabulary.append(
             Token(form=token, normalized_form=normalized_token, is_subword=False, is_internal=False)
