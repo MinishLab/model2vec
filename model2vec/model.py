@@ -465,9 +465,14 @@ class StaticModel:
         :return: A StaticModel
         :raises: ValueError if the path is not a directory.
         """
-        path = Path(path)
-        if not path.is_dir():
-            raise ValueError(f"Path {path} is not a directory.")
+        if isinstance(path, str):
+            path = Path(path)
+
+        if isinstance(path, Path):
+            # Only check if we're sure this is a path.
+            # It could be a cloudpathlib path, or something else.
+            if not path.is_dir():
+                raise ValueError(f"Path {path} is not a directory.")
 
         embeddings, tokenizer, config = load_local_model(path)
 

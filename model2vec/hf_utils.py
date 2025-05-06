@@ -122,7 +122,10 @@ def load_pretrained(
         tokenizer_file = "tokenizer.json"
         config_name = "config.json"
 
-    folder_or_repo_path = Path(folder_or_repo_path)
+    # This check allows users to pass other things than Path objects, e.g.,
+    # cloudpathlib.Anypath.
+    if isinstance(folder_or_repo_path, str):
+        folder_or_repo_path = Path(folder_or_repo_path)
 
     local_folder = folder_or_repo_path / subfolder if subfolder else folder_or_repo_path
 
