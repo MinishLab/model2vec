@@ -114,7 +114,7 @@ def _process_tokenizer(
     max_length = max(len(token) for token in pre_tokenized_tokens)
     probas: list[int] = [-(max_length - x) * 10 for x in range(1, max_length + 1)]
     tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
-    tokenizer_json["model"]["vocab"] = [(token, probas[len(token)-1]) for token in pre_tokenized_tokens]
+    tokenizer_json["model"]["vocab"] = [(token, probas[len(token) - 1]) for token in pre_tokenized_tokens]
 
     return tokenizer_json
 
