@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import re
 from typing import Any
 
+import numpy as np
 from tokenizers import Regex, Tokenizer
 from tokenizers.normalizers import Normalizer, Replace, Strip
 from tokenizers.normalizers import Sequence as NormalizerSequence
@@ -111,8 +111,10 @@ def _process_tokenizer(
 ) -> dict[str, Any]:
     """Process the WordPiece tokenizer JSON."""
     tokenizer_json["model"]["type"] = "Unigram"
+    max_length = max(len(token) for token in pre_tokenized_tokens)
+    probas: list[int] = [-(max_length - x) * 10 for x in range(1, max_length + 1)]
     tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
-    tokenizer_json["model"]["vocab"] = [(token, min(0.0, math.log(0.1 * len(token)))) for token in pre_tokenized_tokens]
+    tokenizer_json["model"]["vocab"] = [(token, probas[len(token)-1]) for token in pre_tokenized_tokens]
 
     return tokenizer_json
 
