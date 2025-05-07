@@ -110,11 +110,20 @@ def _process_tokenizer(
     tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
 ) -> dict[str, Any]:
     """Process the WordPiece tokenizer JSON."""
-    tokenizer_json["model"]["type"] = "Unigram"
+    '''tokenizer_json["model"]["type"] = "Unigram"
     max_length = max(len(token) for token in pre_tokenized_tokens)
-    probas: list[int] = [-(max_length - x) * 10 for x in range(1, max_length + 1)]
+    proba_vals: list[float] = [x * 12 for x in range(max_length + 2)]
+    probas = [proba_vals[len(token)] + int(token.startswith("▁") * 10) for idx, token in enumerate(pre_tokenized_tokens)]
+    s = np.asarray(probas)
+    s = (s / np.sum(s)).tolist()
     tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
-    tokenizer_json["model"]["vocab"] = [(token, probas[len(token) - 1]) for token in pre_tokenized_tokens]
+    tokenizer_json["model"]["vocab"] = [(token, np.log(s[idx])) for idx, token in enumerate(pre_tokenized_tokens)]'''
+
+    tokenizer_json["model"]["type"] = "WordPiece"
+    tokenizer_json["model"]["unk_token"] = unk_token
+    tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
+    tokenizer_json["model"]["continuing_subword_prefix"] = ""
+    tokenizer_json["model"]["max_input_chars_per_word"] = 100
 
     return tokenizer_json
 

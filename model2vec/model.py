@@ -129,7 +129,9 @@ class StaticModel:
         if max_length is not None:
             m = max_length * self.median_token_length
             sentences = [sentence[:m] for sentence in sentences]
-
+        
+        max_len = max([len(sentence) for sentence in sentences])
+        self.tokenizer.model.max_input_chars_per_word = max_len + 1
         if self._can_encode_fast:
             encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
         else:
