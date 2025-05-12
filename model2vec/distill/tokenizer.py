@@ -134,8 +134,8 @@ def _process_unigram(tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[
     """Process the Unigram tokenizer JSON."""
     current_probas = dict(tokenizer_json["model"]["vocab"])
     avg_proba = sum(current_probas.values()) / len(current_probas)
-    new_probas = {word: current_probas.get(word, avg_proba) for word in pre_tokenized_tokens}
-    tokenizer_json["model"]["vocab"] = sorted(new_probas.items(), key=lambda x: x[1], reverse=True)
+    new_probas = [[word, current_probas.get(word, avg_proba)] for word in pre_tokenized_tokens]
+    tokenizer_json["model"]["vocab"] = new_probas
 
     tokens, _ = zip(*tokenizer_json["model"]["vocab"])
     tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token)
