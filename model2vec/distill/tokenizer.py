@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from string import punctuation
 from typing import Any
 
 import numpy as np
@@ -85,6 +86,9 @@ def _prepare_normalizer(
     :return: The prepared tokenizer.
     """
     new_normalizers = []
+    for char in punctuation:
+        new_normalizers.append(Replace(char, f" {char} "))
+
     new_normalizers.append(Replace(Regex(r"\s+"), " "))
     new_normalizers.append(Strip(right=True))
     if normalizer is None:
@@ -106,24 +110,22 @@ def _fix_pretokenizer(pretokenizer: PreTokenizer) -> PreTokenizer | None:
     return pretokenizer
 
 
+def _calculate_token_weight_for_unigram(token: str) -> float:
+    """Calculate the token weight for Unigram."""
+    # Always prefer longer tokens.
+    return len(token) + int(token.startswith("▁"))
+
+
 def _process_tokenizer(
     tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
 ) -> dict[str, Any]:
     """Process the WordPiece tokenizer JSON."""
-    '''tokenizer_json["model"]["type"] = "Unigram"
-    max_length = max(len(token) for token in pre_tokenized_tokens)
-    proba_vals: list[float] = [x * 12 for x in range(max_length + 2)]
-    probas = [proba_vals[len(token)] + int(token.startswith("▁") * 10) for idx, token in enumerate(pre_tokenized_tokens)]
-    s = np.asarray(probas)
-    s = (s / np.sum(s)).tolist()
+    tokenizer_json["model"]["type"] = "Unigram"
     tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
-    tokenizer_json["model"]["vocab"] = [(token, np.log(s[idx])) for idx, token in enumerate(pre_tokenized_tokens)]'''
 
-    tokenizer_json["model"]["type"] = "WordPiece"
-    tokenizer_json["model"]["unk_token"] = unk_token
-    tokenizer_json["model"]["vocab"] = {token: idx for idx, token in enumerate(pre_tokenized_tokens)}
-    tokenizer_json["model"]["continuing_subword_prefix"] = ""
-    tokenizer_json["model"]["max_input_chars_per_word"] = 100
+    token_weights = np.asarray([_calculate_token_weight_for_unigram(token) for token in pre_tokenized_tokens])
+    proba = (token_weights / np.sum(token_weights)).tolist()
+    tokenizer_json["model"]["vocab"] = [(token, np.log(p)) for token, p in zip(pre_tokenized_tokens, proba)]
 
     return tokenizer_json
 
@@ -214,12 +216,10 @@ def clean_and_create_vocabulary(
     internal_tokens: list[str] = [k for k, _ in sorted(internal_vocab.items(), key=lambda x: x[1])]
 
     cleaned_vocabulary = _process_internal_tokens(tokenizer, internal_tokens, token_remove_regex)
-    if len(cleaned_vocabulary) < len(internal_tokens):
-        logger.info(f"Removed {len(internal_tokens) - len(cleaned_vocabulary)} internal tokens.")
     internal_tokens_set = {token.form for token in cleaned_vocabulary}
 
+    normalizer: Normalizer | None = backend_tokenizer.normalizer
     for token in vocabulary:
-        normalizer: Normalizer | None = backend_tokenizer.normalizer
         if normalizer is not None:
             token = normalizer.normalize_str(token)
 
@@ -228,13 +228,12 @@ def clean_and_create_vocabulary(
             continue
 
         pre_tokenizer: PreTokenizer | None = backend_tokenizer.pre_tokenizer
+        normalized_token = token
         if pre_tokenizer is not None:
             normalized_token = _normalize_vocabulary_token(
                 token=token,
                 pre_tokenizer=pre_tokenizer,
             )
-        else:
-            normalized_token = token
 
         # We need to check whether the pretokenized token is in the vocabulary.
         # But we need to return the original token, because that will be tokenized
@@ -243,7 +242,7 @@ def clean_and_create_vocabulary(
             n_duplicates += 1
             continue
 
-        # Add the possibly pretokenized token to _seen_
+        # Add the possibly pretokenized token to seen
         seen_tokens.add(normalized_token)
 
         # After checking the token exists, we need to normalize it into the token
@@ -319,6 +318,11 @@ def _process_internal_tokens(
             added_tokens_to_remove=added_tokens_to_remove,
         ):
             cleaned_internal_tokens.append(token_object)
+
+    if len(cleaned_internal_tokens) != len(internal_tokens):
+        logger.info(
+            f"Removed {len(internal_tokens) - len(cleaned_internal_tokens)} internal tokens from the vocabulary."
+        )
 
     return cleaned_internal_tokens
 

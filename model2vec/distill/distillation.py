@@ -19,7 +19,7 @@ try:
     from huggingface_hub.errors import RepositoryNotFoundError
 except ImportError:
     # For huggingface_hub<0.25.0
-    from huggingface_hub.utils._errors import RepositoryNotFoundError
+    from huggingface_hub.utils._errors import RepositoryNotFoundError  # type: ignore[no-redef]
 
 
 logger = logging.getLogger(__name__)
