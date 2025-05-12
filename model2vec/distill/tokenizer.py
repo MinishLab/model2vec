@@ -75,6 +75,7 @@ def _remap_added_tokens(
 
 def _prepare_normalizer(
     normalizer: Normalizer,
+    vocab: list[str],
 ) -> Normalizer:
     """
     Prepare the normalizer for the tokenizer.
@@ -83,11 +84,16 @@ def _prepare_normalizer(
     If no normalizer is provided, it uses the default one.
 
     :param normalizer: The tokenizer to prepare.
+    :param vocab: The vocabulary to use for the tokenizer.
     :return: The prepared tokenizer.
     """
     new_normalizers = []
     for char in punctuation:
-        new_normalizers.append(Replace(char, f" {char} "))
+        if char in vocab:
+            # If the character is in the vocabulary, we need to replace it with a space.
+            new_normalizers.append(Replace(char, f"{char} "))
+        else:
+            new_normalizers.append(Replace(char, f" {char} "))
 
     new_normalizers.append(Replace(Regex(r"\s+"), " "))
     new_normalizers.append(Strip(right=True))
@@ -148,7 +154,9 @@ def replace_vocabulary(
 ) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
     tokenizer = tokenizer.from_str(tokenizer.to_str())
-    tokenizer.normalizer = _prepare_normalizer(tokenizer.normalizer)
+    tokenizer.normalizer = _prepare_normalizer(
+        tokenizer.normalizer, [token.normalized_form for token in new_vocabulary]
+    )
     tokenizer.pre_tokenizer = _fix_pretokenizer(tokenizer.pre_tokenizer)
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
 
