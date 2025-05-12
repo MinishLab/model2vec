@@ -420,17 +420,21 @@ def _normalize_vocabulary_token(token: str, pre_tokenizer: PreTokenizer) -> str:
     """Normalize a token that is not in the initial token vocabulary."""
     # Add prefix space for byte tokenizers.
     prefixed_token = f" {token}"
+    pretokenized_tokens: tuple[str, ...]
     pretokenized_tokens, offsets = zip(*pre_tokenizer.pre_tokenize_str(prefixed_token))
     # The first item is always the start of the token.
     new_token = [pretokenized_tokens[0]]
     # Loop over the subtokens and offsets.
     for t, (s, _) in zip(pretokenized_tokens[1:], offsets[1:]):
+        # Do not prefix the token with a space if it starts with a metaspace.
+        if t.startswith("▁"):
+            new_token.append(t)
         # If the character before the subtoken is a space, we have a
         # multiword token. e.g., "room for the moon", which is split into
         # ["room", "for", "the", "moon"].
         # If it doesn't have a space, it is part of a complex multiword token,
         # e.g., "chat-gpt", which is split into ["chat", "-", "gpt"].
-        if prefixed_token[s - 1] == " ":
+        elif prefixed_token[s - 1] == " ":
             new_token.append(f" {t}")
         else:
             new_token.append(t)
