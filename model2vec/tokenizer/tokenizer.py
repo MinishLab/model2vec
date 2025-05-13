@@ -13,7 +13,7 @@ from tokenizers.pre_tokenizers import (
 from transformers import PreTrainedTokenizerFast
 
 from model2vec.tokenizer.datamodels import Token
-from model2vec.tokenizer.model import process_tokenizer, process_unigram
+from model2vec.tokenizer.model import process_tokenizer
 from model2vec.tokenizer.normalizer import prepare_normalizer
 from model2vec.tokenizer.pretokenizer import fix_pretokenizer
 
@@ -59,7 +59,6 @@ def replace_vocabulary(
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
     tokenizer_json["pre_tokenizer"] = fix_pretokenizer(tokenizer_json["pre_tokenizer"])
 
-    model_type = tokenizer_json["model"]["type"]
     added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
 
     pre_tokenized_tokens = [x.normalized_form for x in new_vocabulary]
@@ -70,13 +69,7 @@ def replace_vocabulary(
 
     # Remove old added tokens from added tokens
     tokenizer_json["added_tokens"] = [x for x in added_tokens if x["content"] in {"[UNK]", "[PAD]"}]
-
-    if model_type == "WordPiece" or model_type == "BPE":
-        tokenizer_json = process_tokenizer(tokenizer_json, pre_tokenized_tokens, "[UNK]")
-    elif model_type == "Unigram":
-        tokenizer_json = process_unigram(tokenizer_json, pre_tokenized_tokens, "[UNK]")
-    else:
-        raise ValueError(f"Unknown model type {model_type}")
+    tokenizer_json = process_tokenizer(tokenizer_json, pre_tokenized_tokens, "[UNK]")
 
     # Remap special tokens
     tokenizer_json["added_tokens"] = _remap_added_tokens(

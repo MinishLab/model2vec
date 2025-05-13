@@ -64,6 +64,7 @@ onnx = ["onnx", "torch"]
 # train also installs inference
 train = ["torch", "lightning", "scikit-learn", "skops"]
 inference = ["scikit-learn", "skops"]
+tokenizer = ["transformers"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"

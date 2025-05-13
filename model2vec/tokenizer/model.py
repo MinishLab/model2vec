@@ -9,6 +9,8 @@ def process_tokenizer(
     tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
 ) -> dict[str, Any]:
     """Process the WordPiece tokenizer JSON."""
+    if tokenizer_json["model"]["type"] == "Unigram":
+        return _process_unigram(tokenizer_json, pre_tokenized_tokens, unk_token)
     tokenizer_json["model"]["type"] = "Unigram"
     tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
 
@@ -19,7 +21,9 @@ def process_tokenizer(
     return tokenizer_json
 
 
-def process_unigram(tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str) -> dict[str, Any]:
+def _process_unigram(
+    tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
+) -> dict[str, Any]:
     """Process the Unigram tokenizer JSON."""
     current_probas = dict(tokenizer_json["model"]["vocab"])
     avg_proba = sum(current_probas.values()) / len(current_probas)
@@ -27,7 +31,8 @@ def process_unigram(tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[s
     tokenizer_json["model"]["vocab"] = new_probas
 
     tokens, _ = zip(*tokenizer_json["model"]["vocab"])
-    tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token)
+    if unk_token is not None:
+        tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token)
 
     return tokenizer_json
 
