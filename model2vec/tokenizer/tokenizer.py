@@ -3,42 +3,19 @@ from __future__ import annotations
 import json
 import logging
 import re
-from string import punctuation
 from typing import Any
 
-import numpy as np
-from tokenizers import Regex, Tokenizer
-from tokenizers.normalizers import Normalizer, Replace, Strip
-from tokenizers.normalizers import Sequence as NormalizerSequence
+from tokenizers import Tokenizer
+from tokenizers.normalizers import Normalizer
 from tokenizers.pre_tokenizers import (
-    BertPreTokenizer,
-    ByteLevel,
-    CharDelimiterSplit,
-    Metaspace,
     PreTokenizer,
-    Punctuation,
-    Sequence,
-    Split,
-    UnicodeScripts,
-    Whitespace,
-    WhitespaceSplit,
 )
 from transformers import PreTrainedTokenizerFast
 
-_FORBIDDEN_PRETOKENIZERS = (
-    BertPreTokenizer,
-    CharDelimiterSplit,
-    Metaspace,
-    Punctuation,
-    Sequence,
-    Split,
-    UnicodeScripts,
-    Whitespace,
-    WhitespaceSplit,
-)
-
-
-from model2vec.distill.utils import Token
+from model2vec.tokenizer.datamodels import Token
+from model2vec.tokenizer.model import process_tokenizer, process_unigram
+from model2vec.tokenizer.normalizer import prepare_normalizer
+from model2vec.tokenizer.pretokenizer import fix_pretokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -73,92 +50,14 @@ def _remap_added_tokens(
     return special_tokens
 
 
-def _prepare_normalizer(
-    normalizer: Normalizer,
-    vocab: list[str],
-) -> Normalizer:
-    """
-    Prepare the normalizer for the tokenizer.
-
-    This function sets the normalizer for the tokenizer based on the provided normalizer type.
-    If no normalizer is provided, it uses the default one.
-
-    :param normalizer: The tokenizer to prepare.
-    :param vocab: The vocabulary to use for the tokenizer.
-    :return: The prepared tokenizer.
-    """
-    new_normalizers = []
-    for char in punctuation:
-        if char in vocab:
-            # If the character is in the vocabulary, we need to replace it with a space.
-            new_normalizers.append(Replace(char, f"{char} "))
-        else:
-            new_normalizers.append(Replace(char, f" {char} "))
-
-    new_normalizers.append(Replace(Regex(r"\s+"), " "))
-    new_normalizers.append(Strip(right=True))
-    if normalizer is None:
-        return NormalizerSequence(new_normalizers)
-
-    return NormalizerSequence([normalizer] + new_normalizers)
-
-
-def _fix_pretokenizer(pretokenizer: PreTokenizer) -> PreTokenizer | None:
-    """Fixes a single pretokenizer to allow multiword units."""
-    if isinstance(pretokenizer, Metaspace):
-        return Metaspace(split=False, replacement=pretokenizer.replacement, prepend_scheme=pretokenizer.prepend_scheme)
-    if isinstance(pretokenizer, _FORBIDDEN_PRETOKENIZERS):
-        return Metaspace(split=False, replacement="▁")
-    elif isinstance(pretokenizer, ByteLevel):
-        pretokenizer.use_regex = False
-        pretokenizer.add_prefix_space = True
-
-    return pretokenizer
-
-
-def _calculate_token_weight_for_unigram(token: str) -> float:
-    """Calculate the token weight for Unigram."""
-    # Always prefer longer tokens.
-    return len(token) + int(token.startswith("▁"))
-
-
-def _process_tokenizer(
-    tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str | None
-) -> dict[str, Any]:
-    """Process the WordPiece tokenizer JSON."""
-    tokenizer_json["model"]["type"] = "Unigram"
-    tokenizer_json["model"]["unk_id"] = pre_tokenized_tokens.index(unk_token) if unk_token else None
-
-    token_weights = np.asarray([_calculate_token_weight_for_unigram(token) for token in pre_tokenized_tokens])
-    proba = (token_weights / np.sum(token_weights)).tolist()
-    tokenizer_json["model"]["vocab"] = [(token, np.log(p)) for token, p in zip(pre_tokenized_tokens, proba)]
-
-    return tokenizer_json
-
-
-def _process_unigram(tokenizer_json: dict[str, Any], pre_tokenized_tokens: list[str], unk_token: str) -> dict[str, Any]:
-    """Process the Unigram tokenizer JSON."""
-    current_probas = dict(tokenizer_json["model"]["vocab"])
-    avg_proba = sum(current_probas.values()) / len(current_probas)
-    new_probas = [[word, current_probas.get(word, avg_proba)] for word in pre_tokenized_tokens]
-    tokenizer_json["model"]["vocab"] = new_probas
-
-    tokens, _ = zip(*tokenizer_json["model"]["vocab"])
-    tokenizer_json["model"]["unk_id"] = list(tokens).index(unk_token)
-
-    return tokenizer_json
-
-
 def replace_vocabulary(
     tokenizer: Tokenizer, new_vocabulary: list[Token], unk_token: str | None, pad_token: str | None
 ) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
     tokenizer = tokenizer.from_str(tokenizer.to_str())
-    tokenizer.normalizer = _prepare_normalizer(
-        tokenizer.normalizer, [token.normalized_form for token in new_vocabulary]
-    )
-    tokenizer.pre_tokenizer = _fix_pretokenizer(tokenizer.pre_tokenizer)
+    tokenizer.normalizer = prepare_normalizer(tokenizer.normalizer)
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
+    tokenizer_json["pre_tokenizer"] = fix_pretokenizer(tokenizer_json["pre_tokenizer"])
 
     model_type = tokenizer_json["model"]["type"]
     added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
@@ -173,9 +72,9 @@ def replace_vocabulary(
     tokenizer_json["added_tokens"] = [x for x in added_tokens if x["content"] in {"[UNK]", "[PAD]"}]
 
     if model_type == "WordPiece" or model_type == "BPE":
-        tokenizer_json = _process_tokenizer(tokenizer_json, pre_tokenized_tokens, "[UNK]")
+        tokenizer_json = process_tokenizer(tokenizer_json, pre_tokenized_tokens, "[UNK]")
     elif model_type == "Unigram":
-        tokenizer_json = _process_unigram(tokenizer_json, pre_tokenized_tokens, "[UNK]")
+        tokenizer_json = process_unigram(tokenizer_json, pre_tokenized_tokens, "[UNK]")
     else:
         raise ValueError(f"Unknown model type {model_type}")
 
@@ -398,7 +297,9 @@ def _create_normalized_form(
     return f"▁{token.removeprefix(word_prefix)}"
 
 
-def turn_tokens_into_ids(tokens: list[Token], tokenizer: PreTrainedTokenizerFast, unk_token: str) -> list[list[int]]:
+def turn_tokens_into_ids(
+    tokens: list[Token], tokenizer: PreTrainedTokenizerFast, unk_token: str | None
+) -> list[list[int]]:
     """
     Convert a list of Token objects to their corresponding token ID sequences.
 
@@ -406,16 +307,23 @@ def turn_tokens_into_ids(tokens: list[Token], tokenizer: PreTrainedTokenizerFast
     :param tokenizer: The tokenizer to use for converting tokens to IDs
     :param unk_token: The string form of the unk token.
     :return: List of token IDs corresponding to the input tokens
+    :raises ValueError: If the tokenizer returns an unexpected number of tokens for a single token
     """
-    unk_id = tokenizer.convert_tokens_to_ids(unk_token)
-    bos, _, eos = tokenizer.encode("a", add_special_tokens=True)
-    token_ids = []
+    unk_id = None if unk_token is None else tokenizer.convert_tokens_to_ids(unk_token)
+
+    encoding = tokenizer.encode("a", add_special_tokens=True)
+
+    if len(encoding) != 3:
+        raise ValueError(f"Tokenizer returned {len(encoding)} tokens for a single token. This is not supported.")
+    bos, _, eos = encoding
+
+    token_ids: list[list[int]] = []
     for token in tokens:
         if token.is_internal:
             # Careful. Any incorrect tokens will just get `[UNK]``, so this could go horribly wrong
-            token_id = tokenizer.convert_tokens_to_ids(token.form)
+            token_id: int = tokenizer.convert_tokens_to_ids(token.form) or 0
             # Explicitly check and warn if `unk_id` appears, but don't crash.
-            if token_id == unk_id and token.form != unk_token:
+            if unk_id is not None and token_id == unk_id and token.form != unk_token:
                 logger.warning(f"Token {token.form} was set to unk. This is wrong.")
             token_ids.append([bos, token_id, eos])
         else:

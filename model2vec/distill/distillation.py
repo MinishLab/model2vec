@@ -9,10 +9,10 @@ from huggingface_hub import model_info
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import PCADimType, create_embeddings, post_process_embeddings
-from model2vec.distill.tokenizer import clean_and_create_vocabulary, replace_vocabulary, turn_tokens_into_ids
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
+from model2vec.tokenizer import clean_and_create_vocabulary, replace_vocabulary, turn_tokens_into_ids
 
 try:
     # For huggingface_hub>=0.25.0
@@ -91,8 +91,11 @@ def distill_from_model(
         raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")
 
     # Create the embeddings.
-    unk_token = tokenizer.special_tokens_map.get("unk_token")
-    pad_token = tokenizer.special_tokens_map.get("pad_token")
+    unk_token: str | None = tokenizer.special_tokens_map.get("unk_token")
+    pad_token: str | None = tokenizer.special_tokens_map.get("pad_token")
+
+    # Add the cleaned vocabulary to the tokenizer.
+    backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens, unk_token=unk_token, pad_token=pad_token)
 
     # Convert tokens to IDs
     token_ids = turn_tokens_into_ids(all_tokens, tokenizer, unk_token)
@@ -101,8 +104,6 @@ def distill_from_model(
         tokenized=token_ids, model=model, device=device, pad_token_id=tokenizer.get_vocab()[pad_token]
     )
 
-    # Add the cleaned vocabulary to the tokenizer.
-    backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens, unk_token=unk_token, pad_token=pad_token)
     # Post process the embeddings by applying PCA and Zipf weighting.
     embeddings = post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
     # Quantize the embeddings.

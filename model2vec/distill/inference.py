@@ -79,6 +79,8 @@ def create_embeddings(
     intermediate_weights = [intermediate_weights[i] for i in np.argsort(sort_order)]
     out_weights = np.stack(intermediate_weights)
 
+    out_weights = np.nan_to_num(out_weights)
+
     return out_weights
 
 
