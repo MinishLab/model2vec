@@ -892,7 +892,7 @@ wheels = [
 
 [[package]]
 name = "model2vec"
-version = "0.4.1"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
@@ -931,6 +931,9 @@ onnx = [
     { name = "onnx" },
     { name = "torch" },
 ]
+tokenizer = [
+    { name = "transformers" },
+]
 train = [
     { name = "lightning" },
     { name = "scikit-learn" },
@@ -966,6 +969,7 @@ requires-dist = [
     { name = "torch", marker = "extra == 'train'" },
     { name = "tqdm" },
     { name = "transformers", marker = "extra == 'distill'" },
+    { name = "transformers", marker = "extra == 'tokenizer'" },
 ]
 
 [[package]]
