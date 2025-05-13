@@ -350,3 +350,27 @@ def _normalize_vocabulary_token(token: str, pre_tokenizer: PreTokenizer) -> str:
     normalized_token = "".join(new_token)
 
     return normalized_token
+
+
+def create_tokenizer(
+    tokenizer: PreTrainedTokenizerFast,
+    vocabulary: list[str],
+    token_remove_regex: re.Pattern | None = None,
+) -> PreTrainedTokenizerFast:
+    """
+    Create a tokenizer from a vocabulary.
+
+    This function creates a tokenizer from a vocabulary and a tokenizer.
+    It also sets the normalizer and pre-tokenizer for the tokenizer.
+
+    :param tokenizer: The tokenizer to use.
+    :param vocabulary: The vocabulary to use.
+    :param token_remove_regex: The regex to use to remove tokens from the vocabulary.
+    :return: The created tokenizer.
+    """
+    unk_token = tokenizer.special_tokens_map.get("unk_token")
+    pad_token = tokenizer.special_tokens_map.get("pad_token")
+    cleaned_vocabulary = clean_and_create_vocabulary(tokenizer, vocabulary, token_remove_regex)
+    new_tokenizer = replace_vocabulary(tokenizer.backend_tokenizer, cleaned_vocabulary, unk_token, pad_token)
+
+    return PreTrainedTokenizerFast(tokenizer_object=new_tokenizer)
