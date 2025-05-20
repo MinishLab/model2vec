@@ -13,17 +13,9 @@ from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTo
 
 from model2vec.distill.inference import create_embeddings
 from model2vec.distill.tokenizer import replace_vocabulary
-from model2vec.distill.utils import Token, select_optimal_device
+from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
-
-try:
-    # For huggingface_hub>=0.25.0
-    from huggingface_hub.errors import RepositoryNotFoundError
-except ImportError:
-    # For huggingface_hub<0.25.0
-    from huggingface_hub.utils._errors import RepositoryNotFoundError
-
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +129,9 @@ def distill_from_model(
         try:
             info = model_info(model_name)
             language = info.cardData.get("language", None)
-        except RepositoryNotFoundError:
-            logger.info("No model info found for the model. Setting language to None.")
+        except Exception as e:
+            # NOTE: bare except because there's many reasons this can fail.
+            logger.warning(f"Couldn't get the model info from the Hugging Face Hub: {e}. Setting language to None.")
             language = None
 
     return StaticModel(

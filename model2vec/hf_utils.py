@@ -158,8 +158,9 @@ def load_pretrained(
                 )
             )
             metadata = _get_metadata_from_readme(Path(readme_path))
-        except huggingface_hub.utils.EntryNotFoundError:
-            logger.info("No README found in the model folder. No model card loaded.")
+        except Exception as e:
+            # NOTE: we don't want to raise an error here, since the README is optional.
+            logger.info(f"No README found in the model folder: {e} No model card loaded.")
             metadata = {}
 
         config_path = Path(
