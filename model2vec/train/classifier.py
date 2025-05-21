@@ -4,7 +4,7 @@ import logging
 from collections import Counter
 from itertools import chain
 from tempfile import TemporaryDirectory
-from typing import TypeVar, cast, Optional
+from typing import TypeVar, cast
 
 import lightning as pl
 import numpy as np
@@ -135,8 +135,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         early_stopping_patience: int | None = 5,
         test_size: float = 0.1,
         device: str = "auto",
-        X_val: Optional[list[str]] = None,
-        y_val: Optional[list[str]] = None
+        X_val: list[str] | None = None,
+        y_val: LabelType | None = None
     ) -> StaticModelForClassification:
         """
         Fit a model.
