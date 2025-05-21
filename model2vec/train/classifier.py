@@ -173,6 +173,9 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         self._initialize(y)
 
+        if (X_val is not None) != (y_val is not None):
+            raise ValueError("Both X_val and y_val must be provided together, or neither.")
+
         if X_val is not None and y_val is not None:
             train_texts = X
             train_labels = y
