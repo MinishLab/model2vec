@@ -40,7 +40,7 @@ def save_pretrained(
     folder_path = folder_path / subfolder if subfolder else folder_path
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
-    tokenizer.save(str(folder_path / "tokenizer.json"))
+    tokenizer.save(str(folder_path / "tokenizer.json"), pretty=False)
     json.dump(config, open(folder_path / "config.json", "w"), indent=4)
 
     # Create modules.json
