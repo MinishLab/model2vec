@@ -4,7 +4,7 @@ import logging
 from collections import Counter
 from itertools import chain
 from tempfile import TemporaryDirectory
-from typing import TypeVar, cast
+from typing import TypeVar, cast, Optional
 
 import lightning as pl
 import numpy as np
@@ -135,6 +135,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         early_stopping_patience: int | None = 5,
         test_size: float = 0.1,
         device: str = "auto",
+        X_val: Optional[list[str]] = None,
+        y_val: Optional[list[str]] = None
     ) -> StaticModelForClassification:
         """
         Fit a model.
@@ -145,6 +147,9 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         This function seeds everything with a seed of 42, so the results are reproducible.
         It also splits the data into a train and validation set, again with a random seed.
+
+        If `X_val` and `y_val` are not provided, the function will automatically
+        split the training data into a train and validation set using `test_size`.
 
         :param X: The texts to train on.
         :param y: The labels to train on. If the first element is a list, multi-label classification is assumed.
@@ -157,6 +162,8 @@ class StaticModelForClassification(FinetunableStaticModel):
             If this is None, early stopping is disabled.
         :param test_size: The test size for the train-test split.
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
+        :param X_val: The texts to be used for validation.
+        :param y_val: The labels to be used for validation.
         :return: The fitted model.
         """
         pl.seed_everything(_RANDOM_SEED)
@@ -166,11 +173,17 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         self._initialize(y)
 
-        train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
-            X,
-            y,
-            test_size=test_size,
-        )
+        if X_val is not None and y_val is not None:
+            train_texts = X
+            train_labels = y
+            validation_texts = X_val
+            validation_labels = y_val
+        else:
+            train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
+                X,
+                y,
+                test_size=test_size,
+            )
 
         if batch_size is None:
             # Set to a multiple of 32
