@@ -136,7 +136,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         test_size: float = 0.1,
         device: str = "auto",
         X_val: list[str] | None = None,
-        y_val: LabelType | None = None
+        y_val: LabelType | None = None,
     ) -> StaticModelForClassification:
         """
         Fit a model.
@@ -165,6 +165,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param X_val: The texts to be used for validation.
         :param y_val: The labels to be used for validation.
         :return: The fitted model.
+        :raises ValueError: If either X_val or y_val are provided, but not both.
         """
         pl.seed_everything(_RANDOM_SEED)
         logger.info("Re-initializing model.")
@@ -177,6 +178,10 @@ class StaticModelForClassification(FinetunableStaticModel):
             raise ValueError("Both X_val and y_val must be provided together, or neither.")
 
         if X_val is not None and y_val is not None:
+            # Additional check to ensure y_val is of the same type as y
+            if type(y_val[0]) != type(y[0]):
+                raise ValueError("X_val and y_val must be of the same type as X and y.")
+
             train_texts = X
             train_labels = y
             validation_texts = X_val
