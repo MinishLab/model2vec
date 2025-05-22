@@ -969,6 +969,7 @@ requires-dist = [
     { name = "torch", marker = "extra == 'train'" },
     { name = "tqdm" },
     { name = "transformers", marker = "extra == 'distill'", specifier = "<=4.52.1" },
+    { name = "transformers", marker = "extra == 'tokenizer'" },
 ]
 
 [[package]]
