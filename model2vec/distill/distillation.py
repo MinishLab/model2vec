@@ -9,7 +9,6 @@ from huggingface_hub import model_info
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
 from model2vec.distill.inference import PCADimType, create_embeddings, post_process_embeddings
-from model2vec.distill.tokenizer import replace_vocabulary
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
