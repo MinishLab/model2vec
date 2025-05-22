@@ -59,7 +59,7 @@ dev = [
     "ruff",
 ]
 
-distill = ["torch", "transformers", "scikit-learn"]
+distill = ["torch", "transformers<=4.52.1", "scikit-learn"]
 onnx = ["onnx", "torch"]
 # train also installs inference
 train = ["torch", "lightning", "scikit-learn", "skops"]
