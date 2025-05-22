@@ -73,7 +73,9 @@ def distill_from_model(
 
     n_tokens_before = len(vocabulary)
     # Clean the vocabulary by removing duplicate tokens and tokens that are in the internal vocabulary.
-    all_tokens = clean_and_create_vocabulary(tokenizer, vocabulary, token_remove_regex=token_remove_regex)
+    all_tokens, backend_tokenizer = clean_and_create_vocabulary(
+        tokenizer, vocabulary, token_remove_regex=token_remove_regex
+    )
     n_tokens_after = len([token for token in all_tokens if not token.is_internal])
     if n_tokens_before:
         logger.info(

@@ -22,7 +22,7 @@ try:
     from huggingface_hub.errors import RepositoryNotFoundError
 except ImportError:
     # For huggingface_hub<0.25.0
-    from huggingface_hub.utils._errors import RepositoryNotFoundError
+    from huggingface_hub.utils._errors import RepositoryNotFoundError  # type: ignore
 
 rng = np.random.default_rng()
 
@@ -275,7 +275,7 @@ def test_clean_and_create_vocabulary(
 ) -> None:
     """Test the _clean_vocabulary function."""
     with caplog.at_level("WARNING"):
-        tokens = clean_and_create_vocabulary(mock_berttokenizer, added_tokens, None)
+        tokens, _ = clean_and_create_vocabulary(mock_berttokenizer, added_tokens, None)
 
         cleaned_vocab = [token.form for token in tokens if not token.is_internal]
         # Check the cleaned vocabulary matches the expected output

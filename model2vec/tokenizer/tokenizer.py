@@ -14,8 +14,8 @@ from transformers import PreTrainedTokenizerFast
 
 from model2vec.tokenizer.datamodels import Token
 from model2vec.tokenizer.model import process_tokenizer
-from model2vec.tokenizer.normalizer import prepare_normalizer
-from model2vec.tokenizer.pretokenizer import fix_pretokenizer
+from model2vec.tokenizer.normalizer import replace_normalizer
+from model2vec.tokenizer.pretokenizer import replace_pretokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +54,7 @@ def replace_vocabulary(
     tokenizer: Tokenizer, new_vocabulary: list[Token], unk_token: str | None, pad_token: str | None
 ) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
-    tokenizer = tokenizer.from_str(tokenizer.to_str())
-    tokenizer.normalizer = prepare_normalizer(tokenizer.normalizer)  # type: ignore[assignment]  # Is just wrong
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
-    tokenizer_json["pre_tokenizer"] = fix_pretokenizer(tokenizer_json["pre_tokenizer"])
-
     added_tokens: list[dict[str, Any]] = tokenizer_json["added_tokens"]
 
     pre_tokenized_tokens = [x.normalized_form for x in new_vocabulary]
@@ -102,7 +98,7 @@ def clean_and_create_vocabulary(
     tokenizer: PreTrainedTokenizerFast,
     vocabulary: list[str],
     token_remove_regex: re.Pattern | None,
-) -> list[Token]:
+) -> tuple[list[Token], Tokenizer]:
     """Cleans a vocabulary by removing duplicates and tokens that were already in the vocabulary."""
     seen_tokens = set()
     post_normalize_seen_tokens = set()
@@ -115,15 +111,12 @@ def clean_and_create_vocabulary(
     internal_vocab: dict[str, int] = tokenizer.get_vocab()
     internal_tokens: list[str] = [k for k, _ in sorted(internal_vocab.items(), key=lambda x: x[1])]
 
-    cleaned_vocabulary = _process_internal_tokens(tokenizer, internal_tokens, token_remove_regex)
-    internal_tokens_set = {token.form for token in cleaned_vocabulary}
-
-    # Change the backend tokenizer to the new one.
+    # Copy the backend tokenizer to avoid modifying the original.
     backend_tokenizer = backend_tokenizer.from_str(backend_tokenizer.to_str())
-    backend_tokenizer.normalizer = prepare_normalizer(backend_tokenizer.normalizer)  # type: ignore[assignment]  # Is just wrong
-    tokenizer_json: dict[str, Any] = json.loads(backend_tokenizer.to_str())
-    tokenizer_json["pre_tokenizer"] = fix_pretokenizer(tokenizer_json["pre_tokenizer"])
-    backend_tokenizer = Tokenizer.from_str(json.dumps(tokenizer_json))
+    backend_tokenizer = replace_normalizer(backend_tokenizer)
+
+    cleaned_vocabulary = _process_internal_tokens(tokenizer, backend_tokenizer, internal_tokens, token_remove_regex)
+    internal_tokens_set = {token.form for token in cleaned_vocabulary}
 
     normalizer: Normalizer | None = backend_tokenizer.normalizer
     for token in vocabulary:
@@ -178,11 +171,14 @@ def clean_and_create_vocabulary(
     if n_empty:
         logger.warning(f"Removed {n_empty} empty tokens.")
 
-    return cleaned_vocabulary
+    return cleaned_vocabulary, replace_pretokenizer(backend_tokenizer)
 
 
 def _process_internal_tokens(
-    tokenizer: PreTrainedTokenizerFast, internal_tokens: list[str], token_remove_regex: re.Pattern | None
+    tokenizer: PreTrainedTokenizerFast,
+    backend_tokenizer: Tokenizer,
+    internal_tokens: list[str],
+    token_remove_regex: re.Pattern | None,
 ) -> list[Token]:
     """Clean internal tokens."""
     # Get the pad and unk token from the tokenizer.
@@ -193,7 +189,6 @@ def _process_internal_tokens(
     added_tokens_to_remove = set(tokenizer.added_tokens_encoder) - added_tokens_to_keep
     cleaned_internal_tokens: list[Token] = []
 
-    backend_tokenizer = tokenizer.backend_tokenizer
     # Figure out whether token is a subword or not.
     encoded = backend_tokenizer.encode(f" {'a' * 25}", add_special_tokens=False)
     first_token, second_token, *_ = encoded.tokens
@@ -378,7 +373,7 @@ def create_tokenizer(
     """
     unk_token = cast(str | None, tokenizer.special_tokens_map.get("unk_token"))
     pad_token = cast(str | None, tokenizer.special_tokens_map.get("pad_token"))
-    cleaned_vocabulary = clean_and_create_vocabulary(tokenizer, vocabulary, token_remove_regex)
-    new_tokenizer = replace_vocabulary(tokenizer.backend_tokenizer, cleaned_vocabulary, unk_token, pad_token)
+    cleaned_vocabulary, backend_tokenizer = clean_and_create_vocabulary(tokenizer, vocabulary, token_remove_regex)
+    new_tokenizer = replace_vocabulary(backend_tokenizer, cleaned_vocabulary, unk_token, pad_token)
 
     return PreTrainedTokenizerFast(tokenizer_object=new_tokenizer)

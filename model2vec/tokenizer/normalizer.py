@@ -1,21 +1,24 @@
 from string import punctuation
 
-from tokenizers import Regex
+from tokenizers import Regex, Tokenizer
 from tokenizers.normalizers import Normalizer, Replace, Sequence, Strip
 
 
-def prepare_normalizer(
-    normalizer: Normalizer,
-) -> Normalizer:
+def replace_normalizer(
+    tokenizer: Tokenizer,
+) -> Tokenizer:
     """
-    Prepare the normalizer for the tokenizer.
+    Replace the normalizer for the tokenizer.
 
-    This function sets the normalizer for the tokenizer based on the provided normalizer type.
-    If no normalizer is provided, it uses the default one.
+    The new normalizer will replace punctuation with a space before and after the punctuation.
+    It will also replace multiple spaces with a single space and strip the right side of the string.
+    If the tokenizer already has a normalizer, it will be added to the new normalizer.
+    If the tokenizer does not have a normalizer, a new normalizer will be created.
 
-    :param normalizer: The tokenizer to prepare.
-    :return: The prepared tokenizer.
+    :param tokenizer: The tokenizer to change.
+    :return: The tokenizer with a replaced normalizer.
     """
+    normalizer = tokenizer.normalizer
     new_normalizers = []
     for char in punctuation:
         new_normalizers.append(Replace(char, f" {char} "))
@@ -23,6 +26,9 @@ def prepare_normalizer(
     new_normalizers.append(Replace(Regex(r"\s+"), " "))
     new_normalizers.append(Strip(right=True))
     if normalizer is None:
-        return Sequence(new_normalizers)
+        normalizer = Sequence(new_normalizers)
+    else:
+        normalizer = Sequence([normalizer] + new_normalizers)  # type: ignore
+    tokenizer.normalizer = normalizer
 
-    return Sequence([normalizer] + new_normalizers)  # type: ignore
+    return tokenizer

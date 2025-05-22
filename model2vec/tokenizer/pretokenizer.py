@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from typing import Any
+
+from tokenizers import Tokenizer
 
 _FORBIDDEN_PRETOKENIZERS = (
     "WhiteSpace",
@@ -28,26 +31,27 @@ def _fix_single_pretokenizer(pre_tokenizer: dict[str, Any]) -> dict[str, Any] | 
     return pre_tokenizer
 
 
-def fix_pretokenizer(pretokenizer: dict[str, Any] | None) -> dict[str, Any]:
+def replace_pretokenizer(tokenizer: Tokenizer) -> Tokenizer:
     """Fixes a single pretokenizer to allow multiword units."""
-    if pretokenizer is None:
-        return _BASIC_METASPACE
+    tokenizer_json = json.loads(tokenizer.to_str())
+    pre_tokenizer_json = tokenizer_json.get("pre_tokenizer", None)
 
-    if pretokenizer["type"] == "Sequence":
+    if pre_tokenizer_json is None:
+        pre_tokenizer_json = _BASIC_METASPACE
+
+    elif pre_tokenizer_json["type"] == "Sequence":
         new_pretokenizers = []
-        for single_pretokenizer in pretokenizer["pretokenizers"]:
+        for single_pretokenizer in pre_tokenizer_json["pretokenizers"]:
             new_pretokenizer = _fix_single_pretokenizer(single_pretokenizer)
             if new_pretokenizer is not None:
                 new_pretokenizers.append(new_pretokenizer)
-        pretokenizer["pretokenizers"] = new_pretokenizers
 
-        if not pretokenizer:
-            return _BASIC_METASPACE
+        if new_pretokenizers:
+            pre_tokenizer_json["pretokenizers"] = new_pretokenizers
+        else:
+            pre_tokenizer_json = _BASIC_METASPACE
 
-        return pretokenizer
+    pre_tokenizer_json = _fix_single_pretokenizer(pre_tokenizer_json) or _BASIC_METASPACE
+    tokenizer_json["pre_tokenizer"] = pre_tokenizer_json
 
-    single_pretokenizer = _fix_single_pretokenizer(pretokenizer)
-    if single_pretokenizer is None:
-        return _BASIC_METASPACE
-
-    return single_pretokenizer
+    return tokenizer.from_str(json.dumps(tokenizer_json))
