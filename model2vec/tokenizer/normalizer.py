@@ -25,4 +25,4 @@ def prepare_normalizer(
     if normalizer is None:
         return Sequence(new_normalizers)
 
-    return Sequence([normalizer] + new_normalizers)
+    return Sequence([normalizer] + new_normalizers)  # type: ignore

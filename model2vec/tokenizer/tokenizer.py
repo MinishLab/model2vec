@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, cast
 
 from tokenizers import Tokenizer
 from tokenizers.normalizers import Normalizer
@@ -55,7 +55,7 @@ def replace_vocabulary(
 ) -> Tokenizer:
     """Replace the vocabulary of a tokenizer with a new one."""
     tokenizer = tokenizer.from_str(tokenizer.to_str())
-    tokenizer.normalizer = prepare_normalizer(tokenizer.normalizer)
+    tokenizer.normalizer = prepare_normalizer(tokenizer.normalizer)  # type: ignore[assignment]  # Is just wrong
     tokenizer_json: dict[str, Any] = json.loads(tokenizer.to_str())
     tokenizer_json["pre_tokenizer"] = fix_pretokenizer(tokenizer_json["pre_tokenizer"])
 
@@ -118,10 +118,17 @@ def clean_and_create_vocabulary(
     cleaned_vocabulary = _process_internal_tokens(tokenizer, internal_tokens, token_remove_regex)
     internal_tokens_set = {token.form for token in cleaned_vocabulary}
 
+    # Change the backend tokenizer to the new one.
+    backend_tokenizer = backend_tokenizer.from_str(backend_tokenizer.to_str())
+    backend_tokenizer.normalizer = prepare_normalizer(backend_tokenizer.normalizer)  # type: ignore[assignment]  # Is just wrong
+    tokenizer_json: dict[str, Any] = json.loads(backend_tokenizer.to_str())
+    tokenizer_json["pre_tokenizer"] = fix_pretokenizer(tokenizer_json["pre_tokenizer"])
+    backend_tokenizer = Tokenizer.from_str(json.dumps(tokenizer_json))
+
     normalizer: Normalizer | None = backend_tokenizer.normalizer
     for token in vocabulary:
         if normalizer is not None:
-            token = normalizer.normalize_str(token)
+            token = cast(str, normalizer.normalize_str(token))
 
         if not token:
             n_empty += 1
@@ -179,10 +186,10 @@ def _process_internal_tokens(
 ) -> list[Token]:
     """Clean internal tokens."""
     # Get the pad and unk token from the tokenizer.
-    pad_token = tokenizer.special_tokens_map.get("pad_token")
-    unk_token = tokenizer.special_tokens_map.get("unk_token")
+    pad_token: str | None = tokenizer.special_tokens_map.get("pad_token")  # type: ignore[assignment]
+    unk_token: str | None = tokenizer.special_tokens_map.get("unk_token")  # type: ignore[assignment]
     # Empty set if no pad or unk token is set.
-    added_tokens_to_keep = {pad_token, unk_token} - {None}
+    added_tokens_to_keep: set[str] = {x for x in (pad_token, unk_token) if x is not None}
     added_tokens_to_remove = set(tokenizer.added_tokens_encoder) - added_tokens_to_keep
     cleaned_internal_tokens: list[Token] = []
 
@@ -314,7 +321,8 @@ def turn_tokens_into_ids(
     for token in tokens:
         if token.is_internal:
             # Careful. Any incorrect tokens will just get `[UNK]``, so this could go horribly wrong
-            token_id: int = tokenizer.convert_tokens_to_ids(token.form) or 0
+            # Cast because return type is wrong.
+            token_id: int = cast(int, tokenizer.convert_tokens_to_ids(token.form)) or 0
             # Explicitly check and warn if `unk_id` appears, but don't crash.
             if unk_id is not None and token_id == unk_id and token.form != unk_token:
                 logger.warning(f"Token {token.form} was set to unk. This is wrong.")
@@ -368,8 +376,8 @@ def create_tokenizer(
     :param token_remove_regex: The regex to use to remove tokens from the vocabulary.
     :return: The created tokenizer.
     """
-    unk_token = tokenizer.special_tokens_map.get("unk_token")
-    pad_token = tokenizer.special_tokens_map.get("pad_token")
+    unk_token = cast(str | None, tokenizer.special_tokens_map.get("unk_token"))
+    pad_token = cast(str | None, tokenizer.special_tokens_map.get("pad_token"))
     cleaned_vocabulary = clean_and_create_vocabulary(tokenizer, vocabulary, token_remove_regex)
     new_tokenizer = replace_vocabulary(tokenizer.backend_tokenizer, cleaned_vocabulary, unk_token, pad_token)
 

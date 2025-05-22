@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from typing import cast
 
 import numpy as np
 from huggingface_hub import model_info
@@ -222,7 +223,10 @@ def distill(
 
     """
     model: PreTrainedModel = AutoModel.from_pretrained(model_name, trust_remote_code=trust_remote_code)
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code)
+    tokenizer = cast(
+        PreTrainedTokenizerFast,
+        AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code, use_fast=True),
+    )
 
     return distill_from_model(
         model=model,
