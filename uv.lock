@@ -863,7 +863,7 @@ requires-dist = [
     { name = "torch", marker = "extra == 'onnx'" },
     { name = "torch", marker = "extra == 'train'" },
     { name = "tqdm" },
-    { name = "transformers", marker = "extra == 'distill'" },
+    { name = "transformers", marker = "extra == 'distill'", specifier = "<=4.52.1" },
 ]
 
 [[package]]
