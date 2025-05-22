@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 from tokenizers import Tokenizer
+from transformers import AutoTokenizer
 
 from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
@@ -152,6 +153,50 @@ def test_train_test_split(mock_trained_pipeline: StaticModelForClassification) -
     assert len(b) == 2
     assert len(c) == len(a)
     assert len(d) == len(b)
+
+
+def test_y_val_none() -> None:
+    """Test the y_val function."""
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    torch.random.manual_seed(42)
+    vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
+    model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+
+    X = ["dog", "cat"]
+    y = ["0", "1"]
+
+    X_val = ["dog", "cat"]
+    y_val = ["0", "1"]
+
+    with pytest.raises(ValueError):
+        model.fit(X, y, X_val=X_val, y_val=None)
+    with pytest.raises(ValueError):
+        model.fit(X, y, X_val=None, y_val=y_val)
+    model.fit(X, y, X_val=None, y_val=None)
+
+
+@pytest.mark.parametrize(
+    "y_multi,y_val_multi,should_crash",
+    [[True, True, False], [False, False, False], [True, False, True], [False, True, True]],
+)
+def test_y_val(y_multi: bool, y_val_multi: bool, should_crash: bool) -> None:
+    """Test the y_val function."""
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    torch.random.manual_seed(42)
+    vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
+    model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+
+    X = ["dog", "cat"]
+    y = [["0", "1"], ["0"]] if y_multi else ["0", "1"]  # type: ignore
+
+    X_val = ["dog", "cat"]
+    y_val = [["0", "1"], ["0"]] if y_val_multi else ["0", "1"]  # type: ignore
+
+    if should_crash:
+        with pytest.raises(ValueError):
+            model.fit(X, y, X_val=X_val, y_val=y_val)
+    else:
+        model.fit(X, y, X_val=X_val, y_val=y_val)
 
 
 def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
