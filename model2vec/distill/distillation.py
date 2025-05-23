@@ -85,16 +85,30 @@ def distill_from_model(
     if not all_tokens:
         raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")
 
-    # Create the embeddings.
-    unk_token: str | None = tokenizer.special_tokens_map.get("unk_token")
-    pad_token: str | None = tokenizer.special_tokens_map.get("pad_token")
+    unk_token = cast(str | None, tokenizer.special_tokens_map.get("unk_token"))
+    pad_token = cast(str | None, tokenizer.special_tokens_map.get("pad_token"))
 
-    # Add the cleaned vocabulary to the tokenizer.
+    # Weird if to satsify mypy
+    if pad_token is None:
+        if unk_token is not None:
+            pad_token = unk_token
+            logger.warning(
+                "The pad token is not set. Setting it to the unk token. This is a workaround for models that don't have a pad token."
+            )
+        else:
+            pad_token = unk_token or all_tokens[0].form
+            logger.warning(
+                "The pad token is not set. Setting it to the first token in the vocabulary. This is a workaround for models that don't have a pad token."
+            )
+
+    # Replace the vocabulary in the tokenizer with the new vocabulary.
     backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens, unk_token=unk_token, pad_token=pad_token)
 
+    logger.info(f"Creating embeddings for {len(all_tokens)} tokens")
     # Convert tokens to IDs
     token_ids = turn_tokens_into_ids(all_tokens, tokenizer, unk_token)
 
+    # Create the embeddings
     embeddings = create_embeddings(
         tokenized=token_ids, model=model, device=device, pad_token_id=tokenizer.get_vocab()[pad_token]
     )
