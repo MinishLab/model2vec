@@ -5,7 +5,7 @@ This document contains the results of the Model2Vec project. The results are pre
 - [Training Results](#training-results)
 - [Ablations](#ablations)
 
-## MTEB Results
+## MTEB Results (English)
 
 Model2Vec is evaluated on MTEB, as well as two additional tasks: [PEARL](https://github.com/tigerchen52/PEARL) (a phrase representation task) and WordSim (a collection of _word_ similarity tasks). The results are shown in the table below.
 
@@ -51,6 +51,146 @@ NOTE: for fairness of comparison, we disabled multiprocessing for Model2Vec for 
 |:--:|
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
+
+### MMTEB Results (Multilingual)
+The results for the multilingual models are shown in the table below. We compare against the [LaBSE](https://huggingface.co/sentence-transformers/LaBSE) model, as well as other multilingual static embedding models.
+
+| Model                                     | Mean (Task) | Mean (TaskType) | BitMining | Class | Clust | InstRet | MuliClass | PairClass | Rank | Ret | STS       |
+| :---------------------------------------- | :---------- | :-------------- | :------------ | :------------- | :--------- | :-------------------- | :------------------------ | :------------------ | :-------- | :-------- | :-------- |
+| [LaBSE](https://huggingface.co/sentence-transformers/LaBSE) |       52.07 |           45.65 |         76.35 |          54.60 |      38.08 |                 −3.00 |                     20.12 |               75.97 |     50.20 |     33.17 | 65.35 |
+| [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M)              | 47.31   | 40.40           | 40.72         | 52.36      | 38.80  | −2.08                 | 15.95                 | 71.39               | 47.39     | 37.86     | 61.23     |
+| [static-similarity-mrl-multilingual-v1](https://huggingface.co/sentence-transformers/static-similarity-mrl-multilingual-v1) | 47.24       | 41.38       | 50.62     | 48.60          | 30.67      | −1.24                 | 14.74                     | 74.34           | 49.45 | 41.21 | 64.02 |
+| [M2V_multilingual_output](https://huggingface.co/minishlab/M2V_multilingual_output)           | 42.13       | 35.89           | 36.88         | 49.75          | 30.09      | −0.07             | 14.34                     | 69.74               | 41.51     | 25.42     | 55.33     |
+
+As can be seen, [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M) is the most performant static multilingual model, reaching 90.86% of the performance of [LaBSE](https://huggingface.co/sentence-transformers/LaBSE). There are differences per task. The [static-similarity-mrl-multilingual-v1](https://huggingface.co/sentence-transformers/static-similarity-mrl-multilingual-v1) model is better for retrieval and STS tasks (which can be explained by the fact that it's trained for STS), while the [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M) model is better for classification and clustering tasks. It is important to note that the [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M) model supports a  total of 101 languages, while [static-similarity-mrl-multilingual-v1](https://huggingface.co/sentence-transformers/static-similarity-mrl-multilingual-v1) supports only 50 languages. It is also important to note that MMTEB does not include tasks for every language, and there may be a bias towards larger languages.
+
+
+<details>
+  <summary>  Task Abbreviations </summary>
+
+For readability, the MMTEB task names are abbreviated as follows:
+
+- BitMining: Bitext Mining
+- Class: Classification
+- Clust: Clustering
+- InstRet: Instruction Retrieval
+- MuliClass: Multilabel Classification
+- PairClass: PairClassification
+- Rank: Reranking
+- Ret: Retrieval
+- STS: Semantic Textual Similarity
+
+</details>
+
+<details>
+  <summary>  Supported Languages </summary>
+
+The languages supported by the [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M) model are:
+
+- en
+- multilingual
+- af
+- am
+- ar
+- az
+- be
+- bg
+- bn
+- ca
+- ceb
+- co
+- cs
+- cy
+- da
+- de
+- el
+- eo
+- es
+- et
+- eu
+- fa
+- fi
+- fil
+- fr
+- fy
+- ga
+- gd
+- gl
+- gu
+- ha
+- haw
+- hi
+- hmn
+- ht
+- hu
+- hy
+- id
+- ig
+- is
+- it
+- iw
+- ja
+- jv
+- ka
+- kk
+- km
+- kn
+- ko
+- ku
+- ky
+- la
+- lb
+- lo
+- lt
+- lv
+- mg
+- mi
+- mk
+- ml
+- mn
+- mr
+- ms
+- mt
+- my
+- ne
+- nl
+- no
+- ny
+- pa
+- pl
+- ps
+- pt
+- ro
+- ru
+- sd
+- si
+- sk
+- sl
+- sm
+- sn
+- so
+- sq
+- sr
+- st
+- su
+- sv
+- sw
+- ta
+- te
+- tg
+- th
+- tr
+- uk
+- ur
+- uz
+- vi
+- xh
+- yi
+- yo
+- zh
+- zu
+
+</details>
 
 ### Retrieval Results
 
