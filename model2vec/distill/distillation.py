@@ -140,7 +140,7 @@ def distill_from_model(
         # Get the language from the model card.
         try:
             info = model_info(model_name)
-            language = info.cardData.get("language", None)
+            language = info.cardData.get("language", None) if info.cardData is not None else None
         except Exception as e:
             # NOTE: bare except because there's many reasons this can fail.
             logger.warning(f"Couldn't get the model info from the Hugging Face Hub: {e}. Setting language to None.")

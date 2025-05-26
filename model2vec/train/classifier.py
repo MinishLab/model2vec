@@ -135,6 +135,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         early_stopping_patience: int | None = 5,
         test_size: float = 0.1,
         device: str = "auto",
+        X_val: list[str] | None = None,
+        y_val: LabelType | None = None,
     ) -> StaticModelForClassification:
         """
         Fit a model.
@@ -145,6 +147,9 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         This function seeds everything with a seed of 42, so the results are reproducible.
         It also splits the data into a train and validation set, again with a random seed.
+
+        If `X_val` and `y_val` are not provided, the function will automatically
+        split the training data into a train and validation set using `test_size`.
 
         :param X: The texts to train on.
         :param y: The labels to train on. If the first element is a list, multi-label classification is assumed.
@@ -157,7 +162,10 @@ class StaticModelForClassification(FinetunableStaticModel):
             If this is None, early stopping is disabled.
         :param test_size: The test size for the train-test split.
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
+        :param X_val: The texts to be used for validation.
+        :param y_val: The labels to be used for validation.
         :return: The fitted model.
+        :raises ValueError: If either X_val or y_val are provided, but not both.
         """
         pl.seed_everything(_RANDOM_SEED)
         logger.info("Re-initializing model.")
@@ -166,11 +174,24 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         self._initialize(y)
 
-        train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
-            X,
-            y,
-            test_size=test_size,
-        )
+        if (X_val is not None) != (y_val is not None):
+            raise ValueError("Both X_val and y_val must be provided together, or neither.")
+
+        if X_val is not None and y_val is not None:
+            # Additional check to ensure y_val is of the same type as y
+            if type(y_val[0]) != type(y[0]):
+                raise ValueError("X_val and y_val must be of the same type as X and y.")
+
+            train_texts = X
+            train_labels = y
+            validation_texts = X_val
+            validation_labels = y_val
+        else:
+            train_texts, validation_texts, train_labels, validation_labels = self._train_test_split(
+                X,
+                y,
+                test_size=test_size,
+            )
 
         if batch_size is None:
             # Set to a multiple of 32
