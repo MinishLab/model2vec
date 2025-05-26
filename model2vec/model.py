@@ -24,7 +24,7 @@ class StaticModel:
     def __init__(
         self,
         vectors: np.ndarray,
-        weights: np.ndarray,
+        weights: np.ndarray | None,
         token_mapping: dict[int, int],
         tokenizer: Tokenizer,
         config: dict[str, Any] | None = None,
@@ -107,6 +107,8 @@ class StaticModel:
         """
         from model2vec.hf_utils import save_pretrained
 
+        self.config["token_mapping"] = list(self.token_mapping.items())
+
         save_pretrained(
             folder_path=Path(path),
             embeddings=self.embedding,
@@ -116,6 +118,7 @@ class StaticModel:
             language=self.language,
             model_name=model_name,
             subfolder=subfolder,
+            weights=self.weights,
         )
 
     def tokenize(self, sentences: Sequence[str], max_length: int | None = None) -> list[list[int]]:
@@ -131,8 +134,6 @@ class StaticModel:
             m = max_length * self.median_token_length
             sentences = [sentence[:m] for sentence in sentences]
 
-        max_len = max([len(sentence) for sentence in sentences])
-        # self.tokenizer.model.max_input_chars_per_word = max_len + 1
         if self._can_encode_fast:
             encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
         else:
@@ -159,6 +160,7 @@ class StaticModel:
         subfolder: str | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
+        vocabulary_quantization: int | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -178,35 +180,44 @@ class StaticModel:
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, metadata = load_pretrained(
+        embeddings, tokenizer, config, metadata, weights = load_pretrained(
             folder_or_repo_path=path,
             token=token,
             from_sentence_transformers=False,
             subfolder=subfolder,
         )
 
-        weights = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32
-        embeddings = embeddings / weights
-
-        """from sklearn.cluster import KMeans
-        from sklearn.decomposition import PCA
-        km = KMeans(n_clusters=4096, random_state=0)
-        km.fit(embeddings)
-        # Do PCA again?
-        assignments = km.predict(embeddings)
-        embeddings = km.cluster_centers_
-
-        p = PCA(n_components=dimensionality)
-        embeddings = p.fit_transform(embeddings)
-
-        token_mapping = {i: x for i, x in enumerate(assignments)}"""
-        token_mapping = {i: i for i in range(len(embeddings))}
-
         embeddings = quantize_and_reduce_dim(
             embeddings=embeddings,
             quantize_to=quantize_to,
             dimensionality=dimensionality,
         )
+
+        if vocabulary_quantization is not None:
+            if len(embeddings) != len(tokenizer.get_vocab()):
+                raise ValueError(
+                    "Already quantized. "
+                )
+            
+            if weights is None:
+                weights = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32
+                embeddings = embeddings / weights
+
+            # Quantize the vocabulary
+            from sklearn.cluster import KMeans
+            kmeans = KMeans(n_clusters=vocabulary_quantization, random_state=42)
+            kmeans.fit(embeddings)
+            token_mapping = {idx: x for idx, x in enumerate(kmeans.predict(embeddings))}
+            embeddings = kmeans.cluster_centers_
+
+        else:
+            token_mapping = config.pop("token_mapping", None)
+            if isinstance(token_mapping, list):
+                # If the token mapping is a list, convert it to a dict
+                token_mapping = {int(k): int(v) for k, v in token_mapping}
+            elif token_mapping is None:
+                # If no token mapping is provided, use the default mapping
+                token_mapping = {i: i for i in range(len(embeddings))}
 
         return cls(
             embeddings,
@@ -245,7 +256,7 @@ class StaticModel:
         """
         from model2vec.hf_utils import load_pretrained
 
-        embeddings, tokenizer, config, metadata = load_pretrained(
+        embeddings, tokenizer, config, metadata, weights = load_pretrained(
             folder_or_repo_path=path,
             token=token,
             from_sentence_transformers=True,
@@ -258,9 +269,10 @@ class StaticModel:
             dimensionality=dimensionality,
         )
 
-        weights = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32
-        embeddings = embeddings / weights
-        token_mapping = {i: i for i in range(len(embeddings))}
+        token_mapping = config.pop("token_mapping", None)
+        if token_mapping is None:
+            # If no token mapping is provided, use the default mapping
+            token_mapping = {i: i for i in range(len(embeddings))}
 
         return cls(
             embeddings,

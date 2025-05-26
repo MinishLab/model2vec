@@ -30,6 +30,7 @@ def distill_from_model(
     token_remove_pattern: str | None = r"\[unused\d+\]",
     quantize_to: DType | str = DType.Float16,
     use_subword: bool | None = None,
+    vocabulary_quantization: int | None = None,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -113,14 +114,21 @@ def distill_from_model(
         tokenized=token_ids, model=model, device=device, pad_token_id=tokenizer.get_vocab()[pad_token]
     )
 
-    _, weights = post_process_embeddings(np.asarray(embeddings), None, sif_coefficient=sif_coefficient)
-    km = KMeans(4096, random_state=42)
-    km.fit(embeddings)
-    clustered_embeddings = km.predict(embeddings)
-    mapping = {idx: x for idx, x in enumerate(clustered_embeddings)}
+    if vocabulary_quantization is not None:
+        _, weights = post_process_embeddings(np.asarray(embeddings), None, sif_coefficient=sif_coefficient)
+        km = KMeans(vocabulary_quantization, random_state=42)
+        km.fit(embeddings)
+        clustered_embeddings = km.predict(embeddings)
+        mapping = {idx: x for idx, x in enumerate(clustered_embeddings)}
 
-    embeddings = km.cluster_centers_
-    embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
+        embeddings = km.cluster_centers_
+        embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
+    else:
+        # Post-process the embeddings.
+        embeddings, weights = post_process_embeddings(
+            np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient
+        )
+        mapping = {idx: token.form for idx, token in enumerate(all_tokens)}
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
@@ -219,6 +227,7 @@ def distill(
     trust_remote_code: bool = False,
     quantize_to: DType | str = DType.Float16,
     use_subword: bool | None = None,
+    vocabulary_quantization: int | None = None,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -263,4 +272,5 @@ def distill(
         sif_coefficient=sif_coefficient,
         quantize_to=quantize_to,
         use_subword=use_subword,
+        vocabulary_quantization=vocabulary_quantization,
     )
