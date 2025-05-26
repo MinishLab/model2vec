@@ -361,10 +361,13 @@ def create_tokenizer(
     token_remove_regex: re.Pattern | None = None,
 ) -> PreTrainedTokenizerFast:
     """
-    Create a tokenizer from a vocabulary.
+    Create a tokenizer by adding tokens to the vocabulary.
 
-    This function creates a tokenizer from a vocabulary and a tokenizer.
-    It also sets the normalizer and pre-tokenizer for the tokenizer.
+    This function turns any tokenizer into a supertoken tokenizer. It does the following:
+    1. Turns the tokenizer model into a unigram model.
+    2. Adds a new pretokenizer, splitting on punctuation.
+    3. Adds all tokens in vocabulary to the model.
+    4. Removes any internal tokens that conform to the regex.
 
     :param tokenizer: The tokenizer to use.
     :param vocabulary: The vocabulary to use.

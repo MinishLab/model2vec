@@ -26,9 +26,9 @@ def replace_normalizer(
     new_normalizers.append(Replace(Regex(r"\s+"), " "))
     new_normalizers.append(Strip(right=True))
     if normalizer is None:
-        normalizer = Sequence(new_normalizers)
+        normalizer = Sequence(new_normalizers)  # type: ignore
     else:
         normalizer = Sequence([normalizer] + new_normalizers)  # type: ignore
-    tokenizer.normalizer = normalizer
+    tokenizer.normalizer = normalizer  # type: ignore
 
     return tokenizer

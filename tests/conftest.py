@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -8,7 +8,7 @@ import torch
 from tokenizers import Tokenizer
 from tokenizers.models import BPE, Unigram, WordPiece
 from tokenizers.pre_tokenizers import Whitespace
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizerFast
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.train import StaticModelForClassification
@@ -25,7 +25,9 @@ def mock_tokenizer(request: pytest.FixtureRequest) -> Tokenizer:
     tokenizer_type = request.param
 
     if tokenizer_type == "wordpiece":
-        model = WordPiece(vocab={token: idx for idx, token in enumerate(vocab)}, unk_token=unk_token)
+        model = WordPiece(
+            vocab={token: idx for idx, token in enumerate(vocab)}, unk_token=unk_token, max_input_chars_per_word=100
+        )
     elif tokenizer_type == "bpe":
         model = BPE(
             vocab={token: idx for idx, token in enumerate(vocab)},
@@ -35,17 +37,19 @@ def mock_tokenizer(request: pytest.FixtureRequest) -> Tokenizer:
             ignore_merges=True,
         )
     elif tokenizer_type == "unigram":
-        model = Unigram(vocab=[(token, 0.0) for token in vocab], unk_id=0)
+        model = Unigram(vocab=[(token, 0.0) for token in vocab], unk_id=0, byte_fallback=False)
+    else:
+        raise ValueError(f"Unsupported tokenizer type: {tokenizer_type}")
     tokenizer = Tokenizer(model)
-    tokenizer.pre_tokenizer = Whitespace()
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore  # Tokenizer issue
 
     return tokenizer
 
 
 @pytest.fixture(scope="function")
-def mock_berttokenizer() -> AutoTokenizer:
+def mock_berttokenizer() -> PreTrainedTokenizerFast:
     """Load the real BertTokenizerFast from the provided tokenizer.json file."""
-    return AutoTokenizer.from_pretrained("tests/data/test_tokenizer")
+    return cast(PreTrainedTokenizerFast, AutoTokenizer.from_pretrained("tests/data/test_tokenizer"))
 
 
 @pytest.fixture
