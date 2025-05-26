@@ -14,7 +14,7 @@ class Token:
     """A class to represent a token."""
 
     form: str
-    is_subword: bool
+    is_original: bool
 
 
 def select_optimal_device(device: str | None) -> str:

@@ -14,17 +14,9 @@ from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTo
 
 from model2vec.distill.inference import create_embeddings
 from model2vec.distill.tokenizer import replace_vocabulary
-from model2vec.distill.utils import Token, select_optimal_device
+from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
-
-try:
-    # For huggingface_hub>=0.25.0
-    from huggingface_hub.errors import RepositoryNotFoundError
-except ImportError:
-    # For huggingface_hub<0.25.0
-    from huggingface_hub.utils._errors import RepositoryNotFoundError
-
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +32,9 @@ def distill_from_model(
     pca_dims: PCADimType = 256,
     apply_zipf: bool | None = None,
     sif_coefficient: float | None = 1e-4,
-    use_subword: bool = True,
     token_remove_pattern: str | None = r"\[unused\d+\]",
     quantize_to: DType | str = DType.Float16,
+    use_subword: bool | None = None,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -64,18 +56,20 @@ def distill_from_model(
         Zipf weighting is now controlled by the sif_coefficient parameter. If this is set to None, no weighting is applied.
     :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
         Should be a value > 0 and < 1.0. A value of 1e-4 is a good default.
-    :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
+    :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :return: A StaticModel
 
     """
+    if use_subword is not None:
+        logger.warning(
+            "The `use_subword` parameter is deprecated and will be removed in the next release. It doesn't do anything."
+        )
     quantize_to = DType(quantize_to)
     backend_tokenizer = tokenizer.backend_tokenizer
-    sif_coefficient, token_remove_regex = _validate_parameters(
-        vocabulary, apply_zipf, sif_coefficient, use_subword, token_remove_pattern
-    )
+    sif_coefficient, token_remove_regex = _validate_parameters(apply_zipf, sif_coefficient, token_remove_pattern)
 
     if vocabulary is None:
         vocabulary = []
@@ -99,7 +93,6 @@ def distill_from_model(
         tokenizer=tokenizer,
         tokens=cleaned_vocabulary,
         device=device,
-        use_subword=use_subword,
         token_remove_regex=token_remove_regex,
     )
 
@@ -142,9 +135,10 @@ def distill_from_model(
         # Get the language from the model card.
         try:
             info = model_info(model_name)
-            language = info.cardData.get("language", None)
-        except RepositoryNotFoundError:
-            logger.info("No model info found for the model. Setting language to None.")
+            language = info.cardData.get("language", None) if info.cardData is not None else None
+        except Exception as e:
+            # NOTE: bare except because there's many reasons this can fail.
+            logger.warning(f"Couldn't get the model info from the Hugging Face Hub: {e}. Setting language to None.")
             language = None
 
     return StaticModel(
@@ -160,27 +154,20 @@ def distill_from_model(
 
 
 def _validate_parameters(
-    vocabulary: list[str] | None,
     apply_zipf: bool | None,
     sif_coefficient: float | None,
-    use_subword: bool,
     token_remove_pattern: str | None,
 ) -> tuple[float | None, re.Pattern | None]:
     """
     Validate the parameters passed to the distillation function.
 
-    :param vocabulary: The vocabulary to use.
     :param apply_zipf: DEPRECATED: This parameter used to control whether Zipf is applied.
         Zipf weighting is now controlled by the sif_coefficient parameter. If this is set to None, no weighting is applied.
     :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
         Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
-    :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
     :return: The SIF coefficient to use.
-    :raises: ValueError if the PCA dimension is larger than the number of dimensions in the embeddings.
-    :raises: ValueError if the vocabulary contains duplicate tokens.
     :raises: ValueError if the regex can't be compiled.
-    :raises: ValueError if the vocabulary is empty after token removal.
 
     """
     if apply_zipf is not None:
@@ -200,11 +187,6 @@ def _validate_parameters(
         if not 0 < sif_coefficient < 1.0:
             raise ValueError("SIF coefficient must be a value > 0 and < 1.0.")
 
-    if not use_subword and vocabulary is None:
-        raise ValueError(
-            "You must pass a vocabulary if you don't use subword tokens. Either pass a vocabulary, or set use_subword to True."
-        )
-
     token_remove_regex: re.Pattern | None = None
     if token_remove_pattern is not None:
         try:
@@ -222,10 +204,10 @@ def distill(
     pca_dims: PCADimType = 256,
     apply_zipf: bool | None = None,
     sif_coefficient: float | None = 1e-4,
-    use_subword: bool = True,
     token_remove_pattern: str | None = r"\[unused\d+\]",
     trust_remote_code: bool = False,
     quantize_to: DType | str = DType.Float16,
+    use_subword: bool | None = None,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -246,10 +228,10 @@ def distill(
         Zipf weighting is now controlled by the sif_coefficient parameter. If this is set to None, no weighting is applied.
     :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
         Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
-    :param use_subword: Whether to keep subword tokens in the vocabulary. If this is False, you must pass a vocabulary, and the returned tokenizer will only detect full words.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to this regex pattern will be removed from the vocabulary.
     :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming from `transformers`. If this is True, we will load all components.
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
+    :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :return: A StaticModel
 
     """
@@ -263,10 +245,10 @@ def distill(
         device=device,
         pca_dims=pca_dims,
         apply_zipf=apply_zipf,
-        use_subword=use_subword,
         token_remove_pattern=token_remove_pattern,
         sif_coefficient=sif_coefficient,
         quantize_to=quantize_to,
+        use_subword=use_subword,
     )
 
 

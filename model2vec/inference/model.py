@@ -65,7 +65,9 @@ class StaticModelPipeline:
         """Save the model to a folder."""
         save_pipeline(self, path)
 
-    def push_to_hub(self, repo_id: str, subfolder: str, token: str | None = None, private: bool = False) -> None:
+    def push_to_hub(
+        self, repo_id: str, subfolder: str | None = None, token: str | None = None, private: bool = False
+    ) -> None:
         """
         Save a model to a folder, and then push that folder to the hf hub.
 
@@ -219,6 +221,7 @@ def _load_pipeline(
     """
     folder_or_repo_path = Path(folder_or_repo_path)
     model_filename = _DEFAULT_MODEL_FILENAME
+    head_pipeline_path: str | Path
     if folder_or_repo_path.exists():
         head_pipeline_path = folder_or_repo_path / model_filename
         if not head_pipeline_path.exists():
@@ -299,8 +302,6 @@ def evaluate_single_or_multi_label(
     report = classification_report(
         y,
         predictions,
-        labels=np.arange(len(classes)),
-        target_names=[str(c) for c in classes],
         output_dict=output_dict,
         zero_division=0,
     )

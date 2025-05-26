@@ -40,7 +40,7 @@ def save_pretrained(
     folder_path = folder_path / subfolder if subfolder else folder_path
     folder_path.mkdir(exist_ok=True, parents=True)
     save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
-    tokenizer.save(str(folder_path / "tokenizer.json"))
+    tokenizer.save(str(folder_path / "tokenizer.json"), pretty=False)
     json.dump(config, open(folder_path / "config.json", "w"), indent=4)
 
     # Create modules.json
@@ -158,8 +158,9 @@ def load_pretrained(
                 )
             )
             metadata = _get_metadata_from_readme(Path(readme_path))
-        except huggingface_hub.utils.EntryNotFoundError:
-            logger.info("No README found in the model folder. No model card loaded.")
+        except Exception as e:
+            # NOTE: we don't want to raise an error here, since the README is optional.
+            logger.info(f"No README found in the model folder: {e} No model card loaded.")
             metadata = {}
 
         config_path = Path(
