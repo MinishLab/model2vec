@@ -6,6 +6,7 @@ import re
 from typing import Optional, cast
 
 import numpy as np
+from huggingface_hub.hf_api import model_info
 from sklearn.cluster import KMeans
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
@@ -112,17 +113,14 @@ def distill_from_model(
         tokenized=token_ids, model=model, device=device, pad_token_id=tokenizer.get_vocab()[pad_token]
     )
 
-    _, weights = _post_process_embeddings(np.asarray(embeddings), None, sif_coefficient=sif_coefficient)
+    _, weights = post_process_embeddings(np.asarray(embeddings), None, sif_coefficient=sif_coefficient)
     km = KMeans(4096, random_state=42)
     km.fit(embeddings)
     clustered_embeddings = km.predict(embeddings)
     mapping = {idx: x for idx, x in enumerate(clustered_embeddings)}
 
     embeddings = km.cluster_centers_
-    embeddings, _ = _post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
-
-    # Post process the embeddings by applying PCA and Zipf weighting.
-    embeddings = post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+    embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
