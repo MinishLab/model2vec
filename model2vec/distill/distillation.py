@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import cast
+from typing import Optional, cast
 
 import numpy as np
 from huggingface_hub import model_info
@@ -85,8 +85,8 @@ def distill_from_model(
     if not all_tokens:
         raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")
 
-    unk_token = cast(str | None, tokenizer.special_tokens_map.get("unk_token"))
-    pad_token = cast(str | None, tokenizer.special_tokens_map.get("pad_token"))
+    unk_token = cast(Optional[str], tokenizer.special_tokens_map.get("unk_token"))
+    pad_token = cast(Optional[str], tokenizer.special_tokens_map.get("pad_token"))
 
     # Weird if to satsify mypy
     if pad_token is None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 from tokenizers import Tokenizer
 from tokenizers.normalizers import Normalizer
@@ -374,8 +374,8 @@ def create_tokenizer(
     :param token_remove_regex: The regex to use to remove tokens from the vocabulary.
     :return: The created tokenizer.
     """
-    unk_token = cast(str | None, tokenizer.special_tokens_map.get("unk_token"))
-    pad_token = cast(str | None, tokenizer.special_tokens_map.get("pad_token"))
+    unk_token = cast(Optional[str], tokenizer.special_tokens_map.get("unk_token"))
+    pad_token = cast(Optional[str], tokenizer.special_tokens_map.get("pad_token"))
     cleaned_vocabulary, backend_tokenizer = clean_and_create_vocabulary(tokenizer, vocabulary, token_remove_regex)
     new_tokenizer = replace_vocabulary(backend_tokenizer, cleaned_vocabulary, unk_token, pad_token)
 
