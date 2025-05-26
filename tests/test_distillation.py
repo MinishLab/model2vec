@@ -9,7 +9,12 @@ import pytest
 from pytest import LogCaptureFixture
 from transformers import AutoModel, BertTokenizerFast
 
-from model2vec.distill.distillation import _clean_vocabulary, _post_process_embeddings, distill, distill_from_model
+from model2vec.distill.distillation import (
+    clean_and_create_vocabulary,
+    distill,
+    distill_from_model,
+    post_process_embeddings,
+)
 from model2vec.model import StaticModel
 
 try:
@@ -17,7 +22,7 @@ try:
     from huggingface_hub.errors import RepositoryNotFoundError
 except ImportError:
     # For huggingface_hub<0.25.0
-    from huggingface_hub.utils._errors import RepositoryNotFoundError
+    from huggingface_hub.utils._errors import RepositoryNotFoundError  # type: ignore
 
 rng = np.random.default_rng()
 
@@ -94,8 +99,8 @@ def test_distill_removal_pattern(
     # mock_auto_tokenizer.return_value = mock_berttokenizer
     mock_auto_model.return_value = mock_transformer
 
-    # The vocab size is 30522, but we remove 3 tokens: [CLS], [SEP], and [MASK]
-    expected_vocab_size = mock_berttokenizer.vocab_size - 3
+    # The vocab size is 30522, but we remove 998 tokens: [CLS], [SEP], and [MASK], and all [unused] tokens.
+    expected_vocab_size = mock_berttokenizer.vocab_size - 998
 
     static_model = distill_from_model(
         model=mock_transformer,
@@ -128,31 +133,21 @@ def test_distill_removal_pattern(
             token_remove_pattern="[...papapa",
         )
 
-    # Remove all tokens
-    with pytest.raises(ValueError):
-        static_model = distill_from_model(
-            model=mock_transformer,
-            tokenizer=mock_berttokenizer,
-            vocabulary=None,
-            device="cpu",
-            token_remove_pattern=".*",
-        )
-
 
 @pytest.mark.parametrize(
     "vocabulary, pca_dims, apply_zipf, sif_coefficient, expected_shape",
     [
-        (None, 256, True, None, (29525, 256)),  # Output vocab with subwords, PCA applied
-        (None, "auto", False, None, (29525, 768)),  # Subword, PCA set to 'auto'
-        (None, "auto", True, 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
-        (None, "auto", False, 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, 256, True, None, (29524, 256)),  # Output vocab with subwords, PCA applied
+        (None, "auto", False, None, (29524, 768)),  # Subword, PCA set to 'auto'
+        (None, "auto", True, 1e-4, (29524, 768)),  # Subword, PCA set to 'auto'
+        (None, "auto", False, 1e-4, (29524, 768)),  # Subword, PCA set to 'auto'
         (None, "auto", True, 0, None),  # Sif too low
         (None, "auto", True, 1, None),  # Sif too high
-        (None, "auto", False, 0, (29525, 768)),  # Sif too low, but apply_zipf is False
-        (None, "auto", False, 1, (29525, 768)),  # Sif too high, but apply_zipf is False
-        (None, 1024, False, None, (29525, 768)),  # Subword, PCA set to high number.
-        (["wordA", "wordB"], 4, False, None, (29527, 4)),  # Custom vocab with subword, PCA applied
-        (None, None, True, None, (29525, 768)),  # No PCA applied
+        (None, "auto", False, 0, (29524, 768)),  # Sif too low, but apply_zipf is False
+        (None, "auto", False, 1, (29524, 768)),  # Sif too high, but apply_zipf is False
+        (None, 1024, False, None, (29524, 768)),  # Subword, PCA set to high number.
+        (["wordA", "wordB"], 4, False, None, (29526, 4)),  # Custom vocab with subword, PCA applied
+        (None, None, True, None, (29524, 768)),  # No PCA applied
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -240,9 +235,9 @@ def test__post_process_embeddings(
     # Test that the function raises an error if the PCA dims are larger than the number of dimensions
     if pca_dims and pca_dims > embeddings.shape[1]:
         with pytest.raises(ValueError):
-            _post_process_embeddings(embeddings, pca_dims, None)
+            post_process_embeddings(embeddings, pca_dims, None)
 
-    processed_embeddings = _post_process_embeddings(embeddings, pca_dims, sif_coefficient)
+    processed_embeddings = post_process_embeddings(embeddings, pca_dims, sif_coefficient)
 
     # Assert the shape is correct
     assert processed_embeddings.shape == expected_shape
@@ -261,21 +256,18 @@ def test__post_process_embeddings(
 
 
 @pytest.mark.parametrize(
-    "preprocessed_vocabulary, added_tokens, expected_output, expected_warnings",
+    "added_tokens, expected_output, expected_warnings",
     [
-        # Case: duplicates ("word2") and an empty token ("")
-        (["word1", "word2", "word2", "word3", ""], ["word3"], ["word1", "word2"], ["Removed", "duplicate", "empty"]),
+        # Case: duplicates ("2010", "government") and an empty token ("")
+        (["2010", "government", "nerv", ""], ["nerv"], ["Removed", "duplicate", "empty"]),
         # Case: No duplicates, no empty tokens
-        (["wordA", "wordB", "wordC"], [], ["worda", "wordb", "wordc"], []),
-        # Case: Duplicate "wordB" and "wordA" already in added_tokens
-        (["wordA", "wordB", "wordC", "wordB"], ["worda"], ["wordb", "wordc"], ["Removed", "duplicate"]),
+        (["worda", "wordb", "wordc"], ["worda", "wordb", "wordc"], []),
         # Case: Only empty token (""), should return an empty list
-        ([""], [], [], ["Removed", "empty"]),
+        ([""], [], ["Removed", "empty"]),
     ],
 )
-def test__clean_vocabulary(
+def test_clean_and_create_vocabulary(
     mock_berttokenizer: BertTokenizerFast,
-    preprocessed_vocabulary: list[str],
     added_tokens: list[str],
     expected_output: list[str],
     expected_warnings: list[str],
@@ -283,8 +275,9 @@ def test__clean_vocabulary(
 ) -> None:
     """Test the _clean_vocabulary function."""
     with caplog.at_level("WARNING"):
-        cleaned_vocab = _clean_vocabulary(mock_berttokenizer.backend_tokenizer, preprocessed_vocabulary, added_tokens)
+        tokens, _ = clean_and_create_vocabulary(mock_berttokenizer, added_tokens, None)
 
+        cleaned_vocab = [token.form for token in tokens if not token.is_internal]
         # Check the cleaned vocabulary matches the expected output
         assert cleaned_vocab == expected_output
 

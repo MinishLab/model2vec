@@ -3,23 +3,23 @@ from __future__ import annotations
 
 import inspect
 import logging
-import re
 from pathlib import Path
-from typing import Protocol, Union
+from typing import Literal, Protocol, Union
 
 import numpy as np
 import torch
+from sklearn.decomposition import PCA
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
-from transformers import PreTrainedModel, PreTrainedTokenizerFast
+from transformers import PreTrainedModel
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
-
-from model2vec.distill.utils import Token, filter_vocabulary_by_regex
 
 logger = logging.getLogger(__name__)
 
 
 PathLike = Union[Path, str]
+PCADimType = Union[int, None, float, Literal["auto"]]
+
 
 _DEFAULT_BATCH_SIZE = 256
 
@@ -30,11 +30,10 @@ class ModulewithWeights(Protocol):
 
 def create_embeddings(
     model: PreTrainedModel,
-    tokenizer: PreTrainedTokenizerFast,
-    tokens: list[str],
+    tokenized: list[list[int]],
     device: str,
-    token_remove_regex: re.Pattern | None,
-) -> tuple[list[Token], np.ndarray]:
+    pad_token_id: int,
+) -> np.ndarray:
     """
     Create output embeddings for a bunch of tokens using a pretrained model.
 
@@ -42,50 +41,15 @@ def create_embeddings(
 
     :param model: The model to use.
         This should be a transformers model.
-    :param tokenizer: The tokenizer to use.
-    :param tokens: The tokens to use.
+    :param tokenized: All tokenized tokens.
     :param device: The torch device to use.
-    :param token_remove_regex: A regex pattern to remove tokens from the vocabulary.
-    :return: The tokens and output embeddings.
+    :param pad_token_id: The pad token id. Used to pad sequences.
+    :return: The output embeddings.
     """
     model = model.to(device)
 
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
-
-    out_tokens: list[Token] = []
-    tokenized: list[torch.Tensor] = []
-    pad_token = tokenizer.special_tokens_map.get("pad_token")
-    # We need to use the pad token id for padding below.
-    pad_token_id = tokenizer.convert_tokens_to_ids(pad_token)
-    unk_token = tokenizer.special_tokens_map.get("unk_token")
-
-    # Empty set if no pad or unk token is set.
-    tokens_to_keep = {pad_token, unk_token} - {None}
-
-    if token_remove_regex is not None:
-        # Sort the vocabulary by id, important for zipf.
-        sorted_vocab = sorted(tokenizer.get_vocab().items(), key=lambda x: x[1])
-        id_list = filter_vocabulary_by_regex(token_remove_regex, sorted_vocab)
-    else:
-        # If the token remove regex is None, just use all tokens.
-        id_list = list(range(len(tokenizer.get_vocab())))
-
-    added_tokens_ids = [id for token, id in tokenizer.added_tokens_encoder.items() if token not in tokens_to_keep]
-    ids = torch.Tensor(sorted(set(id_list) - set(added_tokens_ids))).long()
-
-    if ids is not None:
-        dummy_encoding = tokenizer.encode("A")
-        bos_token_id, eos_token_id = dummy_encoding[0], dummy_encoding[-1]
-
-        bos = torch.full([len(ids)], fill_value=bos_token_id)
-        eos = torch.full([len(ids)], fill_value=eos_token_id)
-
-        tokenized.extend(torch.stack([bos, ids, eos], dim=1))
-        subword_tokens = [Token(x, True) for x in tokenizer.convert_ids_to_tokens(ids.tolist())]
-        out_tokens.extend(subword_tokens)
-
-    tokenized.extend([tokenizer.encode_plus(token, return_tensors="pt")["input_ids"][0] for token in tokens])
 
     # Add token_type_ids only if the model supports it
     add_token_type_ids = "token_type_ids" in inspect.getfullargspec(model.forward).args
@@ -98,7 +62,7 @@ def create_embeddings(
     pbar = tqdm(total=len(sorted_tokenized), desc="Encoding tokens", unit=" tokens")
 
     for batch_idx in range(0, len(sorted_tokenized), _DEFAULT_BATCH_SIZE):
-        batch = sorted_tokenized[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]
+        batch = [torch.Tensor(x).long() for x in sorted_tokenized[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]]
 
         encoded = {}
         encoded["input_ids"] = pad_sequence(batch, batch_first=True, padding_value=pad_token_id)
@@ -113,10 +77,11 @@ def create_embeddings(
 
     # Sort the output back to the original order
     intermediate_weights = [intermediate_weights[i] for i in np.argsort(sort_order)]
-    out_tokens.extend([Token(x, False) for x in tokens])
     out_weights = np.stack(intermediate_weights)
 
-    return out_tokens, out_weights
+    out_weights = np.nan_to_num(out_weights)
+
+    return out_weights
 
 
 @torch.no_grad()
@@ -147,3 +112,49 @@ def _encode_mean_using_model(model: PreTrainedModel, encodings: dict[str, torch.
     result = torch.bmm(mask[:, None, :].float(), out).squeeze(1)
 
     return result
+
+
+def post_process_embeddings(
+    embeddings: np.ndarray, pca_dims: PCADimType, sif_coefficient: float | None = 1e-4
+) -> tuple[np.ndarray, np.ndarray]:
+    """Post process embeddings by applying PCA and SIF weighting by estimating the frequencies through Zipf's law."""
+    if pca_dims is not None:
+        if pca_dims == "auto":
+            pca_dims = embeddings.shape[1]
+        if pca_dims > embeddings.shape[1]:
+            logger.warning(
+                f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]}). "
+                "Applying PCA, but not reducing dimensionality. Is this is not desired, please set `pca_dims` to None. "
+                "Applying PCA will probably improve performance, so consider just leaving it."
+            )
+            pca_dims = embeddings.shape[1]
+        if pca_dims >= embeddings.shape[0]:
+            logger.warning(
+                f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
+            )
+        elif pca_dims <= embeddings.shape[1]:
+            if isinstance(pca_dims, float):
+                logger.info(f"Applying PCA with {pca_dims} explained variance.")
+            else:
+                logger.info(f"Applying PCA with n_components {pca_dims}")
+
+            orig_dims = embeddings.shape[1]
+            p = PCA(n_components=pca_dims, svd_solver="full")
+            embeddings = p.fit_transform(embeddings)
+
+            if embeddings.shape[1] < orig_dims:
+                explained_variance_ratio = np.sum(p.explained_variance_ratio_)
+                explained_variance = np.sum(p.explained_variance_)
+                logger.info(f"Reduced dimensionality from {orig_dims} to {embeddings.shape[1]}.")
+                logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
+                logger.info(f"Explained variance: {explained_variance:.3f}.")
+
+    if sif_coefficient is not None:
+        logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
+        inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
+        proba = inv_rank / np.sum(inv_rank)
+        weight = (sif_coefficient / (sif_coefficient + proba))[:, None]
+    else:
+        weight = np.ones((embeddings.shape[0], 1))
+
+    return embeddings, weight
