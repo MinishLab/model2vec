@@ -3,24 +3,19 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Literal, Union
+from typing import Optional, cast
 
 import numpy as np
 from huggingface_hub import model_info
-from sklearn.decomposition import PCA
-from tokenizers import Tokenizer
 from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
 
-from model2vec.distill.inference import create_embeddings
-from model2vec.distill.tokenizer import replace_vocabulary
+from model2vec.distill.inference import PCADimType, create_embeddings, post_process_embeddings
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
+from model2vec.tokenizer import clean_and_create_vocabulary, replace_vocabulary, turn_tokens_into_ids
 
 logger = logging.getLogger(__name__)
-
-
-PCADimType = Union[int, None, float, Literal["auto"]]
 
 
 def distill_from_model(
@@ -60,6 +55,7 @@ def distill_from_model(
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :return: A StaticModel
+    :raises: ValueError if the vocabulary is empty after preprocessing.
 
     """
     if use_subword is not None:
@@ -74,35 +70,51 @@ def distill_from_model(
         vocabulary = []
 
     device = select_optimal_device(device)
-    # Make a base list of tokens.
-    subword_vocab: dict[str, int] = tokenizer.get_vocab()
-    subword_tokens: list[str] = [k for k, _ in sorted(subword_vocab.items(), key=lambda x: x[1])]
 
     n_tokens_before = len(vocabulary)
-    # Clean the vocabulary by removing duplicate tokens and tokens that are in the subword vocabulary.
-    cleaned_vocabulary = _clean_vocabulary(tokenizer.backend_tokenizer, vocabulary, subword_tokens)
-    n_tokens_after = len(cleaned_vocabulary)
-    logger.info(
-        f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
+    # Clean the vocabulary by removing duplicate tokens and tokens that are in the internal vocabulary.
+    all_tokens, backend_tokenizer = clean_and_create_vocabulary(
+        tokenizer, vocabulary, token_remove_regex=token_remove_regex
     )
+    n_tokens_after = len([token for token in all_tokens if not token.is_internal])
+    if n_tokens_before:
+        logger.info(
+            f"Adding {n_tokens_after} tokens to the vocabulary. Removed {n_tokens_before - n_tokens_after} tokens during preprocessing."
+        )
 
-    # Create the embeddings.
-    all_tokens, embeddings = create_embeddings(
-        model=model,
-        tokenizer=tokenizer,
-        tokens=cleaned_vocabulary,
-        device=device,
-        token_remove_regex=token_remove_regex,
-    )
+    if not all_tokens:
+        raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")
 
-    unk_token = tokenizer.special_tokens_map.get("unk_token")
-    pad_token = tokenizer.special_tokens_map.get("pad_token")
-    # Add the cleaned vocabulary to the tokenizer.
+    unk_token = cast(Optional[str], tokenizer.special_tokens_map.get("unk_token"))
+    pad_token = cast(Optional[str], tokenizer.special_tokens_map.get("pad_token"))
+
+    # Weird if to satsify mypy
+    if pad_token is None:
+        if unk_token is not None:
+            pad_token = unk_token
+            logger.warning(
+                "The pad token is not set. Setting it to the unk token. This is a workaround for models that don't have a pad token."
+            )
+        else:
+            pad_token = unk_token or all_tokens[0].form
+            logger.warning(
+                "The pad token is not set. Setting it to the first token in the vocabulary. This is a workaround for models that don't have a pad token."
+            )
+
+    # Replace the vocabulary in the tokenizer with the new vocabulary.
     backend_tokenizer = replace_vocabulary(backend_tokenizer, all_tokens, unk_token=unk_token, pad_token=pad_token)
 
-    # Post process the embeddings by applying PCA and Zipf weighting.
-    embeddings = _post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+    logger.info(f"Creating embeddings for {len(all_tokens)} tokens")
+    # Convert tokens to IDs
+    token_ids = turn_tokens_into_ids(all_tokens, tokenizer, unk_token)
 
+    # Create the embeddings
+    embeddings = create_embeddings(
+        tokenized=token_ids, model=model, device=device, pad_token_id=tokenizer.get_vocab()[pad_token]
+    )
+
+    # Post process the embeddings by applying PCA and Zipf weighting.
+    embeddings = post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
@@ -227,7 +239,10 @@ def distill(
 
     """
     model: PreTrainedModel = AutoModel.from_pretrained(model_name, trust_remote_code=trust_remote_code)
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code)
+    tokenizer = cast(
+        PreTrainedTokenizerFast,
+        AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code, use_fast=True),
+    )
 
     return distill_from_model(
         model=model,
@@ -241,97 +256,3 @@ def distill(
         quantize_to=quantize_to,
         use_subword=use_subword,
     )
-
-
-def _post_process_embeddings(
-    embeddings: np.ndarray, pca_dims: PCADimType, sif_coefficient: float | None = 1e-4
-) -> np.ndarray:
-    """Post process embeddings by applying PCA and SIF weighting by estimating the frequencies through Zipf's law."""
-    if pca_dims is not None:
-        if pca_dims == "auto":
-            pca_dims = embeddings.shape[1]
-        if pca_dims > embeddings.shape[1]:
-            logger.warning(
-                f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]}). "
-                "Applying PCA, but not reducing dimensionality. Is this is not desired, please set `pca_dims` to None. "
-                "Applying PCA will probably improve performance, so consider just leaving it."
-            )
-            pca_dims = embeddings.shape[1]
-        if pca_dims >= embeddings.shape[0]:
-            logger.warning(
-                f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
-            )
-        elif pca_dims <= embeddings.shape[1]:
-            if isinstance(pca_dims, float):
-                logger.info(f"Applying PCA with {pca_dims} explained variance.")
-            else:
-                logger.info(f"Applying PCA with n_components {pca_dims}")
-
-            orig_dims = embeddings.shape[1]
-            p = PCA(n_components=pca_dims, svd_solver="full")
-            embeddings = p.fit_transform(embeddings)
-
-            if embeddings.shape[1] < orig_dims:
-                explained_variance_ratio = np.sum(p.explained_variance_ratio_)
-                explained_variance = np.sum(p.explained_variance_)
-                logger.info(f"Reduced dimensionality from {orig_dims} to {embeddings.shape[1]}.")
-                logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
-                logger.info(f"Explained variance: {explained_variance:.3f}.")
-
-    if sif_coefficient is not None:
-        logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
-        inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
-        proba = inv_rank / np.sum(inv_rank)
-        embeddings *= (sif_coefficient / (sif_coefficient + proba))[:, None]
-
-    return embeddings
-
-
-def _clean_vocabulary(tokenizer: Tokenizer, vocabulary: list[str], added_tokens: list[str]) -> list[str]:
-    """Cleans a vocabulary by removing duplicates and tokens that were already in the vocabulary."""
-    added_tokens_set = set(added_tokens)
-    seen_tokens = set()
-    cleaned_vocabulary = []
-    n_empty = 0
-    n_duplicates = 0
-    n_multiword = 0
-    for token in vocabulary:
-        normalizer = tokenizer.normalizer
-        if normalizer is not None:
-            token = normalizer.normalize_str(token)
-
-        if not token:
-            n_empty += 1
-            continue
-
-        pre_tokenizer = tokenizer.pre_tokenizer
-        # We need to check whether the pretokenized token is a single word or not.
-        if pre_tokenizer is not None:
-            pretokenized_tokens = pre_tokenizer.pre_tokenize_str(token)
-            if len(pretokenized_tokens) != 1:
-                n_multiword += 1
-                continue
-            new_token = pretokenized_tokens[-1][0]
-        else:
-            new_token = token
-
-        # We need to check whether the pretokenized token is in the vocabulary.
-        # But we need to return the original token, because that will be tokenized
-        # again by the tokenizer during featurization.
-        if new_token in seen_tokens or new_token in added_tokens_set:
-            n_duplicates += 1
-            continue
-
-        # Add the possibly pretokenized token to _seen_
-        seen_tokens.add(new_token)
-        # Add the original string to the vocabulary.
-        cleaned_vocabulary.append(token)
-
-    if n_duplicates:
-        logger.warning(f"Removed {n_duplicates} duplicate tokens.")
-    if n_empty:
-        logger.warning(f"Removed {n_empty} empty tokens.")
-    if n_multiword:
-        logger.warning(f"Removed {n_multiword} multiword tokens.")
-
-    return cleaned_vocabulary
