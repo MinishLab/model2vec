@@ -7,7 +7,7 @@
 
 
 <div align="center">
-  <h2 style="margin-top: 0;">Fast State-of-the-Art Static Embeddings</h2>
+  <h2 style="margin-top: -0.5em;">Fast State-of-the-Art Static Embeddings</h2>
 </div>
 
 
