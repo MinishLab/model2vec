@@ -331,7 +331,7 @@ class StaticModel:
             return out_array[0]
         return out_array
 
-    def _encode_batch_as_sequence(self, sentences: list[str], max_length: int | None) -> list[np.ndarray]:
+    def _encode_batch_as_sequence(self, sentences: Sequence[str], max_length: int | None) -> list[np.ndarray]:
         """Encode a batch of sentences as a sequence."""
         ids = self.tokenize(sentences=sentences, max_length=max_length)
         out: list[np.ndarray] = []
