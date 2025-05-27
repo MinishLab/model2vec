@@ -1,14 +1,15 @@
 
-<div align="center">
-    <picture>
-      <img width="35%" alt="Model2Vec logo" src="assets/images/logo_v2.png">
-    </picture>
-  </a>
+<div align="center" style="margin-bottom: 0;">
+  <picture style="margin-bottom: 0;">
+    <img width="35%" alt="Model2Vec logo" src="assets/images/model2vec_logo.png">
+  </picture>
 </div>
 
+
 <div align="center">
-  <h2>Fast State-of-the-Art Static Embeddings</h2>
+  <h2 style="margin-top: 0;">Fast State-of-the-Art Static Embeddings</h2>
 </div>
+
 
 <div align="center">
   <h2>
