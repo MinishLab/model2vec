@@ -1,8 +1,8 @@
 
-<p align="center">
+<h2 align="center">
   <img width="35%" alt="Model2Vec logo" src="assets/images/model2vec_logo.png"><br/>
-  <strong style="font-size: 1.5em">Fast State-of-the-Art Static Embeddings</strong>
-</p>
+  Fast State-of-the-Art Static Embeddings
+</h2>
 
 
 
