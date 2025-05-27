@@ -65,7 +65,9 @@ def replace_vocabulary(
 
     # Remove old added tokens from added tokens
     tokenizer_json["added_tokens"] = [x for x in added_tokens if x["content"] in {"[UNK]", "[PAD]"}]
-    tokenizer_json = process_tokenizer(tokenizer_json, pre_tokenized_tokens, "[UNK]" if "[UNK]" in pre_tokenized_tokens else None)
+    tokenizer_json = process_tokenizer(
+        tokenizer_json, pre_tokenized_tokens, "[UNK]" if "[UNK]" in pre_tokenized_tokens else None
+    )
 
     # Remap special tokens
     tokenizer_json["added_tokens"] = _remap_added_tokens(
@@ -111,11 +113,11 @@ def clean_and_create_vocabulary(
     internal_vocab: dict[str, int] = tokenizer.get_vocab()
     internal_tokens: list[str] = [k for k, _ in sorted(internal_vocab.items(), key=lambda x: x[1])]
 
+    cleaned_vocabulary = _process_internal_tokens(tokenizer, backend_tokenizer, internal_tokens, token_remove_regex)
     # Copy the backend tokenizer to avoid modifying the original.
     backend_tokenizer = backend_tokenizer.from_str(backend_tokenizer.to_str())
     backend_tokenizer = replace_normalizer(backend_tokenizer)
 
-    cleaned_vocabulary = _process_internal_tokens(tokenizer, backend_tokenizer, internal_tokens, token_remove_regex)
     internal_tokens_set = {token.form for token in cleaned_vocabulary}
 
     normalizer: Normalizer | None = backend_tokenizer.normalizer
@@ -302,7 +304,6 @@ def turn_tokens_into_ids(
     :param tokenizer: The tokenizer to use for converting tokens to IDs
     :param unk_token: The string form of the unk token.
     :return: List of token IDs corresponding to the input tokens
-    :raises ValueError: If the tokenizer returns an unexpected number of tokens for a single token
     """
     unk_id = None if unk_token is None else tokenizer.convert_tokens_to_ids(unk_token)
     prefix, suffix = find_eos_bos(tokenizer)
@@ -330,12 +331,14 @@ def find_eos_bos(tokenizer: PreTrainedTokenizerFast) -> tuple[list[int], list[in
     if len(encoding) != 3:
         a_encoded = tokenizer.encode("a", add_special_tokens=False)
         if len(a_encoded) != 1:
-            raise ValueError(f"Error while encoding, couldn't determine eos and bos tokens. The model tokenizes 'a' to '{a_encoded}'")
+            raise ValueError(
+                f"Error while encoding, couldn't determine eos and bos tokens. The model tokenizes 'a' to '{a_encoded}'"
+            )
         a_idx = encoding.index(a_encoded[0])
-        prefix, suffix = encoding[:a_idx], encoding[a_idx + 1:]
+        prefix, suffix = encoding[:a_idx], encoding[a_idx + 1 :]
     else:
         prefix, suffix = encoding[:1], encoding[2:]
-    return prefix,suffix
+    return prefix, suffix
 
 
 def _normalize_vocabulary_token(token: str, pre_tokenizer: PreTokenizer) -> str:
