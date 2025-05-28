@@ -40,4 +40,4 @@ def _process_unigram(
 def _calculate_token_weight_for_unigram(token: str) -> float:
     """Calculate the token weight for Unigram."""
     # Always prefer longer tokens.
-    return len(token) + token.count("▁")
+    return len(token) + token.count("▁") + token.count("Ġ")
