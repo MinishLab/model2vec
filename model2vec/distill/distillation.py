@@ -119,7 +119,7 @@ def distill_from_model(
         km = KMeans(vocabulary_quantization, random_state=42)
         km.fit(embeddings)
         clustered_embeddings = km.predict(embeddings)
-        mapping = {idx: x for idx, x in enumerate(clustered_embeddings)}
+        mapping = {idx: int(x) for idx, x in enumerate(clustered_embeddings)}
 
         embeddings = km.cluster_centers_
         embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
@@ -128,7 +128,7 @@ def distill_from_model(
         embeddings, weights = post_process_embeddings(
             np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient
         )
-        mapping = {idx: token.form for idx, token in enumerate(all_tokens)}
+        mapping = {idx: idx for idx in range(len(all_tokens))}
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
