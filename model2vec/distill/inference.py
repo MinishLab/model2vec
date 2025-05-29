@@ -140,7 +140,7 @@ def post_process_embeddings(
 
             orig_dims = embeddings.shape[1]
             p = PCA(n_components=pca_dims, svd_solver="full")
-            embeddings = p.fit_transform(embeddings)
+            embeddings = p.fit_transform(embeddings)  # n_samples x n_components
 
             if embeddings.shape[1] < orig_dims:
                 explained_variance_ratio = np.sum(p.explained_variance_ratio_)
@@ -148,6 +148,11 @@ def post_process_embeddings(
                 logger.info(f"Reduced dimensionality from {orig_dims} to {embeddings.shape[1]}.")
                 logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
                 logger.info(f"Explained variance: {explained_variance:.3f}.")
+
+            first_singular_vector = p.components_[:, [0]] / np.linalg.norm(p.components_[:, 0])  # n_components x 1
+            magnitudes = embeddings @ first_singular_vector  # n_samples x 1
+            projections =  magnitudes @ first_singular_vector.T  # n_samples x n_components
+            embeddings -= projections  # n_samples x n_components
 
     if sif_coefficient is not None:
         logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
