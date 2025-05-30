@@ -38,6 +38,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         hidden_dim: int = 512,
         out_dim: int = 2,
         pad_id: int = 0,
+        token_mapping: list[int] | None = None,
     ) -> None:
         """Initialize a standard classifier model."""
         self.n_layers = n_layers
@@ -46,7 +47,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.classes_: list[str] = [str(x) for x in range(out_dim)]
         # multilabel flag will be set based on the type of `y` passed to fit.
         self.multilabel: bool = False
-        super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer)
+        super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer, token_mapping=token_mapping)
 
     @property
     def classes(self) -> np.ndarray:

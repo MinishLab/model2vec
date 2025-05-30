@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class FinetunableStaticModel(nn.Module):
-    def __init__(self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0) -> None:
+    def __init__(self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0, token_mapping: list[int] | None = None) -> None:
         """
         Initialize a trainable StaticModel from a StaticModel.
 
@@ -38,6 +38,11 @@ class FinetunableStaticModel(nn.Module):
             )
             self.vectors = vectors.float()
 
+        if token_mapping is not None:
+            self.token_mapping = torch.tensor(token_mapping, dtype=torch.int64)
+        else:
+            self.token_mapping = torch.arange(len(vectors), dtype=torch.int64)
+        self.token_mapping = nn.Parameter(self.token_mapping, requires_grad=False)
         self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
         self.head = self.construct_head()
         self.w = self.construct_weights()
@@ -45,7 +50,7 @@ class FinetunableStaticModel(nn.Module):
 
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""
-        weights = torch.zeros(len(self.vectors))
+        weights = torch.zeros(len(self.token_mapping))
         weights[self.pad_id] = -10_000
         return nn.Parameter(weights)
 
@@ -66,11 +71,16 @@ class FinetunableStaticModel(nn.Module):
         """Load the model from a static model."""
         model.embedding = np.nan_to_num(model.embedding)
         embeddings_converted = torch.from_numpy(model.embedding)
+        if model.token_mapping is not None:
+            token_mapping = [i for _, i in sorted(model.token_mapping.items(), key=lambda x: x[0])]
+        else:
+            token_mapping = None
         return cls(
             vectors=embeddings_converted,
             pad_id=model.tokenizer.token_to_id("[PAD]"),
             out_dim=out_dim,
             tokenizer=model.tokenizer,
+            token_mapping=token_mapping,
             **kwargs,
         )
 
@@ -90,7 +100,8 @@ class FinetunableStaticModel(nn.Module):
         w = w * zeros
         # Add a small epsilon to avoid division by zero
         length = zeros.sum(1) + 1e-16
-        embedded = self.embeddings(input_ids)
+        input_ids_embeddings = self.token_mapping[input_ids]
+        embedded = self.embeddings(input_ids_embeddings)
         # Weigh each token
         embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
         # Mean pooling by dividing by the length
@@ -118,7 +129,7 @@ class FinetunableStaticModel(nn.Module):
         return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
 
     @property
-    def device(self) -> str:
+    def device(self) -> torch.device:
         """Get the device of the model."""
         return self.embeddings.weight.device
 
@@ -126,8 +137,9 @@ class FinetunableStaticModel(nn.Module):
         """Convert the model to a static model."""
         emb = self.embeddings.weight.detach().cpu().numpy()
         w = torch.sigmoid(self.w).detach().cpu().numpy()
+        token_mapping = {i: int(token_id) for i, token_id in enumerate(self.token_mapping.tolist())}
 
-        return StaticModel(emb * w[:, None], self.tokenizer, normalize=True)
+        return StaticModel(vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=True, token_mapping=token_mapping)
 
 
 class TextDataset(Dataset):
