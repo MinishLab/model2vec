@@ -29,6 +29,7 @@ def distill_from_model(
     token_remove_pattern: str | None = r"\[unused\d+\]",
     quantize_to: DType | str = DType.Float16,
     use_subword: bool | None = None,
+    remove_bias: bool = False,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -114,7 +115,12 @@ def distill_from_model(
     )
 
     # Post process the embeddings by applying PCA and Zipf weighting.
-    embeddings = post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+    embeddings = post_process_embeddings(
+        np.asarray(embeddings),
+        pca_dims,
+        sif_coefficient=sif_coefficient,
+        remove_bias=remove_bias,
+    )
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
@@ -211,6 +217,7 @@ def distill(
     trust_remote_code: bool = False,
     quantize_to: DType | str = DType.Float16,
     use_subword: bool | None = None,
+    remove_bias: bool = False,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -255,4 +262,5 @@ def distill(
         sif_coefficient=sif_coefficient,
         quantize_to=quantize_to,
         use_subword=use_subword,
+        remove_bias=remove_bias,
     )

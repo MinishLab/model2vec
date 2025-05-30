@@ -118,7 +118,7 @@ def post_process_embeddings(
     embeddings: np.ndarray,
     pca_dims: PCADimType,
     sif_coefficient: float | None = 1e-4,
-    remove_bias: bool = True,
+    remove_bias: bool = False,
 ) -> np.ndarray:
     """Post process embeddings by applying PCA and SIF weighting by estimating the frequencies through Zipf's law."""
     if pca_dims is not None or remove_bias:
