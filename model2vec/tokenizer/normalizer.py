@@ -18,10 +18,18 @@ def replace_normalizer(
     :param tokenizer: The tokenizer to change.
     :return: The tokenizer with a replaced normalizer.
     """
+    spaces_punctuation = tokenizer.encode("a, ,", add_special_tokens=False).tokens
+    if len(spaces_punctuation) != 3:
+        add_space = False
+    else:
+        _, first_comma, second_comma = spaces_punctuation
+        add_space = first_comma == second_comma == ","
+
     normalizer = tokenizer.normalizer
     new_normalizers = []
     for char in punctuation:
-        new_normalizers.append(Replace(char, f" {char} "))
+        replacement = f" {char} " if add_space else f"{char} "
+        new_normalizers.append(Replace(char, replacement))
 
     new_normalizers.append(Replace(Regex(r"\s+"), " "))
     new_normalizers.append(Strip(right=True))
