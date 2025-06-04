@@ -137,6 +137,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         device: str = "auto",
         X_val: list[str] | None = None,
         y_val: LabelType | None = None,
+        weight: torch.Tensor | None = None,
     ) -> StaticModelForClassification:
         """
         Fit a model.
@@ -164,6 +165,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :param X_val: The texts to be used for validation.
         :param y_val: The labels to be used for validation.
+        :param weight: The weight of the classes. If None, all classes are weighted equally.
         :return: The fitted model.
         :raises ValueError: If either X_val or y_val are provided, but not both.
         """
@@ -373,12 +375,12 @@ class StaticModelForClassification(FinetunableStaticModel):
 
 
 class _ClassifierLightningModule(pl.LightningModule):
-    def __init__(self, model: StaticModelForClassification, learning_rate: float) -> None:
+    def __init__(self, model: StaticModelForClassification, learning_rate: float, weight: torch.Tensor | None = None) -> None:
         """Initialize the LightningModule."""
         super().__init__()
         self.model = model
         self.learning_rate = learning_rate
-        self.loss_function = nn.CrossEntropyLoss() if not model.multilabel else nn.BCEWithLogitsLoss()
+        self.loss_function = nn.CrossEntropyLoss(weight=weight) if not model.multilabel else nn.BCEWithLogitsLoss(pos_weight=weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Simple forward pass."""
