@@ -174,6 +174,23 @@ def test_y_val_none() -> None:
         model.fit(X, y, X_val=None, y_val=y_val)
     model.fit(X, y, X_val=None, y_val=None)
 
+def test_class_weight() -> None:
+    """Test the class weight function."""
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    torch.random.manual_seed(42)
+    vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
+    model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+
+    X = ["dog", "cat"]
+    y = ["0", "1"]
+
+    bad_class_weight = torch.tensor([1.0])
+    with pytest.raises(ValueError):
+        model.fit(X, y, class_weight=bad_class_weight)
+
+    class_weight = torch.tensor([1.0, 2.0])
+    model.fit(X, y, class_weight=class_weight)
+
 
 @pytest.mark.parametrize(
     "y_multi,y_val_multi,should_crash",
