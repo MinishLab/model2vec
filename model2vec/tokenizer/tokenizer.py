@@ -10,7 +10,7 @@ from tokenizers.normalizers import Normalizer
 from tokenizers.pre_tokenizers import (
     PreTokenizer,
 )
-from transformers import PreTrainedTokenizerFast
+from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model2vec.tokenizer.datamodels import Token
 from model2vec.tokenizer.model import process_tokenizer
@@ -392,4 +392,7 @@ def create_tokenizer(
     cleaned_vocabulary, backend_tokenizer = clean_and_create_vocabulary(tokenizer, vocabulary, token_remove_regex)
     new_tokenizer = replace_vocabulary(backend_tokenizer, cleaned_vocabulary, unk_token, pad_token)
 
-    return PreTrainedTokenizerFast(tokenizer_object=new_tokenizer)
+    tokenizer_object = PreTrainedTokenizerFast(tokenizer_object=new_tokenizer)
+    tokenizer_object.add_special_tokens({"pad_token": "[PAD]", "unk_token": "[UNK]"})
+
+    return tokenizer_object
