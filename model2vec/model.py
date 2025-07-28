@@ -195,9 +195,7 @@ class StaticModel:
 
         if quantize_vocabulary is not None:
             embeddings, token_mapping, weights = vocabulary_quantization(
-                n_clusters=quantize_vocabulary,
-                weights=weights,
-                embeddings=embeddings
+                n_clusters=quantize_vocabulary, weights=weights, embeddings=embeddings
             )
         else:
             token_mapping = config.pop("token_mapping", None)

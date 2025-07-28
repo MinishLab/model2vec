@@ -64,7 +64,9 @@ def quantize_and_reduce_dim(
     return embeddings
 
 
-def vocabulary_quantization(n_clusters: int, weights: np.ndarray | None, embeddings: np.ndarray) -> tuple[np.ndarray, dict[int, int], np.ndarray]:
+def vocabulary_quantization(
+    n_clusters: int, weights: np.ndarray | None, embeddings: np.ndarray
+) -> tuple[np.ndarray, dict[int, int], np.ndarray]:
     """Quantize the vocabulary of embeddings using KMeans clustering."""
     if weights is None:
         weights = cast(np.ndarray, np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32)
@@ -72,10 +74,10 @@ def vocabulary_quantization(n_clusters: int, weights: np.ndarray | None, embeddi
 
     # Quantize the vocabulary
     from sklearn.cluster import KMeans
+
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     kmeans.fit(embeddings)
     token_mapping = {idx: x for idx, x in enumerate(kmeans.predict(embeddings))}
     embeddings = kmeans.cluster_centers_
 
     return embeddings, token_mapping, weights
-    
