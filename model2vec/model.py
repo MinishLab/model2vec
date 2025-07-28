@@ -12,7 +12,7 @@ from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.quantization import DType, quantize_and_reduce_dim
+from model2vec.quantization import DType, quantize_and_reduce_dim, vocabulary_quantization
 from model2vec.utils import ProgressParallel, load_local_model
 
 PathLike = Union[Path, str]
@@ -160,7 +160,7 @@ class StaticModel:
         subfolder: str | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
-        vocabulary_quantization: int | None = None,
+        quantize_vocabulary: int | None = None,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -193,23 +193,12 @@ class StaticModel:
             dimensionality=dimensionality,
         )
 
-        if vocabulary_quantization is not None:
-            if len(embeddings) != len(tokenizer.get_vocab()):
-                raise ValueError(
-                    "Already quantized. "
-                )
-            
-            if weights is None:
-                weights = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32
-                embeddings = embeddings / weights
-
-            # Quantize the vocabulary
-            from sklearn.cluster import KMeans
-            kmeans = KMeans(n_clusters=vocabulary_quantization, random_state=42)
-            kmeans.fit(embeddings)
-            token_mapping = {idx: x for idx, x in enumerate(kmeans.predict(embeddings))}
-            embeddings = kmeans.cluster_centers_
-
+        if quantize_vocabulary is not None:
+            embeddings, token_mapping, weights = vocabulary_quantization(
+                n_clusters=quantize_vocabulary,
+                weights=weights,
+                embeddings=embeddings
+            )
         else:
             token_mapping = config.pop("token_mapping", None)
             if isinstance(token_mapping, list):
