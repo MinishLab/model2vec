@@ -25,7 +25,7 @@ from model2vec.train.base import FinetunableStaticModel, TextDataset
 logger = logging.getLogger(__name__)
 _RANDOM_SEED = 42
 
-LabelType = TypeVar("LabelType", list[str], list[list[str]])
+LabelType = TypeVar("LabelType", list[str], list[int], list[list[str]], list[list[int]])
 
 
 class StaticModelForClassification(FinetunableStaticModel):

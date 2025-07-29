@@ -8,7 +8,9 @@ import torch
 from tokenizers import Tokenizer
 from tokenizers.models import BPE, Unigram, WordPiece
 from tokenizers.pre_tokenizers import Whitespace
-from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizerFast
+from transformers import AutoTokenizer
+from transformers.modeling_utils import PreTrainedModel
+from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.train import StaticModelForClassification
@@ -53,7 +55,7 @@ def mock_berttokenizer() -> PreTrainedTokenizerFast:
 
 
 @pytest.fixture
-def mock_transformer() -> AutoModel:
+def mock_transformer() -> PreTrainedModel:
     """Create a mock transformer model."""
 
     class MockPreTrainedModel:
@@ -81,7 +83,7 @@ def mock_transformer() -> AutoModel:
             # Simply call the forward method to simulate the same behavior as transformers models
             return self.forward(*args, **kwargs)
 
-    return MockPreTrainedModel()
+    return cast(PreTrainedModel, MockPreTrainedModel())
 
 
 @pytest.fixture(scope="session")
@@ -91,9 +93,9 @@ def mock_vectors() -> np.ndarray:
 
 
 @pytest.fixture
-def mock_config() -> dict[str, str]:
+def mock_config() -> dict[str, Any]:
     """Create a mock config."""
-    return {"some_config": "value"}
+    return {"some_config": "value", "token_mapping": [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]}
 
 
 @pytest.fixture(scope="session")
@@ -127,6 +129,6 @@ def mock_trained_pipeline(request: pytest.FixtureRequest) -> StaticModelForClass
     else:
         y = [[0, 1], [0]] if is_multilabel else [0, 1]  # type: ignore
 
-    model.fit(X, y)
+    model.fit(X, y)  # type: ignore
 
     return model

@@ -68,8 +68,10 @@ def vocabulary_quantization(
     n_clusters: int, weights: np.ndarray | None, embeddings: np.ndarray
 ) -> tuple[np.ndarray, dict[int, int], np.ndarray]:
     """Quantize the vocabulary of embeddings using KMeans clustering."""
+    # If the model does not have weights, we assume the norm to be informative.
     if weights is None:
         weights = cast(np.ndarray, np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32)
+        # Divide by the norm to normalize the embeddings, so we don't bias the clustering.
         embeddings = embeddings / weights
 
     # Quantize the vocabulary
@@ -77,7 +79,9 @@ def vocabulary_quantization(
 
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     kmeans.fit(embeddings)
+    # Create a mapping from the original token index to the cluster index
     token_mapping = {idx: x for idx, x in enumerate(kmeans.predict(embeddings))}
+    # The cluster centers are the new embeddings.
     embeddings = kmeans.cluster_centers_
 
     return embeddings, token_mapping, weights

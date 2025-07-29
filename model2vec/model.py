@@ -24,9 +24,9 @@ class StaticModel:
     def __init__(
         self,
         vectors: np.ndarray,
-        weights: np.ndarray | None,
-        token_mapping: dict[int, int],
         tokenizer: Tokenizer,
+        weights: np.ndarray | None = None,
+        token_mapping: dict[int, int] | None = None,
         config: dict[str, Any] | None = None,
         normalize: bool | None = None,
         base_model_name: str | None = None,
@@ -46,6 +46,12 @@ class StaticModel:
         super().__init__()
         tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
         self.tokens = tokens
+
+        if token_mapping is None and len(vectors) != len(tokens):
+            raise ValueError(
+                f"Number of tokens ({len(tokens)}) does not match number of vectors ({len(vectors)}). "
+                "Please provide a token mapping or ensure the number of tokens matches the number of vectors."
+            )
 
         self.embedding = vectors
         self.weights = weights
@@ -107,7 +113,8 @@ class StaticModel:
         """
         from model2vec.hf_utils import save_pretrained
 
-        self.config["token_mapping"] = list(self.token_mapping.items())
+        if self.token_mapping is not None:
+            self.config["token_mapping"] = list(self.token_mapping.items())
 
         save_pretrained(
             folder_path=Path(path),
@@ -208,9 +215,9 @@ class StaticModel:
 
         return cls(
             embeddings,
+            tokenizer,
             weights,
             token_mapping,
-            tokenizer,
             config,
             normalize=normalize,
             base_model_name=metadata.get("base_model"),
@@ -263,9 +270,9 @@ class StaticModel:
 
         return cls(
             embeddings,
+            tokenizer,
             weights,
             token_mapping,
-            tokenizer,
             config,
             normalize=normalize,
             base_model_name=metadata.get("base_model"),
@@ -439,8 +446,15 @@ class StaticModel:
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
-                id_list_remapped = [self.token_mapping.get(token_id, token_id) for token_id in id_list]
-                emb = (self.embedding[id_list_remapped] * self.weights[id_list]).mean(axis=0)
+                if self.token_mapping is None:
+                    id_list_remapped = id_list
+                else:
+                    id_list_remapped = [self.token_mapping.get(token_id, token_id) for token_id in id_list]
+                emb = self.embedding[id_list_remapped]
+                if self.weights is not None:
+                    emb = (emb * self.weights[id_list][:, None])
+                emb = emb.mean(axis=0)
+
                 out.append(emb)
             else:
                 out.append(np.zeros(self.dim))

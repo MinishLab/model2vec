@@ -11,8 +11,8 @@ import torch
 from sklearn.decomposition import PCA
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
-from transformers import PreTrainedModel
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+from transformers.modeling_utils import PreTrainedModel
 
 logger = logging.getLogger(__name__)
 
@@ -153,8 +153,8 @@ def post_process_embeddings(
         logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
         inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
         proba = inv_rank / np.sum(inv_rank)
-        weight = (sif_coefficient / (sif_coefficient + proba))[:, None]
+        weight = (sif_coefficient / (sif_coefficient + proba))
     else:
-        weight = np.ones((embeddings.shape[0], 1))
+        weight = np.ones(embeddings.shape[0])
 
     return embeddings, weight

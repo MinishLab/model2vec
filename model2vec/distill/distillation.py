@@ -8,7 +8,9 @@ from typing import Optional, cast
 import numpy as np
 from huggingface_hub.hf_api import model_info
 from sklearn.cluster import KMeans
-from transformers import AutoModel, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerFast
+from transformers import AutoModel, AutoTokenizer
+from transformers.modeling_utils import PreTrainedModel
+from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model2vec.distill.inference import PCADimType, create_embeddings, post_process_embeddings
 from model2vec.distill.utils import select_optimal_device

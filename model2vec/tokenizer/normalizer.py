@@ -1,7 +1,7 @@
 from string import punctuation
 
 from tokenizers import Regex, Tokenizer
-from tokenizers.normalizers import Normalizer, Replace, Sequence, Strip
+from tokenizers.normalizers import Replace, Sequence, Strip
 
 
 def replace_normalizer(
