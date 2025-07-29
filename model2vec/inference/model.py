@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Sequence, TypeVar
+from typing import Sequence, TypeVar, cast
 
 import huggingface_hub
 import numpy as np
@@ -273,14 +273,14 @@ def save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> Non
     )
 
 
-def _is_multi_label_shaped(y: LabelType) -> bool:
+def _is_multi_label_shaped(y: list[int] | list[str] | list[list[int]] | list[list[str]]) -> bool:
     """Check if the labels are in a multi-label shape."""
     return isinstance(y, (list, tuple)) and len(y) > 0 and isinstance(y[0], (list, tuple, set))
 
 
 def evaluate_single_or_multi_label(
     predictions: np.ndarray,
-    y: LabelType,
+    y: list[int] | list[str] | list[list[int]] | list[list[str]],
     output_dict: bool = False,
 ) -> str | dict[str, dict[str, float]]:
     """
@@ -292,16 +292,22 @@ def evaluate_single_or_multi_label(
     :return: A classification report.
     """
     if _is_multi_label_shaped(y):
+        # Cast because the type checker doesn't understand that y is a list of lists.
+        y = cast(list[list[str]] | list[list[int]], y)
         classes = sorted(set([label for labels in y for label in labels]))
         mlb = MultiLabelBinarizer(classes=classes)
-        y = mlb.fit_transform(y)
-        predictions = mlb.transform(predictions)
-    elif isinstance(y[0], (str, int)):
-        classes = sorted(set(y))
+        y_transformed = mlb.fit_transform(y)
+        predictions_transformed = mlb.transform(predictions)
+    else:
+        if all(isinstance(label, (str, int)) for label in y):
+            y = cast(list[str] | list[int], y)
+            classes = sorted(set(y))
+        y_transformed = np.array(y)
+        predictions_transformed = np.array(predictions)
 
     report = classification_report(
-        y,
-        predictions,
+        y_transformed,
+        predictions_transformed,
         output_dict=output_dict,
         zero_division=0,
     )

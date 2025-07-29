@@ -452,7 +452,7 @@ class StaticModel:
                     id_list_remapped = [self.token_mapping.get(token_id, token_id) for token_id in id_list]
                 emb = self.embedding[id_list_remapped]
                 if self.weights is not None:
-                    emb = (emb * self.weights[id_list][:, None])
+                    emb = emb * self.weights[id_list][:, None]
                 emb = emb.mean(axis=0)
 
                 out.append(emb)
@@ -514,4 +514,4 @@ class StaticModel:
 
         embeddings, tokenizer, config = load_local_model(path)
 
-        return StaticModel(embeddings, tokenizer, config)
+        return StaticModel(embeddings, tokenizer, config=config)

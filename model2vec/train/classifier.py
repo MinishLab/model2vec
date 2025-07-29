@@ -4,7 +4,7 @@ import logging
 from collections import Counter
 from itertools import chain
 from tempfile import TemporaryDirectory
-from typing import TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 import lightning as pl
 import numpy as np
@@ -25,10 +25,11 @@ from model2vec.train.base import FinetunableStaticModel, TextDataset
 logger = logging.getLogger(__name__)
 _RANDOM_SEED = 42
 
-LabelType = TypeVar("LabelType", list[str], list[int], list[list[str]], list[list[int]])
+PossibleLabels = list[str] | list[list[str]]
+LabelType = TypeVar("LabelType", list[str], list[list[str]])
 
 
-class StaticModelForClassification(FinetunableStaticModel):
+class StaticModelForClassification(FinetunableStaticModel, Generic[LabelType]):
     def __init__(
         self,
         *,
@@ -39,15 +40,23 @@ class StaticModelForClassification(FinetunableStaticModel):
         out_dim: int = 2,
         pad_id: int = 0,
         token_mapping: list[int] | None = None,
+        weights: torch.Tensor | None = None,
     ) -> None:
         """Initialize a standard classifier model."""
         self.n_layers = n_layers
         self.hidden_dim = hidden_dim
         # Alias: Follows scikit-learn. Set to dummy classes
-        self.classes_: list[str] = [str(x) for x in range(out_dim)]
+        self.classes_: list[str] = ["0", "1"]
         # multilabel flag will be set based on the type of `y` passed to fit.
         self.multilabel: bool = False
-        super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer, token_mapping=token_mapping)
+        super().__init__(
+            vectors=vectors,
+            out_dim=out_dim,
+            pad_id=pad_id,
+            tokenizer=tokenizer,
+            token_mapping=token_mapping,
+            weights=weights,
+        )
 
     @property
     def classes(self) -> np.ndarray:
@@ -166,7 +175,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :param X_val: The texts to be used for validation.
         :param y_val: The labels to be used for validation.
-        :param class_weight: The weight of the classes. If None, all classes are weighted equally. Must 
+        :param class_weight: The weight of the classes. If None, all classes are weighted equally. Must
             have the same length as the number of classes.
         :return: The fitted model.
         :raises ValueError: If either X_val or y_val are provided, but not both.
@@ -202,7 +211,7 @@ class StaticModelForClassification(FinetunableStaticModel):
             base_number = int(min(max(1, (len(train_texts) / 30) // 32), 16))
             batch_size = int(base_number * 32)
             logger.info("Batch size automatically set to %d.", batch_size)
-        
+
         if class_weight is not None:
             if len(class_weight) != len(self.classes_):
                 raise ValueError("class_weight must have the same length as the number of classes.")
@@ -284,11 +293,8 @@ class StaticModelForClassification(FinetunableStaticModel):
 
         :param y: The labels.
         :raises ValueError: If the labels are inconsistent.
-        """
-        if isinstance(y[0], (str, int)):
-            # Check if all labels are strings or integers.
-            if not all(isinstance(label, (str, int)) for label in y):
-                raise ValueError("Inconsistent label types in y. All labels must be strings or integers.")
+        """        
+        if all(isinstance(label, str) for label in y):
             self.multilabel = False
             classes = sorted(set(y))
         else:
@@ -330,13 +336,13 @@ class StaticModelForClassification(FinetunableStaticModel):
                 indices = [mapping[label] for label in sample_labels]
                 labels_tensor[i, indices] = 1.0
         else:
-            labels_tensor = torch.tensor([self.classes_.index(label) for label in cast(list[str], y)], dtype=torch.long)
+            labels_tensor = torch.tensor([self.classes_.index(label) for label in y], dtype=torch.long)
         return TextDataset(tokenized, labels_tensor)
 
     def _train_test_split(
         self,
         X: list[str],
-        y: list[str] | list[list[str]],
+        y: LabelType,
         test_size: float,
     ) -> tuple[list[str], list[str], LabelType, LabelType]:
         """
@@ -384,12 +390,18 @@ class StaticModelForClassification(FinetunableStaticModel):
 
 
 class _ClassifierLightningModule(pl.LightningModule):
-    def __init__(self, model: StaticModelForClassification, learning_rate: float, class_weight: torch.Tensor | None = None) -> None:
+    def __init__(
+        self, model: StaticModelForClassification, learning_rate: float, class_weight: torch.Tensor | None = None
+    ) -> None:
         """Initialize the LightningModule."""
         super().__init__()
         self.model = model
         self.learning_rate = learning_rate
-        self.loss_function = nn.CrossEntropyLoss(weight=class_weight) if not model.multilabel else nn.BCEWithLogitsLoss(pos_weight=class_weight)
+        self.loss_function = (
+            nn.CrossEntropyLoss(weight=class_weight)
+            if not model.multilabel
+            else nn.BCEWithLogitsLoss(pos_weight=class_weight)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Simple forward pass."""
@@ -408,10 +420,12 @@ class _ClassifierLightningModule(pl.LightningModule):
         x, y = batch
         head_out, _ = self.model(x)
         loss = self.loss_function(head_out, y)
+
+        accuracy: float
         if self.model.multilabel:
             preds = (torch.sigmoid(head_out) > 0.5).float()
             # Multilabel accuracy is defined as the Jaccard score averaged over samples.
-            accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples")
+            accuracy = cast(float, jaccard_score(y.cpu(), preds.cpu(), average="samples"))
         else:
             accuracy = (head_out.argmax(dim=1) == y).float().mean()
         self.log("val_loss", loss)

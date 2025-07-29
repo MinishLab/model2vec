@@ -95,7 +95,7 @@ def mock_vectors() -> np.ndarray:
 @pytest.fixture
 def mock_config() -> dict[str, Any]:
     """Create a mock config."""
-    return {"some_config": "value", "token_mapping": [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]}
+    return {"some_config": "value"}
 
 
 @pytest.fixture(scope="session")

@@ -16,7 +16,16 @@ logger = logging.getLogger(__name__)
 
 
 class FinetunableStaticModel(nn.Module):
-    def __init__(self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0, token_mapping: list[int] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        vectors: torch.Tensor,
+        tokenizer: Tokenizer,
+        out_dim: int = 2,
+        pad_id: int = 0,
+        token_mapping: list[int] | None = None,
+        weights: torch.Tensor | None = None,
+    ) -> None:
         """
         Initialize a trainable StaticModel from a StaticModel.
 
@@ -45,7 +54,7 @@ class FinetunableStaticModel(nn.Module):
         self.token_mapping = nn.Parameter(self.token_mapping, requires_grad=False)
         self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
         self.head = self.construct_head()
-        self.w = self.construct_weights()
+        self.w = self.construct_weights() if weights is None else nn.Parameter(weights, requires_grad=True)
         self.tokenizer = tokenizer
 
     def construct_weights(self) -> nn.Parameter:
@@ -70,6 +79,7 @@ class FinetunableStaticModel(nn.Module):
     def from_static_model(cls: type[ModelType], *, model: StaticModel, out_dim: int = 2, **kwargs: Any) -> ModelType:
         """Load the model from a static model."""
         model.embedding = np.nan_to_num(model.embedding)
+        weights = torch.from_numpy(model.weights) if model.weights is not None else None
         embeddings_converted = torch.from_numpy(model.embedding)
         if model.token_mapping is not None:
             token_mapping = [i for _, i in sorted(model.token_mapping.items(), key=lambda x: x[0])]
@@ -81,6 +91,7 @@ class FinetunableStaticModel(nn.Module):
             out_dim=out_dim,
             tokenizer=model.tokenizer,
             token_mapping=token_mapping,
+            weights=weights,
             **kwargs,
         )
 
@@ -139,7 +150,9 @@ class FinetunableStaticModel(nn.Module):
         w = torch.sigmoid(self.w).detach().cpu().numpy()
         token_mapping = {i: int(token_id) for i, token_id in enumerate(self.token_mapping.tolist())}
 
-        return StaticModel(vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=True, token_mapping=token_mapping)
+        return StaticModel(
+            vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=True, token_mapping=token_mapping
+        )
 
 
 class TextDataset(Dataset):
@@ -169,7 +182,7 @@ class TextDataset(Dataset):
         """Collate function."""
         texts, targets = zip(*batch)
 
-        tensors = [torch.LongTensor(x) for x in texts]
+        tensors: list[torch.Tensor] = [torch.LongTensor(x) for x in texts]
         padded = pad_sequence(tensors, batch_first=True, padding_value=0)
 
         return padded, torch.stack(targets)
