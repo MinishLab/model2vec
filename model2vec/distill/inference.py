@@ -46,7 +46,7 @@ def create_embeddings(
     :param pad_token_id: The pad token id. Used to pad sequences.
     :return: The output embeddings.
     """
-    model = model.to(device)
+    model = model.to(device)  # type: ignore  # Transformers error
 
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
@@ -98,7 +98,7 @@ def _encode_mean_using_model(model: PreTrainedModel, encodings: dict[str, torch.
     """
     encodings = {k: v.to(model.device) for k, v in encodings.items()}
     encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(**encodings)
-    out: torch.Tensor = encoded.last_hidden_state.cpu()
+    out: torch.Tensor = encoded.last_hidden_state.cpu()  # type: ignore  # False positive
     # NOTE: If the dtype is bfloat 16, we convert to float32,
     # because numpy does not suport bfloat16
     # See here: https://github.com/numpy/numpy/issues/19808
@@ -153,7 +153,7 @@ def post_process_embeddings(
         logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
         inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
         proba = inv_rank / np.sum(inv_rank)
-        weight = (sif_coefficient / (sif_coefficient + proba))
+        weight = sif_coefficient / (sif_coefficient + proba)
     else:
         weight = np.ones(embeddings.shape[0])
 
