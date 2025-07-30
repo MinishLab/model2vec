@@ -33,6 +33,8 @@ class FinetunableStaticModel(nn.Module):
         :param tokenizer: The tokenizer.
         :param out_dim: The output dimension of the head.
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models
+        :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
+        :param weights: The weights of the model. If None, the weights are initialized to zeros.
         """
         super().__init__()
         self.pad_id = pad_id
@@ -82,7 +84,7 @@ class FinetunableStaticModel(nn.Module):
         weights = torch.from_numpy(model.weights) if model.weights is not None else None
         embeddings_converted = torch.from_numpy(model.embedding)
         if model.token_mapping is not None:
-            token_mapping = [i for _, i in sorted(model.token_mapping.items(), key=lambda x: x[0])]
+            token_mapping = model.token_mapping.tolist()
         else:
             token_mapping = None
         return cls(
@@ -148,7 +150,7 @@ class FinetunableStaticModel(nn.Module):
         """Convert the model to a static model."""
         emb = self.embeddings.weight.detach().cpu().numpy()
         w = torch.sigmoid(self.w).detach().cpu().numpy()
-        token_mapping = {i: int(token_id) for i, token_id in enumerate(self.token_mapping.tolist())}
+        token_mapping = self.token_mapping.tolist()
 
         return StaticModel(
             vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=True, token_mapping=token_mapping

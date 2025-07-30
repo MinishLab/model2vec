@@ -36,6 +36,7 @@ def save_pretrained(
     :param config: A metadata config.
     :param create_model_card: Whether to create a model card.
     :param subfolder: The subfolder to save the model in.
+    :param weights: The weights of the model. If None, no weights are saved.
     :param **kwargs: Any additional arguments.
     """
     folder_path = folder_path / subfolder if subfolder else folder_path
@@ -194,11 +195,6 @@ def load_pretrained(
 
     tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
     config = json.load(open(config_path))
-
-    if len(tokenizer.get_vocab()) != len(embeddings):
-        logger.warning(
-            f"Number of tokens does not match number of embeddings: `{len(tokenizer.get_vocab())}` vs `{len(embeddings)}`"
-        )
 
     return embeddings, tokenizer, config, metadata, weights
 

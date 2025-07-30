@@ -64,9 +64,9 @@ def quantize_and_reduce_dim(
     return embeddings
 
 
-def vocabulary_quantization(
+def quantize_vocabulary(
     n_clusters: int, weights: np.ndarray | None, embeddings: np.ndarray
-) -> tuple[np.ndarray, dict[int, int], np.ndarray]:
+) -> tuple[np.ndarray, list[int], np.ndarray]:
     """Quantize the vocabulary of embeddings using KMeans clustering."""
     # If the model does not have weights, we assume the norm to be informative.
     if weights is None:
@@ -80,7 +80,8 @@ def vocabulary_quantization(
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     kmeans.fit(embeddings)
     # Create a mapping from the original token index to the cluster index
-    token_mapping = {idx: x for idx, x in enumerate(kmeans.predict(embeddings))}
+    # Make sure to convert to list, otherwise we get np.int32 which is not jsonable.
+    token_mapping = cast(list[int], kmeans.predict(embeddings).tolist())
     # The cluster centers are the new embeddings.
     embeddings = kmeans.cluster_centers_
 

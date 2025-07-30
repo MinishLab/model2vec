@@ -104,7 +104,7 @@ def setup_logging() -> None:
     )
 
 
-def load_local_model(folder: Path) -> tuple[np.ndarray, Tokenizer, dict[str, str]]:
+def load_local_model(folder: Path) -> tuple[np.ndarray, Tokenizer, dict[str, str], np.ndarray | None]:
     """Load a local model."""
     embeddings_path = folder / "model.safetensors"
     tokenizer_path = folder / "tokenizer.json"
@@ -112,6 +112,11 @@ def load_local_model(folder: Path) -> tuple[np.ndarray, Tokenizer, dict[str, str
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     embeddings = opened_tensor_file.get_tensor("embeddings")
+    try:
+        weights = opened_tensor_file.get_tensor("weights")
+    except Exception:
+        # Bare except because safetensors does not export its own errors.
+        weights = None
 
     if config_path.exists():
         config = json.load(open(config_path))
@@ -124,5 +129,4 @@ def load_local_model(folder: Path) -> tuple[np.ndarray, Tokenizer, dict[str, str
         logger.warning(
             f"Number of tokens does not match number of embeddings: `{len(tokenizer.get_vocab())}` vs `{len(embeddings)}`"
         )
-
-    return embeddings, tokenizer, config
+    return embeddings, tokenizer, config, weights

@@ -4,7 +4,7 @@ import logging
 from collections import Counter
 from itertools import chain
 from tempfile import TemporaryDirectory
-from typing import Generic, TypeVar, cast
+from typing import TypeVar, cast
 
 import lightning as pl
 import numpy as np
@@ -25,11 +25,10 @@ from model2vec.train.base import FinetunableStaticModel, TextDataset
 logger = logging.getLogger(__name__)
 _RANDOM_SEED = 42
 
-PossibleLabels = list[str] | list[list[str]]
 LabelType = TypeVar("LabelType", list[str], list[list[str]])
 
 
-class StaticModelForClassification(FinetunableStaticModel, Generic[LabelType]):
+class StaticModelForClassification(FinetunableStaticModel):
     def __init__(
         self,
         *,
@@ -46,7 +45,7 @@ class StaticModelForClassification(FinetunableStaticModel, Generic[LabelType]):
         self.n_layers = n_layers
         self.hidden_dim = hidden_dim
         # Alias: Follows scikit-learn. Set to dummy classes
-        self.classes_: list[str] = ["0", "1"]
+        self.classes_: list[str] = [str(x) for x in range(out_dim)]
         # multilabel flag will be set based on the type of `y` passed to fit.
         self.multilabel: bool = False
         super().__init__(
@@ -134,7 +133,7 @@ class StaticModelForClassification(FinetunableStaticModel, Generic[LabelType]):
                 pred.append(torch.softmax(logits, dim=1).cpu().numpy())
         return np.concatenate(pred, axis=0)
 
-    def fit(
+    def fit(  #  noqa: C901  # Refactor later
         self,
         X: list[str],
         y: LabelType,
@@ -293,8 +292,11 @@ class StaticModelForClassification(FinetunableStaticModel, Generic[LabelType]):
 
         :param y: The labels.
         :raises ValueError: If the labels are inconsistent.
-        """        
-        if all(isinstance(label, str) for label in y):
+        """
+        if isinstance(y[0], (str, int)):
+            # Check if all labels are strings or integers.
+            if not all(isinstance(label, (str, int)) for label in y):
+                raise ValueError("Inconsistent label types in y. All labels must be strings or integers.")
             self.multilabel = False
             classes = sorted(set(y))
         else:
@@ -336,13 +338,13 @@ class StaticModelForClassification(FinetunableStaticModel, Generic[LabelType]):
                 indices = [mapping[label] for label in sample_labels]
                 labels_tensor[i, indices] = 1.0
         else:
-            labels_tensor = torch.tensor([self.classes_.index(label) for label in y], dtype=torch.long)
+            labels_tensor = torch.tensor([self.classes_.index(label) for label in cast(list[str], y)], dtype=torch.long)
         return TextDataset(tokenized, labels_tensor)
 
     def _train_test_split(
         self,
         X: list[str],
-        y: LabelType,
+        y: list[str] | list[list[str]],
         test_size: float,
     ) -> tuple[list[str], list[str], LabelType, LabelType]:
         """
@@ -420,7 +422,6 @@ class _ClassifierLightningModule(pl.LightningModule):
         x, y = batch
         head_out, _ = self.model(x)
         loss = self.loss_function(head_out, y)
-
         accuracy: float
         if self.model.multilabel:
             preds = (torch.sigmoid(head_out) > 0.5).float()
