@@ -9,7 +9,7 @@ We support both single and multi-label classification, which work seamlessly bas
 To train, make sure you install the training extra:
 
 ```
-pip install model2vec[training]
+pip install model2vec[train]
 ```
 
 # Quickstart
