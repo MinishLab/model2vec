@@ -92,7 +92,7 @@ m2v_model.save_pretrained("m2v_model")
 After distillation, you can also fine-tune your own classification models on top of the distilled model, or on a pre-trained model. First, make sure you install the `training` extras with:
 
 ```bash
-pip install model2vec[training]
+pip install model2vec[train]
 ```
 
 Then, you can fine-tune a model as follows:
