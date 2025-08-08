@@ -57,7 +57,7 @@ jobs:
       # Run tests with coverage
       - name: Run tests under coverage
         run: |
-          coverage run -m pytest
+          coverage run --source=model2vec -m pytest
           coverage report
 
       # Upload results to Codecov
