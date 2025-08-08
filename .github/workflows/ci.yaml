@@ -18,6 +18,8 @@ jobs:
             python-version: "3.11"
           - os: windows-latest
             python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.13"
       fail-fast: false
 
     steps:
