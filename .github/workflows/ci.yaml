@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
         exclude:
           - os: windows-latest
             python-version: "3.9"
@@ -18,6 +18,8 @@ jobs:
             python-version: "3.11"
           - os: windows-latest
             python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.13"
       fail-fast: false
 
     steps:
@@ -55,7 +57,7 @@ jobs:
       # Run tests with coverage
       - name: Run tests under coverage
         run: |
-          coverage run -m pytest
+          coverage run --source=model2vec -m pytest
           coverage report
 
       # Upload results to Codecov

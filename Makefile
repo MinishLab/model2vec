@@ -10,7 +10,6 @@ install:
 
 install-no-pre-commit:
 	uv pip install ".[dev,distill,inference,train]"
-	uv pip install "torch<2.5.0"
 
 install-base:
 	uv sync --extra dev
