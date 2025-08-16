@@ -31,7 +31,7 @@ def quantize_vocabulary(
     # Store the original dtype to restore it later
     orig_dtype = embeddings.dtype
 
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, init="k-means++")
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, init="random")
     cast_embeddings = embeddings.astype(np.float32)
     # Fit KMeans to the embeddings
     kmeans.fit(cast_embeddings)
