@@ -300,7 +300,7 @@ def evaluate_single_or_multi_label(
         predictions_transformed = mlb.transform(predictions)
     else:
         if all(isinstance(label, (str, int)) for label in y):
-            y = cast(list[str] | list[int], y)
+            y = cast(Union[list[str], list[int]], y)
             classes = sorted(set(y))
         y_transformed = np.array(y)
         predictions_transformed = np.array(predictions)
