@@ -209,7 +209,7 @@ def test_distill(
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
 def test_missing_modelinfo(
     mock_model_info: MagicMock,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
     mock_berttokenizer: BertTokenizerFast,
 ) -> None:
     """Test that missing model info does not crash."""
