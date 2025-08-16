@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 from enum import Enum
-from typing import cast
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class DType(str, Enum):
@@ -62,27 +64,3 @@ def quantize_and_reduce_dim(
         embeddings = embeddings[:, :dimensionality]
 
     return embeddings
-
-
-def quantize_vocabulary(
-    n_clusters: int, weights: np.ndarray | None, embeddings: np.ndarray
-) -> tuple[np.ndarray, list[int], np.ndarray]:
-    """Quantize the vocabulary of embeddings using KMeans clustering."""
-    # If the model does not have weights, we assume the norm to be informative.
-    if weights is None:
-        weights = cast(np.ndarray, np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-32)
-        # Divide by the norm to normalize the embeddings, so we don't bias the clustering.
-        embeddings = embeddings / weights
-
-    # Quantize the vocabulary
-    from sklearn.cluster import KMeans
-
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    kmeans.fit(embeddings)
-    # Create a mapping from the original token index to the cluster index
-    # Make sure to convert to list, otherwise we get np.int32 which is not jsonable.
-    token_mapping = cast(list[int], kmeans.predict(embeddings).tolist())
-    # The cluster centers are the new embeddings.
-    embeddings = kmeans.cluster_centers_
-
-    return embeddings, token_mapping, weights

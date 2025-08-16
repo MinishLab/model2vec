@@ -65,6 +65,7 @@ onnx = ["onnx", "torch"]
 train = ["torch", "lightning", "scikit-learn", "skops"]
 inference = ["scikit-learn", "skops"]
 tokenizer = ["transformers"]
+quantization = ["scikit-learn"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"

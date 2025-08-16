@@ -944,6 +944,10 @@ onnx = [
     { name = "onnx" },
     { name = "torch" },
 ]
+quantization = [
+    { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scikit-learn", version = "1.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+]
 tokenizer = [
     { name = "transformers" },
 ]
@@ -973,6 +977,7 @@ requires-dist = [
     { name = "safetensors" },
     { name = "scikit-learn", marker = "extra == 'distill'" },
     { name = "scikit-learn", marker = "extra == 'inference'" },
+    { name = "scikit-learn", marker = "extra == 'quantization'" },
     { name = "scikit-learn", marker = "extra == 'train'" },
     { name = "setuptools" },
     { name = "skops", marker = "extra == 'inference'" },

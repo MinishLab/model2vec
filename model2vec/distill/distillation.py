@@ -14,8 +14,9 @@ from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 from model2vec.distill.inference import PCADimType, create_embeddings, post_process_embeddings
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
-from model2vec.quantization import DType, quantize_embeddings, quantize_vocabulary
+from model2vec.quantization import DType, quantize_embeddings
 from model2vec.tokenizer import clean_and_create_vocabulary, replace_vocabulary, turn_tokens_into_ids
+from model2vec.vocabulary_quantization import quantize_vocabulary
 
 logger = logging.getLogger(__name__)
 

@@ -125,8 +125,4 @@ def load_local_model(folder: Path) -> tuple[np.ndarray, Tokenizer, dict[str, str
 
     tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
 
-    if len(tokenizer.get_vocab()) != len(embeddings):
-        logger.warning(
-            f"Number of tokens does not match number of embeddings: `{len(tokenizer.get_vocab())}` vs `{len(embeddings)}`"
-        )
     return embeddings, tokenizer, config, weights
