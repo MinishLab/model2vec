@@ -91,8 +91,8 @@ def test_conversion(mock_trained_pipeline: StaticModelForClassification) -> None
     """Test the conversion to numpy."""
     staticmodel = mock_trained_pipeline.to_static_model()
     with torch.no_grad():
-        result_1 = mock_trained_pipeline._encode(torch.tensor([[0, 1], [1, 0]]).long()).numpy()
-    result_2 = staticmodel.embedding[[[0, 1], [1, 0]]].mean(0)
+        result_1 = mock_trained_pipeline._encode(torch.tensor([[1, 2], [2, 1]]).long()).numpy()
+    result_2 = staticmodel.embedding[[[1, 2], [2, 1]]].mean(0)
     result_2 /= np.linalg.norm(result_2, axis=1, keepdims=True)
 
     assert np.allclose(result_1, result_2)
@@ -173,6 +173,7 @@ def test_y_val_none() -> None:
     with pytest.raises(ValueError):
         model.fit(X, y, X_val=None, y_val=y_val)
     model.fit(X, y, X_val=None, y_val=None)
+
 
 def test_class_weight() -> None:
     """Test the class weight function."""

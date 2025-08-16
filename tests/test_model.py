@@ -115,6 +115,7 @@ def test_encode_as_tokens_empty(
 ) -> None:
     """Test encoding of an empty list of sentences."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    encoded: list[np.ndarray] | np.ndarray
     encoded = model.encode_as_sequence("")
     assert np.array_equal(encoded, np.zeros(shape=(0, 2), dtype=model.embedding.dtype))
 
@@ -239,6 +240,30 @@ def test_load_pretrained_dim(
     # Load the model back from the same path
     with pytest.raises(ValueError):
         StaticModel.from_pretrained(save_path, dimensionality=3000)
+
+
+def test_load_pretrained_vocabulary_quantized(
+    tmp_path: Path, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test loading a pretrained model with vocabulary quantization."""
+    # Save the model to a temporary path
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    save_path = tmp_path / "saved_model"
+    model.save_pretrained(save_path)
+
+    # Load the model back from the same path
+    loaded_model = StaticModel.from_pretrained(save_path, vocabulary_quantization=3)
+
+    # Assert that the loaded model has the same properties as the original one
+    assert loaded_model.embedding.dtype == np.float64
+    assert loaded_model.embedding.shape == (3, 2)  # Assuming 3 clusters after quantization
+    assert loaded_model.weights is not None
+    assert loaded_model.weights.shape == (5,)
+    assert loaded_model.token_mapping is not None
+    assert len(loaded_model.token_mapping) == mock_tokenizer.get_vocab_size()
+    assert len(loaded_model.token_mapping) == len(loaded_model.weights)
+    assert loaded_model.encode("word1 word2").shape == (2,)
+    assert loaded_model.encode(["word1 word2"] * 4).shape == (4, 2)
 
 
 def test_initialize_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:

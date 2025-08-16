@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from transformers import PreTrainedTokenizerFast
+from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model2vec.tokenizer.model import _calculate_token_weight_for_unigram, _process_unigram, process_tokenizer
 from model2vec.tokenizer.normalizer import replace_normalizer

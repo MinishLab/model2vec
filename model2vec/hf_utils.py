@@ -24,6 +24,7 @@ def save_pretrained(
     config: dict[str, Any],
     create_model_card: bool = True,
     subfolder: str | None = None,
+    weights: np.ndarray | None = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -35,11 +36,17 @@ def save_pretrained(
     :param config: A metadata config.
     :param create_model_card: Whether to create a model card.
     :param subfolder: The subfolder to save the model in.
+    :param weights: The weights of the model. If None, no weights are saved.
     :param **kwargs: Any additional arguments.
     """
     folder_path = folder_path / subfolder if subfolder else folder_path
     folder_path.mkdir(exist_ok=True, parents=True)
-    save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
+
+    model_weights = {"embeddings": embeddings}
+    if weights is not None:
+        model_weights["weights"] = weights
+
+    save_file(model_weights, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"), pretty=False)
     json.dump(config, open(folder_path / "config.json", "w"), indent=4)
 
@@ -99,7 +106,7 @@ def load_pretrained(
     subfolder: str | None = None,
     token: str | None = None,
     from_sentence_transformers: bool = False,
-) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any]]:
+) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any], np.ndarray | None]:
     """
     Loads a pretrained model from a folder.
 
@@ -177,18 +184,19 @@ def load_pretrained(
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
     if from_sentence_transformers:
         embeddings = opened_tensor_file.get_tensor("embedding.weight")
+        weights = None
     else:
         embeddings = opened_tensor_file.get_tensor("embeddings")
+        try:
+            weights = opened_tensor_file.get_tensor("weights")
+        except Exception:
+            # Bare except because safetensors does not export its own errors.
+            weights = None
 
     tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
     config = json.load(open(config_path))
 
-    if len(tokenizer.get_vocab()) != len(embeddings):
-        logger.warning(
-            f"Number of tokens does not match number of embeddings: `{len(tokenizer.get_vocab())}` vs `{len(embeddings)}`"
-        )
-
-    return embeddings, tokenizer, config, metadata
+    return embeddings, tokenizer, config, metadata, weights
 
 
 def _get_metadata_from_readme(readme_path: Path) -> dict[str, Any]:
