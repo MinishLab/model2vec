@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Sequence, TypeVar, cast
+from typing import Sequence, TypeVar, Union, cast
 
 import huggingface_hub
 import numpy as np
@@ -293,7 +293,7 @@ def evaluate_single_or_multi_label(
     """
     if _is_multi_label_shaped(y):
         # Cast because the type checker doesn't understand that y is a list of lists.
-        y = cast(list[list[str]] | list[list[int]], y)
+        y = cast(Union[list[list[str]], list[list[int]]], y)
         classes = sorted(set([label for labels in y for label in labels]))
         mlb = MultiLabelBinarizer(classes=classes)
         y_transformed = mlb.fit_transform(y)
