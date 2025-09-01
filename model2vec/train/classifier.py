@@ -9,6 +9,7 @@ from typing import TypeVar, cast
 import lightning as pl
 import numpy as np
 import torch
+from heavyball import AdamW, Muon
 from lightning.pytorch.callbacks import Callback, EarlyStopping
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from sklearn.metrics import jaccard_score
@@ -429,7 +430,7 @@ class _ClassifierLightningModule(pl.LightningModule):
 
     def configure_optimizers(self) -> OptimizerLRScheduler:
         """Configure optimizer and learning rate scheduler."""
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        optimizer = Muon(self.model.parameters(), lr=self.learning_rate)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",

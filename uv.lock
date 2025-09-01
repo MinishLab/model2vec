@@ -584,6 +584,22 @@ http = [
 ]
 
 [[package]]
+name = "heavyball"
+version = "1.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "numpy", version = "2.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "opt-einsum" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6d/48/7c45b21591b3ba6e81e266ff24b571571aa938e03bf3c377d4aad00e5b5a/heavyball-1.7.2.tar.gz", hash = "sha256:0aa07f06d00484876cbaf0800ac727e2ba1af355f4c69710ae626f794fc6663e", size = 61920 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fc/70/4dcd9d09a2c8f930d65b5fd734c8acb644f7fa033fc83fa0c468612fc228/heavyball-1.7.2-py3-none-any.whl", hash = "sha256:6acc6ba4221db8f96d56c37c21b4882725088179ab03216363e435699026728d", size = 39276 },
+]
+
+[[package]]
 name = "hf-xet"
 version = "1.1.5"
 source = { registry = "https://pypi.org/simple" }
@@ -948,6 +964,7 @@ tokenizer = [
     { name = "transformers" },
 ]
 train = [
+    { name = "heavyball" },
     { name = "lightning" },
     { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-learn", version = "1.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -958,6 +975,7 @@ train = [
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
+    { name = "heavyball", marker = "extra == 'train'" },
     { name = "ipython", marker = "extra == 'dev'" },
     { name = "jinja2" },
     { name = "joblib" },
@@ -1594,6 +1612,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/9d/05/545c0b2c67421cac9573301e6a3e3d0ddf7c7bc4d1ae09781285cc996f16/onnx-1.18.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7839bf2adb494e46ccf375a7936b5d9e241b63e1a84254f3eb2e2e184e3292c8", size = 17584166 },
     { url = "https://files.pythonhosted.org/packages/83/56/7df8f208de6c0bf678082f2fed291ad73da2bc68e1372c7ab4b62da4bfb6/onnx-1.18.0-cp39-cp39-win32.whl", hash = "sha256:2bd5c0c55669b6d8f12e859cc27f3a631fe58730871b21f001527e1d56219e2a", size = 15734840 },
     { url = "https://files.pythonhosted.org/packages/50/41/a46e4701203c832af815eb502b101abc4bfc84b189b453e60fe267fafe9b/onnx-1.18.0-cp39-cp39-win_amd64.whl", hash = "sha256:a3ff1735f99589be4f311eb586f2b949998614a82fb6261ae6af5a29879b9375", size = 15843250 },
+]
+
+[[package]]
+name = "opt-einsum"
+version = "3.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/b9/2ac072041e899a52f20cf9510850ff58295003aa75525e58343591b0cbfb/opt_einsum-3.4.0.tar.gz", hash = "sha256:96ca72f1b886d148241348783498194c577fa30a8faac108586b14f1ba4473ac", size = 63004 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd", size = 71932 },
 ]
 
 [[package]]
