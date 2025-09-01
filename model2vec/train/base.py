@@ -50,7 +50,7 @@ class FinetunableStaticModel(nn.Module):
         """Construct the weights for the model."""
         weights = torch.zeros(len(self.vectors))
         weights[self.pad_id] = -10_000
-        return nn.Parameter(weights)
+        return nn.Parameter(weights, requires_grad=not self.freeze)
 
     def construct_head(self) -> nn.Sequential:
         """Method should be overridden for various other classes."""
@@ -121,7 +121,7 @@ class FinetunableStaticModel(nn.Module):
         return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
 
     @property
-    def device(self) -> str:
+    def device(self) -> torch.device:
         """Get the device of the model."""
         return self.embeddings.weight.device
 
