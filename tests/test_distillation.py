@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 from pytest import LogCaptureFixture
-from transformers import AutoModel, BertTokenizerFast
+from transformers import BertTokenizerFast
+from transformers.modeling_utils import PreTrainedModel
 
 from model2vec.distill.distillation import (
     clean_and_create_vocabulary,
@@ -28,14 +29,14 @@ rng = np.random.default_rng()
 
 
 @pytest.mark.parametrize(
-    "vocabulary, pca_dims, apply_zipf",
+    "vocabulary, pca_dims",
     [
-        (None, 256, True),  # Output vocab with subwords, PCA applied
-        (["wordA", "wordB"], 4, False),  # Custom vocab with subword, PCA applied
-        (None, "auto", False),  # Subword, PCA set to 'auto'
-        (None, 1024, False),  # Subword, PCA set to high number.
-        (None, None, True),  # No PCA applied
-        (None, 0.9, True),  # PCA as float applied
+        (None, 256),  # Output vocab with subwords, PCA applied
+        (["wordA", "wordB"], 4),  # Custom vocab with subword, PCA applied
+        (None, "auto"),  # Subword, PCA set to 'auto'
+        (None, 1024),  # Subword, PCA set to high number.
+        (None, None),  # No PCA applied
+        (None, 0.9),  # PCA as float applied
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -44,10 +45,9 @@ def test_distill_from_model(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
     mock_berttokenizer: BertTokenizerFast,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
     vocabulary: list[str] | None,
     pca_dims: int | None,
-    apply_zipf: bool,
 ) -> None:
     """Test distill function with different parameters."""
     # Mock the return value of model_info to avoid calling the Hugging Face API
@@ -64,7 +64,6 @@ def test_distill_from_model(
         vocabulary=vocabulary,
         device="cpu",
         pca_dims=pca_dims,
-        apply_zipf=apply_zipf,
         token_remove_pattern=None,
     )
 
@@ -73,7 +72,6 @@ def test_distill_from_model(
         vocabulary=vocabulary,
         device="cpu",
         pca_dims=pca_dims,
-        apply_zipf=apply_zipf,
         token_remove_pattern=None,
     )
 
@@ -89,7 +87,7 @@ def test_distill_removal_pattern(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
     mock_berttokenizer: BertTokenizerFast,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
 ) -> None:
     """Test the removal pattern."""
     # Mock the return value of model_info to avoid calling the Hugging Face API
@@ -99,9 +97,6 @@ def test_distill_removal_pattern(
     # mock_auto_tokenizer.return_value = mock_berttokenizer
     mock_auto_model.return_value = mock_transformer
 
-    # The vocab size is 30522, but we remove 998 tokens: [CLS], [SEP], and [MASK], and all [unused] tokens.
-    expected_vocab_size = mock_berttokenizer.vocab_size - 998
-
     static_model = distill_from_model(
         model=mock_transformer,
         tokenizer=mock_berttokenizer,
@@ -110,7 +105,8 @@ def test_distill_removal_pattern(
         token_remove_pattern=None,
     )
 
-    assert len(static_model.embedding) == expected_vocab_size
+    # 3 special tokens removed.
+    assert len(static_model.embedding) == mock_berttokenizer.vocab_size - 3
 
     # No tokens removed, nonsensical pattern
     static_model = distill_from_model(
@@ -121,7 +117,20 @@ def test_distill_removal_pattern(
         token_remove_pattern="£££££££££££££££££",
     )
 
-    assert len(static_model.embedding) == expected_vocab_size
+    # 3 special tokens removed
+    assert len(static_model.embedding) == mock_berttokenizer.vocab_size - 3
+
+    # No tokens removed, nonsensical pattern
+    static_model = distill_from_model(
+        model=mock_transformer,
+        tokenizer=mock_berttokenizer,
+        vocabulary=None,
+        device="cpu",
+        token_remove_pattern=r"\[unused.+\]",
+    )
+
+    # 995 unused + 3 special tokens removed
+    assert len(static_model.embedding) == mock_berttokenizer.vocab_size - 997
 
     # Weird pattern.
     with pytest.raises(ValueError):
@@ -135,19 +144,19 @@ def test_distill_removal_pattern(
 
 
 @pytest.mark.parametrize(
-    "vocabulary, pca_dims, apply_zipf, sif_coefficient, expected_shape",
+    "vocabulary, pca_dims, sif_coefficient, expected_shape",
     [
-        (None, 256, True, None, (29524, 256)),  # Output vocab with subwords, PCA applied
-        (None, "auto", False, None, (29524, 768)),  # Subword, PCA set to 'auto'
-        (None, "auto", True, 1e-4, (29524, 768)),  # Subword, PCA set to 'auto'
-        (None, "auto", False, 1e-4, (29524, 768)),  # Subword, PCA set to 'auto'
-        (None, "auto", True, 0, None),  # Sif too low
-        (None, "auto", True, 1, None),  # Sif too high
-        (None, "auto", False, 0, (29524, 768)),  # Sif too low, but apply_zipf is False
-        (None, "auto", False, 1, (29524, 768)),  # Sif too high, but apply_zipf is False
-        (None, 1024, False, None, (29524, 768)),  # Subword, PCA set to high number.
-        (["wordA", "wordB"], 4, False, None, (29526, 4)),  # Custom vocab with subword, PCA applied
-        (None, None, True, None, (29524, 768)),  # No PCA applied
+        (None, 256, None, (29525, 256)),  # Output vocab with subwords, PCA applied
+        (None, "auto", None, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, "auto", 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, "auto", 1e-4, (29525, 768)),  # Subword, PCA set to 'auto'
+        (None, "auto", 0, None),  # Sif too low
+        (None, "auto", 1, None),  # Sif too high
+        (None, "auto", 0, (29525, 768)),  # Sif too low, but apply_zipf is False
+        (None, "auto", 1, (29525, 768)),  # Sif too high, but apply_zipf is False
+        (None, 1024, None, (29525, 768)),  # Subword, PCA set to high number.
+        (["wordA", "wordB"], 4, None, (29527, 4)),  # Custom vocab with subword, PCA applied
+        (None, None, None, (29525, 768)),  # No PCA applied
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -155,10 +164,9 @@ def test_distill_removal_pattern(
 def test_distill(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
     vocabulary: list[str] | None,
     pca_dims: int | None,
-    apply_zipf: bool,
     sif_coefficient: float | None,
     expected_shape: tuple[int, int],
 ) -> None:
@@ -171,19 +179,13 @@ def test_distill(
 
     model_name = "tests/data/test_tokenizer"
 
-    if (
-        apply_zipf is not None
-        and apply_zipf
-        and sif_coefficient is not None
-        and (sif_coefficient <= 0 or sif_coefficient >= 1)
-    ):
+    if sif_coefficient is not None and (sif_coefficient <= 0 or sif_coefficient >= 1):
         with pytest.raises(ValueError):
             static_model = distill(
                 model_name=model_name,
                 vocabulary=vocabulary,
                 device="cpu",
                 pca_dims=pca_dims,
-                apply_zipf=apply_zipf,
                 sif_coefficient=sif_coefficient,
             )
 
@@ -194,7 +196,6 @@ def test_distill(
             vocabulary=vocabulary,
             device="cpu",
             pca_dims=pca_dims,
-            apply_zipf=apply_zipf,
             sif_coefficient=sif_coefficient,
         )
 
@@ -208,7 +209,7 @@ def test_distill(
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
 def test_missing_modelinfo(
     mock_model_info: MagicMock,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
     mock_berttokenizer: BertTokenizerFast,
 ) -> None:
     """Test that missing model info does not crash."""

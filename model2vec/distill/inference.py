@@ -46,7 +46,7 @@ def create_embeddings(
     :param pad_token_id: The pad token id. Used to pad sequences.
     :return: The output embeddings.
     """
-    model = model.to(device)
+    model = model.to(device)  # type: ignore
 
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
@@ -98,6 +98,7 @@ def _encode_mean_using_model(model: PreTrainedModel, encodings: dict[str, torch.
     """
     encodings = {k: v.to(model.device) for k, v in encodings.items()}
     encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(**encodings)
+    assert encoded.last_hidden_state is not None
     out: torch.Tensor = encoded.last_hidden_state.cpu()
     # NOTE: If the dtype is bfloat 16, we convert to float32,
     # because numpy does not suport bfloat16
