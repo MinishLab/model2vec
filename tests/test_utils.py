@@ -98,7 +98,7 @@ def test_local_load(mock_tokenizer: Tokenizer, config: dict[str, Any], expected:
         mock_tokenizer.save(str(Path(tempdir) / "tokenizer.json"))
         if config is not None:
             json.dump(config, open(tempdir_path / "config.json", "w"))
-        arr, tokenizer, config, weights = load_local_model(tempdir_path)
+        arr, tokenizer, config, weights, _ = load_local_model(tempdir_path)
         assert config == expected
         assert tokenizer.to_str() == mock_tokenizer.to_str()
         assert arr.shape == x.shape

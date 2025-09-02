@@ -30,7 +30,7 @@ class StaticModel:
         base_model_name: str | None = None,
         language: list[str] | None = None,
         weights: np.ndarray | None = None,
-        token_mapping: list[int] | None = None,
+        token_mapping: np.ndarray | None = None,
     ) -> None:
         """
         Initialize the StaticModel.
@@ -63,7 +63,7 @@ class StaticModel:
         self.weights = weights
         # Convert to an array for fast lookups
         # We can't use or short circuit here because np.ndarray as booleans are ambiguous.
-        self.token_mapping: np.ndarray | None = None if token_mapping is None else np.asarray(token_mapping)
+        self.token_mapping: np.ndarray | None = token_mapping
 
         self.tokenizer = tokenizer
         self.unk_token_id: int | None
@@ -121,9 +121,6 @@ class StaticModel:
         """
         from model2vec.hf_utils import save_pretrained
 
-        if self.token_mapping is not None:
-            self.config["token_mapping"] = self.token_mapping.tolist()
-
         save_pretrained(
             folder_path=Path(path),
             embeddings=self.embedding,
@@ -134,6 +131,7 @@ class StaticModel:
             model_name=model_name,
             subfolder=subfolder,
             weights=self.weights,
+            mapping=self.token_mapping,
         )
 
     def tokenize(self, sentences: Sequence[str], max_length: int | None = None) -> list[list[int]]:
@@ -490,11 +488,10 @@ class StaticModel:
         if not path.is_dir():
             raise ValueError(f"Path {path} is not a directory.")
 
-        embeddings, tokenizer, config, weights = load_local_model(path)
-        token_mapping = cast(list[int], config.pop("token_mapping", None))
+        embeddings, tokenizer, config, weights, mapping = load_local_model(path)
 
         return StaticModel(
-            vectors=embeddings, tokenizer=tokenizer, config=config, weights=weights, token_mapping=token_mapping
+            vectors=embeddings, tokenizer=tokenizer, config=config, weights=weights, token_mapping=mapping
         )
 
 
@@ -517,7 +514,7 @@ def quantize_model(
     """
     from model2vec.quantization import quantize_and_reduce_dim
 
-    token_mapping: list[int] | None
+    token_mapping: np.ndarray | None
     weights: np.ndarray | None
     if vocabulary_quantization is not None:
         from model2vec.vocabulary_quantization import quantize_vocabulary
@@ -530,7 +527,7 @@ def quantize_model(
         )
     else:
         embeddings = model.embedding
-        token_mapping = cast(list[int], model.token_mapping.tolist()) if model.token_mapping is not None else None
+        token_mapping = model.token_mapping
         weights = model.weights
     if quantize_to is not None or dimensionality is not None:
         embeddings = quantize_and_reduce_dim(
@@ -568,20 +565,18 @@ def _loading_helper(
     if from_sentence_transformers and subfolder is not None:
         raise ValueError("Subfolder is not supported for sentence transformers models.")
 
-    embeddings, tokenizer, config, metadata, weights = load_pretrained(
+    embeddings, tokenizer, config, metadata, weights, mapping = load_pretrained(
         folder_or_repo_path=path,
         token=token,
         from_sentence_transformers=from_sentence_transformers,
         subfolder=subfolder,
     )
 
-    token_mapping = config.pop("token_mapping", None)
-
     model = cls(
         vectors=embeddings,
         tokenizer=tokenizer,
         weights=weights,
-        token_mapping=token_mapping,
+        token_mapping=mapping,
         config=config,
         normalize=normalize,
         base_model_name=metadata.get("base_model"),

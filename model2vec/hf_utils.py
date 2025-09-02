@@ -25,6 +25,7 @@ def save_pretrained(
     create_model_card: bool = True,
     subfolder: str | None = None,
     weights: np.ndarray | None = None,
+    mapping: np.ndarray | None = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -37,6 +38,7 @@ def save_pretrained(
     :param create_model_card: Whether to create a model card.
     :param subfolder: The subfolder to save the model in.
     :param weights: The weights of the model. If None, no weights are saved.
+    :param mapping: The token mapping of the model. If None, there is no token mapping.
     :param **kwargs: Any additional arguments.
     """
     folder_path = folder_path / subfolder if subfolder else folder_path
@@ -45,6 +47,8 @@ def save_pretrained(
     model_weights = {"embeddings": embeddings}
     if weights is not None:
         model_weights["weights"] = weights
+    if mapping is not None:
+        model_weights["mapping"] = mapping
 
     save_file(model_weights, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"), pretty=False)
@@ -106,7 +110,7 @@ def load_pretrained(
     subfolder: str | None = None,
     token: str | None = None,
     from_sentence_transformers: bool = False,
-) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any], np.ndarray | None]:
+) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any], np.ndarray | None, np.ndarray | None]:
     """
     Loads a pretrained model from a folder.
 
@@ -185,6 +189,7 @@ def load_pretrained(
     if from_sentence_transformers:
         embeddings = opened_tensor_file.get_tensor("embedding.weight")
         weights = None
+        mapping = None
     else:
         embeddings = opened_tensor_file.get_tensor("embeddings")
         try:
@@ -192,11 +197,15 @@ def load_pretrained(
         except Exception:
             # Bare except because safetensors does not export its own errors.
             weights = None
+        try:
+            mapping = opened_tensor_file.get_tensor("mapping")
+        except Exception:
+            mapping = None
 
     tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
     config = json.load(open(config_path))
 
-    return embeddings, tokenizer, config, metadata, weights
+    return embeddings, tokenizer, config, metadata, weights, mapping
 
 
 def _get_metadata_from_readme(readme_path: Path) -> dict[str, Any]:

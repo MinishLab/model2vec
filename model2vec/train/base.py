@@ -150,7 +150,7 @@ class FinetunableStaticModel(nn.Module):
         """Convert the model to a static model."""
         emb = self.embeddings.weight.detach().cpu().numpy()
         w = torch.sigmoid(self.w).detach().cpu().numpy()
-        token_mapping = self.token_mapping.tolist()
+        token_mapping = self.token_mapping.numpy()
 
         return StaticModel(
             vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=True, token_mapping=token_mapping

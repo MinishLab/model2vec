@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def quantize_vocabulary(
     n_clusters: int, weights: np.ndarray | None, embeddings: np.ndarray
-) -> tuple[np.ndarray, list[int], np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Quantize the vocabulary of embeddings using KMeans clustering."""
     logger.info(f"Quantizing vocabulary to {n_clusters} clusters.")
     # If the model does not have weights, we assume the norm to be informative.
@@ -38,8 +38,7 @@ def quantize_vocabulary(
     # Fit KMeans to the embeddings
     kmeans.fit(cast_embeddings)
     # Create a mapping from the original token index to the cluster index
-    # Make sure to convert to list, otherwise we get np.int32 which is not jsonable.
-    token_mapping = cast(list[int], kmeans.predict(cast_embeddings).tolist())
+    token_mapping = kmeans.predict(cast_embeddings)
     # The cluster centers are the new embeddings.
     # Convert them back to the original dtype
     embeddings = kmeans.cluster_centers_.astype(orig_dtype)
