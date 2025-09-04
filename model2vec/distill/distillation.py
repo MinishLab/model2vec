@@ -7,6 +7,7 @@ from typing import cast
 
 import numpy as np
 from huggingface_hub import model_info
+from skeletoken import TokenizerModel
 from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
@@ -16,6 +17,7 @@ from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
 from model2vec.tokenizer import clean_and_create_vocabulary, replace_vocabulary, turn_tokens_into_ids
+from model2vec.tokenizer.tokenizer import _patch_tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +88,10 @@ def distill_from_model(
 
     logger.info(f"Creating embeddings for {len(tokens)} tokens")
     # Convert tokens to IDs
-    token_ids = turn_tokens_into_ids(tokens, tokenizer.backend_tokenizer)
+    m = _patch_tokenizer(tokenizer=tokenizer, lower_case=False)
+    bb = m.to_tokenizer()
+
+    token_ids = turn_tokens_into_ids(tokens, bb)
 
     # Create the embeddings
     pad_token = cast(str | None, tokenizer.special_tokens_map.get("pad_token", None))

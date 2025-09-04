@@ -5,7 +5,7 @@ import re
 from typing import cast
 
 from skeletoken import TokenizerModel
-from skeletoken.addedtoken import AddedToken
+from skeletoken.addedtoken import AddedToken, AddedTokens
 from skeletoken.models import WordPiece
 from skeletoken.pretokenizers import ByteLevelPreTokenizer, PreTokenizerSequence
 from tokenizers import Tokenizer
@@ -50,7 +50,7 @@ def replace_vocabulary(tokenizer: Tokenizer, new_vocabulary: list[Token]) -> Tok
     tokenizer_model.model.vocab.replace_vocabulary(tokens)
 
     new_added_tokens = []
-    for added_token in tokenizer_model.added_tokens:
+    for added_token in tokenizer_model.added_tokens.root:
         if added_token.content not in {tokenizer_model.unk_token, tokenizer_model.pad_token}:
             continue
         new_added_tokens.append(added_token)
@@ -70,7 +70,7 @@ def replace_vocabulary(tokenizer: Tokenizer, new_vocabulary: list[Token]) -> Tok
             )
 
     pre_tokenized_tokens = [x.normalized_form for x in new_vocabulary]
-    tokenizer_model.added_tokens = _remap_added_tokens(new_added_tokens, pre_tokenized_tokens)
+    tokenizer_model.added_tokens = AddedTokens(_remap_added_tokens(new_added_tokens, pre_tokenized_tokens))
     # Set post processor to None because we don't care about it
     tokenizer_model.post_processor = None
     # We need to re-set the pad and unk tokens to put the correct indices.
@@ -166,7 +166,7 @@ def _process_internal_tokens(
     added_tokens_to_keep: set[str] = {
         x for x in (tokenizer_model.pad_token, tokenizer_model.unk_token) if x is not None
     }
-    added_tokens_to_remove = {x.content for x in tokenizer_model.added_tokens} - added_tokens_to_keep
+    added_tokens_to_remove = {x.content for x in tokenizer_model.added_tokens.root} - added_tokens_to_keep
     cleaned_internal_tokens: list[Token] = []
 
     for token in internal_tokens:
