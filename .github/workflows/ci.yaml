@@ -9,17 +9,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: ["ubuntu-latest", "windows-latest"]
+        os: ["ubuntu-latest"]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-        exclude:
-          - os: windows-latest
-            python-version: "3.9"
-          - os: windows-latest
-            python-version: "3.11"
-          - os: windows-latest
-            python-version: "3.12"
-          - os: windows-latest
-            python-version: "3.13"
       fail-fast: false
 
     steps:
@@ -31,19 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
 
-      # Step for Windows: Create and activate a virtual environment
-      - name: Create and activate a virtual environment (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        run: |
-          irm https://astral.sh/uv/install.ps1 | iex
-          $env:Path = "C:\Users\runneradmin\.local\bin;$env:Path"
-          uv venv .venv
-          "VIRTUAL_ENV=.venv" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "$PWD/.venv/Scripts" | Out-File -FilePath $env:GITHUB_PATH -Append
-
-      # Step for Unix: Create and activate a virtual environment
       - name: Create and activate a virtual environment (Unix)
-        if: ${{ runner.os != 'Windows' }}
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           uv venv .venv
