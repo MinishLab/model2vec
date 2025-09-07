@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class FinetunableStaticModel(nn.Module):
-    def __init__(self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0) -> None:
+    def __init__(
+        self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0, freeze: bool = False
+    ) -> None:
         """
         Initialize a trainable StaticModel from a StaticModel.
 
@@ -24,6 +26,7 @@ class FinetunableStaticModel(nn.Module):
         :param tokenizer: The tokenizer.
         :param out_dim: The output dimension of the head.
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models
+        :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
         """
         super().__init__()
         self.pad_id = pad_id
@@ -37,8 +40,8 @@ class FinetunableStaticModel(nn.Module):
                 f"Your vectors are {dtype} precision, converting to to torch.float32 to avoid compatibility issues."
             )
             self.vectors = vectors.float()
-
-        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
+        self.freeze = freeze
+        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=self.freeze, padding_idx=pad_id)
         self.head = self.construct_head()
         self.w = self.construct_weights()
         self.tokenizer = tokenizer
@@ -47,7 +50,7 @@ class FinetunableStaticModel(nn.Module):
         """Construct the weights for the model."""
         weights = torch.zeros(len(self.vectors))
         weights[self.pad_id] = -10_000
-        return nn.Parameter(weights)
+        return nn.Parameter(weights, requires_grad=not self.freeze)
 
     def construct_head(self) -> nn.Sequential:
         """Method should be overridden for various other classes."""
@@ -118,7 +121,7 @@ class FinetunableStaticModel(nn.Module):
         return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
 
     @property
-    def device(self) -> str:
+    def device(self) -> torch.device:
         """Get the device of the model."""
         return self.embeddings.weight.device
 
@@ -157,7 +160,7 @@ class TextDataset(Dataset):
         """Collate function."""
         texts, targets = zip(*batch)
 
-        tensors = [torch.LongTensor(x) for x in texts]
+        tensors: list[torch.Tensor] = [torch.LongTensor(x) for x in texts]
         padded = pad_sequence(tensors, batch_first=True, padding_value=0)
 
         return padded, torch.stack(targets)
