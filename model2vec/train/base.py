@@ -59,7 +59,7 @@ class FinetunableStaticModel(nn.Module):
         self.freeze = freeze
         self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=self.freeze, padding_idx=pad_id)
         self.head = self.construct_head()
-        self.w = self.construct_weights() if weights is None else nn.Parameter(weights, requires_grad=True)
+        self.w = self.construct_weights() if weights is None else nn.Parameter(weights.float(), requires_grad=True)
         self.tokenizer = tokenizer
 
     def construct_weights(self) -> nn.Parameter:
