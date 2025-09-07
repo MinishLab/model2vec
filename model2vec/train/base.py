@@ -25,6 +25,7 @@ class FinetunableStaticModel(nn.Module):
         pad_id: int = 0,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
+        freeze: bool = False,
     ) -> None:
         """
         Initialize a trainable StaticModel from a StaticModel.
@@ -35,6 +36,7 @@ class FinetunableStaticModel(nn.Module):
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
         :param weights: The weights of the model. If None, the weights are initialized to zeros.
+        :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
         """
         super().__init__()
         self.pad_id = pad_id
@@ -54,7 +56,8 @@ class FinetunableStaticModel(nn.Module):
         else:
             self.token_mapping = torch.arange(len(vectors), dtype=torch.int64)
         self.token_mapping = nn.Parameter(self.token_mapping, requires_grad=False)
-        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
+        self.freeze = freeze
+        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=self.freeze, padding_idx=pad_id)
         self.head = self.construct_head()
         self.w = self.construct_weights() if weights is None else nn.Parameter(weights, requires_grad=True)
         self.tokenizer = tokenizer
@@ -63,7 +66,7 @@ class FinetunableStaticModel(nn.Module):
         """Construct the weights for the model."""
         weights = torch.zeros(len(self.token_mapping))
         weights[self.pad_id] = -10_000
-        return nn.Parameter(weights)
+        return nn.Parameter(weights, requires_grad=not self.freeze)
 
     def construct_head(self) -> nn.Sequential:
         """Method should be overridden for various other classes."""

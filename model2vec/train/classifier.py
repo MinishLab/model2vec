@@ -40,6 +40,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         pad_id: int = 0,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
+        freeze: bool = False,
     ) -> None:
         """Initialize a standard classifier model."""
         self.n_layers = n_layers
@@ -55,6 +56,7 @@ class StaticModelForClassification(FinetunableStaticModel):
             tokenizer=tokenizer,
             token_mapping=token_mapping,
             weights=weights,
+            freeze=freeze,
         )
 
     @property
@@ -133,7 +135,7 @@ class StaticModelForClassification(FinetunableStaticModel):
                 pred.append(torch.softmax(logits, dim=1).cpu().numpy())
         return np.concatenate(pred, axis=0)
 
-    def fit(  #  noqa: C901  # Refactor later
+    def fit(  # noqa: C901  # Complexity is bad.
         self,
         X: list[str],
         y: LabelType,
@@ -309,7 +311,9 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.classes_ = classes
         self.out_dim = len(self.classes_)  # Update output dimension
         self.head = self.construct_head()
-        self.embeddings = nn.Embedding.from_pretrained(self.vectors.clone(), freeze=False, padding_idx=self.pad_id)
+        self.embeddings = nn.Embedding.from_pretrained(
+            self.vectors.clone(), freeze=self.freeze, padding_idx=self.pad_id
+        )
         self.w = self.construct_weights()
         self.train()
 
