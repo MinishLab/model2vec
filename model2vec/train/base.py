@@ -65,13 +65,15 @@ class FinetunableStaticModel(nn.Module):
         return cls.from_static_model(model=model, out_dim=out_dim, **kwargs)
 
     @classmethod
-    def from_static_model(cls: type[ModelType], *, model: StaticModel, out_dim: int = 2, **kwargs: Any) -> ModelType:
+    def from_static_model(
+        cls: type[ModelType], *, model: StaticModel, out_dim: int = 2, pad_token: str = "[PAD]", **kwargs: Any
+    ) -> ModelType:
         """Load the model from a static model."""
         model.embedding = np.nan_to_num(model.embedding)
         embeddings_converted = torch.from_numpy(model.embedding)
         return cls(
             vectors=embeddings_converted,
-            pad_id=model.tokenizer.token_to_id("[PAD]"),
+            pad_id=model.tokenizer.token_to_id(pad_token),
             out_dim=out_dim,
             tokenizer=model.tokenizer,
             **kwargs,
