@@ -13,7 +13,7 @@ from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
 from model2vec.quantization import DType, quantize_and_reduce_dim
-from model2vec.utils import ProgressParallel, load_local_model
+from model2vec.utils import ProgressParallel
 
 PathLike = Union[Path, str]
 
@@ -156,6 +156,7 @@ class StaticModel:
         subfolder: str | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
+        skip_metadata: bool = False,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -171,6 +172,8 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
+        :param skip_metadata: Whether to skip loading metadata. This is useful if you don't need the metadata.
+            Loading metadata can be slow for models with lots of results in the README.md
         :return: A StaticModel.
         """
         from model2vec.hf_utils import load_pretrained
@@ -180,6 +183,7 @@ class StaticModel:
             token=token,
             from_sentence_transformers=False,
             subfolder=subfolder,
+            skip_metadata=skip_metadata,
         )
 
         embeddings = quantize_and_reduce_dim(
@@ -205,6 +209,7 @@ class StaticModel:
         normalize: bool | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
+        skip_metadata: bool = False,
     ) -> StaticModel:
         """
         Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
@@ -219,6 +224,8 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
+        :param skip_metadata: Whether to skip loading metadata. This is useful if you don't need the metadata.
+            Loading metadata can be slow for models with lots of results in the README.md
         :return: A StaticModel.
         """
         from model2vec.hf_utils import load_pretrained
@@ -228,6 +235,7 @@ class StaticModel:
             token=token,
             from_sentence_transformers=True,
             subfolder=None,
+            skip_metadata=skip_metadata,
         )
 
         embeddings = quantize_and_reduce_dim(
@@ -447,28 +455,3 @@ class StaticModel:
         with TemporaryDirectory() as temp_dir:
             self.save_pretrained(temp_dir, model_name=repo_id)
             push_folder_to_hub(Path(temp_dir), subfolder=subfolder, repo_id=repo_id, private=private, token=token)
-
-    @classmethod
-    def load_local(cls: type[StaticModel], path: PathLike) -> StaticModel:
-        """
-        Loads a model from a local path.
-
-        You should only use this code path if you are concerned with start-up time.
-        Loading via the `from_pretrained` method is safer, and auto-downloads, but
-        also means we import a whole bunch of huggingface code that we don't need.
-
-        Additionally, huggingface will check the most recent version of the model,
-        which can be slow.
-
-        :param path: The path to load the model from. The path is a directory saved by the
-            `save_pretrained` method.
-        :return: A StaticModel
-        :raises: ValueError if the path is not a directory.
-        """
-        path = Path(path)
-        if not path.is_dir():
-            raise ValueError(f"Path {path} is not a directory.")
-
-        embeddings, tokenizer, config = load_local_model(path)
-
-        return StaticModel(embeddings, tokenizer, config)
