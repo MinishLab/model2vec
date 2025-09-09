@@ -5,7 +5,7 @@ import os
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator, Sequence, Union, overload
+from typing import Any, Iterator, Sequence, Union, cast, overload
 
 import numpy as np
 from joblib import delayed
@@ -29,6 +29,8 @@ class StaticModel:
         normalize: bool | None = None,
         base_model_name: str | None = None,
         language: list[str] | None = None,
+        weights: np.ndarray | None = None,
+        token_mapping: np.ndarray | None = None,
     ) -> None:
         """
         Initialize the StaticModel.
@@ -39,16 +41,29 @@ class StaticModel:
         :param normalize: Whether to normalize the embeddings.
         :param base_model_name: The used base model name. Used for creating a model card.
         :param language: The language of the model. Used for creating a model card.
+        :param weights: The weights to use for the embeddings. If None, no weights are used.
+            We always assume the norm of the embeddings is an implicit weight anyway.
+            This is only used for models that have undergone vocabulary quantization.
+        :param token_mapping: A mapping from token ids to indices in the vectors.
+            If None, we don't remap the tokens during inference.
+            This is only used for models that have undergone vocabulary quantization.
         :raises: ValueError if the number of tokens does not match the number of vectors.
         """
         super().__init__()
         tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
         self.tokens = tokens
 
-        self.embedding = vectors
+        if token_mapping is None and len(vectors) != len(tokens):
+            raise ValueError(
+                f"Number of tokens ({len(tokens)}) does not match number of vectors ({len(vectors)}). "
+                "Please provide a token mapping or ensure the number of tokens matches the number of vectors."
+            )
 
-        if len(tokens) != vectors.shape[0]:
-            raise ValueError(f"Number of tokens ({len(tokens)}) does not match number of vectors ({vectors.shape[0]})")
+        self.embedding = vectors
+        self.weights = weights
+        # Convert to an array for fast lookups
+        # We can't use or short circuit here because np.ndarray as booleans are ambiguous.
+        self.token_mapping: np.ndarray | None = token_mapping
 
         self.tokenizer = tokenizer
         self.unk_token_id: int | None
@@ -115,6 +130,8 @@ class StaticModel:
             language=self.language,
             model_name=model_name,
             subfolder=subfolder,
+            weights=self.weights,
+            mapping=self.token_mapping,
         )
 
     def tokenize(self, sentences: Sequence[str], max_length: int | None = None) -> list[list[int]]:
@@ -156,6 +173,7 @@ class StaticModel:
         subfolder: str | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
+        vocabulary_quantization: int | None = None,
         force_download: bool = True,
     ) -> StaticModel:
         """
@@ -172,33 +190,22 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
+        :param vocabulary_quantization: The number of clusters to use for vocabulary quantization.
         :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
             already present in the cache.
         :return: A StaticModel.
         """
-        from model2vec.hf_utils import load_pretrained
-
-        embeddings, tokenizer, config, metadata = load_pretrained(
-            folder_or_repo_path=path,
+        return _loading_helper(
+            cls=cls,
+            path=path,
             token=token,
-            from_sentence_transformers=False,
-            subfolder=subfolder,
-            force_download=force_download,
-        )
-
-        embeddings = quantize_and_reduce_dim(
-            embeddings=embeddings,
+            vocabulary_quantization=vocabulary_quantization,
             quantize_to=quantize_to,
             dimensionality=dimensionality,
-        )
-
-        return cls(
-            embeddings,
-            tokenizer,
-            config,
+            from_sentence_transformers=False,
             normalize=normalize,
-            base_model_name=metadata.get("base_model"),
-            language=metadata.get("language"),
+            subfolder=subfolder,
+            force_download=force_download,
         )
 
     @classmethod
@@ -209,6 +216,7 @@ class StaticModel:
         normalize: bool | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
+        vocabulary_quantization: int | None = None,
         force_download: bool = True,
     ) -> StaticModel:
         """
@@ -224,33 +232,22 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
+        :param vocabulary_quantization: The number of clusters to use for vocabulary quantization.
         :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
             already present in the cache.
         :return: A StaticModel.
         """
-        from model2vec.hf_utils import load_pretrained
-
-        embeddings, tokenizer, config, metadata = load_pretrained(
-            folder_or_repo_path=path,
+        return _loading_helper(
+            cls=cls,
+            path=path,
             token=token,
-            from_sentence_transformers=True,
-            subfolder=None,
-            force_download=force_download,
-        )
-
-        embeddings = quantize_and_reduce_dim(
-            embeddings=embeddings,
+            vocabulary_quantization=vocabulary_quantization,
             quantize_to=quantize_to,
             dimensionality=dimensionality,
-        )
-
-        return cls(
-            embeddings,
-            tokenizer,
-            config,
+            from_sentence_transformers=True,
             normalize=normalize,
-            base_model_name=metadata.get("base_model"),
-            language=metadata.get("language"),
+            subfolder=None,
+            force_download=force_download,
         )
 
     @overload
@@ -345,7 +342,7 @@ class StaticModel:
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
-                out.append(self.embedding[id_list])
+                out.append(self._encode_helper(id_list))
             else:
                 out.append(np.zeros((0, self.dim)))
 
@@ -414,13 +411,35 @@ class StaticModel:
             return out_array[0]
         return out_array
 
+    def _encode_helper(self, id_list: list[int]) -> np.ndarray:
+        """
+        Helper function to encode a list of ids.
+
+        This function is used to deduplicate the logic in `encode` and `encode_as_sequence`.
+        It retrieves the embeddings for the given list of ids, applying weights if available.
+
+        :param id_list: A list of token ids.
+        :return: The embeddings for the given ids, as a sequence of vectors.
+        """
+        id_list_remapped: list[int] | np.ndarray
+        if self.token_mapping is None:
+            id_list_remapped = id_list
+        else:
+            id_list_remapped = self.token_mapping[id_list]
+        emb = self.embedding[id_list_remapped]
+        if self.weights is not None:
+            emb = emb * self.weights[id_list][:, None]
+
+        return emb
+
     def _encode_batch(self, sentences: Sequence[str], max_length: int | None) -> np.ndarray:
         """Encode a batch of sentences."""
         ids = self.tokenize(sentences=sentences, max_length=max_length)
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
-                out.append(self.embedding[id_list].mean(0))
+                emb = self._encode_helper(id_list)
+                out.append(emb.mean(axis=0))
             else:
                 out.append(np.zeros(self.dim))
 
@@ -455,3 +474,101 @@ class StaticModel:
         with TemporaryDirectory() as temp_dir:
             self.save_pretrained(temp_dir, model_name=repo_id)
             push_folder_to_hub(Path(temp_dir), subfolder=subfolder, repo_id=repo_id, private=private, token=token)
+
+
+def quantize_model(
+    model: StaticModel,
+    vocabulary_quantization: int | None = None,
+    quantize_to: str | DType | None = None,
+    dimensionality: int | None = None,
+) -> StaticModel:
+    """
+    Quantize the model to a lower precision and possibly lower dimensionality.
+
+    :param model: The model to quantize.
+    :param vocabulary_quantization: The number of clusters to use for quantization.
+    :param quantize_to: The dtype to quantize the model to.
+    :param dimensionality: The desired dimensionality of the model.
+        This needs to be < than the current model dimensionality.
+    :return: A new StaticModel with the quantized embeddings.
+    :raises: ValueError if the model is already quantized.
+    """
+    from model2vec.quantization import quantize_and_reduce_dim
+
+    token_mapping: np.ndarray | None
+    weights: np.ndarray | None
+    if vocabulary_quantization is not None:
+        from model2vec.vocabulary_quantization import quantize_vocabulary
+
+        if len(model.tokens) != len(model.embedding):
+            raise ValueError("Model already has been vocabulary quantized, cannot quantize again.")
+
+        embeddings, token_mapping, weights = quantize_vocabulary(
+            n_clusters=vocabulary_quantization, weights=model.weights, embeddings=model.embedding
+        )
+    else:
+        embeddings = model.embedding
+        token_mapping = model.token_mapping
+        weights = model.weights
+    if quantize_to is not None or dimensionality is not None:
+        embeddings = quantize_and_reduce_dim(
+            embeddings=embeddings,
+            quantize_to=quantize_to,
+            dimensionality=dimensionality,
+        )
+
+    return StaticModel(
+        vectors=embeddings,
+        tokenizer=model.tokenizer,
+        config=model.config,
+        weights=weights,
+        token_mapping=token_mapping,
+        normalize=model.normalize,
+        base_model_name=model.base_model_name,
+        language=model.language,
+    )
+
+
+def _loading_helper(
+    cls: type[StaticModel],
+    path: PathLike,
+    token: str | None,
+    vocabulary_quantization: int | None,
+    quantize_to: str | DType | None,
+    dimensionality: int | None,
+    from_sentence_transformers: bool,
+    normalize: bool | None,
+    subfolder: str | None,
+    force_download: bool,
+) -> StaticModel:
+    """Helper function to load a model from a directory."""
+    from model2vec.hf_utils import load_pretrained
+
+    if from_sentence_transformers and subfolder is not None:
+        raise ValueError("Subfolder is not supported for sentence transformers models.")
+
+    embeddings, tokenizer, config, metadata, weights, mapping = load_pretrained(
+        folder_or_repo_path=path,
+        token=token,
+        from_sentence_transformers=from_sentence_transformers,
+        subfolder=subfolder,
+        force_download=force_download,
+    )
+
+    model = cls(
+        vectors=embeddings,
+        tokenizer=tokenizer,
+        weights=weights,
+        token_mapping=mapping,
+        config=config,
+        normalize=normalize,
+        base_model_name=metadata.get("base_model"),
+        language=metadata.get("language"),
+    )
+
+    return quantize_model(
+        model=model,
+        vocabulary_quantization=vocabulary_quantization,
+        quantize_to=quantize_to,
+        dimensionality=dimensionality,
+    )

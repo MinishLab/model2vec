@@ -25,6 +25,8 @@ def save_pretrained(
     config: dict[str, Any],
     create_model_card: bool = True,
     subfolder: str | None = None,
+    weights: np.ndarray | None = None,
+    mapping: np.ndarray | None = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -36,11 +38,20 @@ def save_pretrained(
     :param config: A metadata config.
     :param create_model_card: Whether to create a model card.
     :param subfolder: The subfolder to save the model in.
+    :param weights: The weights of the model. If None, no weights are saved.
+    :param mapping: The token mapping of the model. If None, there is no token mapping.
     :param **kwargs: Any additional arguments.
     """
     folder_path = folder_path / subfolder if subfolder else folder_path
     folder_path.mkdir(exist_ok=True, parents=True)
-    save_file({"embeddings": embeddings}, folder_path / "model.safetensors")
+
+    model_weights = {"embeddings": embeddings}
+    if weights is not None:
+        model_weights["weights"] = weights
+    if mapping is not None:
+        model_weights["mapping"] = mapping
+
+    save_file(model_weights, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"), pretty=False)
     json.dump(config, open(folder_path / "config.json", "w"), indent=4)
 
@@ -101,7 +112,7 @@ def load_pretrained(
     token: str | None,
     from_sentence_transformers: bool,
     force_download: bool,
-) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any]]:
+) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any], np.ndarray | None, np.ndarray | None]:
     """
     Loads a pretrained model from a folder.
 
@@ -114,7 +125,7 @@ def load_pretrained(
     :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
         already present in the cache.
     :raises: FileNotFoundError if the folder exists, but the file does not exist locally.
-    :return: The embeddings, tokenizer, config, and metadata.
+    :return: The embeddings, tokenizer, config, metadata, weights and mapping.
 
     """
     if from_sentence_transformers:
@@ -176,8 +187,17 @@ def load_pretrained(
         )
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
-    embedding_key = "embedding.weight" if from_sentence_transformers else "embeddings"
-    embeddings = opened_tensor_file.get_tensor(embedding_key)
+    embedding_name = "embedding.weight" if from_sentence_transformers else "embeddings"
+    embeddings = opened_tensor_file.get_tensor(embedding_name)
+    try:
+        weights = opened_tensor_file.get_tensor("weights")
+    except Exception:
+        # Bare except because safetensors does not export its own errors.
+        weights = None
+    try:
+        mapping = opened_tensor_file.get_tensor("mapping")
+    except Exception:
+        mapping = None
 
     if readme_path.exists():
         metadata = _get_metadata_from_readme(readme_path)
@@ -187,12 +207,7 @@ def load_pretrained(
     tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
     config = json.load(open(config_path))
 
-    if len(tokenizer.get_vocab()) != len(embeddings):
-        logger.warning(
-            f"Number of tokens does not match number of embeddings: `{len(tokenizer.get_vocab())}` vs `{len(embeddings)}`"
-        )
-
-    return embeddings, tokenizer, config, metadata
+    return embeddings, tokenizer, config, metadata, weights, mapping
 
 
 def _get_metadata_from_readme(readme_path: Path) -> dict[str, Any]:

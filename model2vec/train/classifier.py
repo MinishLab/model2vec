@@ -38,6 +38,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         hidden_dim: int = 512,
         out_dim: int = 2,
         pad_id: int = 0,
+        token_mapping: list[int] | None = None,
+        weights: torch.Tensor | None = None,
         freeze: bool = False,
     ) -> None:
         """Initialize a standard classifier model."""
@@ -47,7 +49,15 @@ class StaticModelForClassification(FinetunableStaticModel):
         self.classes_: list[str] = [str(x) for x in range(out_dim)]
         # multilabel flag will be set based on the type of `y` passed to fit.
         self.multilabel: bool = False
-        super().__init__(vectors=vectors, out_dim=out_dim, pad_id=pad_id, tokenizer=tokenizer, freeze=freeze)
+        super().__init__(
+            vectors=vectors,
+            out_dim=out_dim,
+            pad_id=pad_id,
+            tokenizer=tokenizer,
+            token_mapping=token_mapping,
+            weights=weights,
+            freeze=freeze,
+        )
 
     @property
     def classes(self) -> np.ndarray:
@@ -416,10 +426,11 @@ class _ClassifierLightningModule(pl.LightningModule):
         x, y = batch
         head_out, _ = self.model(x)
         loss = self.loss_function(head_out, y)
+        accuracy: float
         if self.model.multilabel:
             preds = (torch.sigmoid(head_out) > 0.5).float()
             # Multilabel accuracy is defined as the Jaccard score averaged over samples.
-            accuracy = jaccard_score(y.cpu(), preds.cpu(), average="samples")
+            accuracy = cast(float, jaccard_score(y.cpu(), preds.cpu(), average="samples"))
         else:
             accuracy = (head_out.argmax(dim=1) == y).float().mean()
         self.log("val_loss", loss)

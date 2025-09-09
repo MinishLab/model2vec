@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from enum import Enum
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class DType(str, Enum):

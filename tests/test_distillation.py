@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 from pytest import LogCaptureFixture
-from transformers import AutoModel, BertTokenizerFast
+from transformers import BertTokenizerFast
+from transformers.modeling_utils import PreTrainedModel
 
 from model2vec.distill.distillation import (
     clean_and_create_vocabulary,
@@ -44,7 +45,7 @@ def test_distill_from_model(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
     mock_berttokenizer: BertTokenizerFast,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
     vocabulary: list[str] | None,
     pca_dims: int | None,
     apply_zipf: bool,
@@ -89,7 +90,7 @@ def test_distill_removal_pattern(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
     mock_berttokenizer: BertTokenizerFast,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
 ) -> None:
     """Test the removal pattern."""
     # Mock the return value of model_info to avoid calling the Hugging Face API
@@ -155,7 +156,7 @@ def test_distill_removal_pattern(
 def test_distill(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
     vocabulary: list[str] | None,
     pca_dims: int | None,
     apply_zipf: bool,
@@ -208,7 +209,7 @@ def test_distill(
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
 def test_missing_modelinfo(
     mock_model_info: MagicMock,
-    mock_transformer: AutoModel,
+    mock_transformer: PreTrainedModel,
     mock_berttokenizer: BertTokenizerFast,
 ) -> None:
     """Test that missing model info does not crash."""
@@ -237,7 +238,7 @@ def test__post_process_embeddings(
         with pytest.raises(ValueError):
             post_process_embeddings(embeddings, pca_dims, None)
 
-    processed_embeddings = post_process_embeddings(embeddings, pca_dims, sif_coefficient)
+    processed_embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient)
 
     # Assert the shape is correct
     assert processed_embeddings.shape == expected_shape
