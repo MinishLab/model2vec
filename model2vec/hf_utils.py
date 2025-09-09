@@ -9,6 +9,7 @@ import huggingface_hub
 import numpy as np
 import safetensors
 from huggingface_hub import ModelCard, ModelCardData
+from huggingface_hub.constants import HF_HUB_CACHE
 from safetensors.numpy import save_file
 from tokenizers import Tokenizer
 
@@ -107,9 +108,10 @@ def _create_model_card(
 
 def load_pretrained(
     folder_or_repo_path: str | Path,
-    subfolder: str | None = None,
-    token: str | None = None,
-    from_sentence_transformers: bool = False,
+    subfolder: str | None,
+    token: str | None,
+    from_sentence_transformers: bool,
+    force_download: bool,
 ) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any], np.ndarray | None, np.ndarray | None]:
     """
     Loads a pretrained model from a folder.
@@ -120,8 +122,10 @@ def load_pretrained(
     :param subfolder: The subfolder to load from.
     :param token: The huggingface token to use.
     :param from_sentence_transformers: Whether to load the model from a sentence transformers model.
+    :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
+        already present in the cache.
     :raises: FileNotFoundError if the folder exists, but the file does not exist locally.
-    :return: The embeddings, tokenizer, config, and metadata.
+    :return: The embeddings, tokenizer, config, metadata, weights and mapping.
 
     """
     if from_sentence_transformers:
@@ -133,7 +137,13 @@ def load_pretrained(
         tokenizer_file = "tokenizer.json"
         config_name = "config.json"
 
-    folder_or_repo_path = Path(folder_or_repo_path)
+    cached_folder = _get_latest_model_path(str(folder_or_repo_path))
+    if cached_folder and not force_download:
+        logger.info(f"Found cached model at {cached_folder}, loading from cache.")
+        folder_or_repo_path = cached_folder
+    else:
+        logger.info(f"No cached model found for {folder_or_repo_path}, loading from local or hub.")
+        folder_or_repo_path = Path(folder_or_repo_path)
 
     local_folder = folder_or_repo_path / subfolder if subfolder else folder_or_repo_path
 
@@ -150,9 +160,7 @@ def load_pretrained(
         if not tokenizer_path.exists():
             raise FileNotFoundError(f"Tokenizer file does not exist in {local_folder}")
 
-        # README is optional, so this is a bit finicky.
         readme_path = local_folder / "README.md"
-        metadata = _get_metadata_from_readme(readme_path)
 
     else:
         logger.info("Folder does not exist locally, attempting to use huggingface hub.")
@@ -161,18 +169,11 @@ def load_pretrained(
                 folder_or_repo_path.as_posix(), model_file, token=token, subfolder=subfolder
             )
         )
-
-        try:
-            readme_path = Path(
-                huggingface_hub.hf_hub_download(
-                    folder_or_repo_path.as_posix(), "README.md", token=token, subfolder=subfolder
-                )
+        readme_path = Path(
+            huggingface_hub.hf_hub_download(
+                folder_or_repo_path.as_posix(), "README.md", token=token, subfolder=subfolder
             )
-            metadata = _get_metadata_from_readme(Path(readme_path))
-        except Exception as e:
-            # NOTE: we don't want to raise an error here, since the README is optional.
-            logger.info(f"No README found in the model folder: {e} No model card loaded.")
-            metadata = {}
+        )
 
         config_path = Path(
             huggingface_hub.hf_hub_download(
@@ -186,21 +187,22 @@ def load_pretrained(
         )
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
-    if from_sentence_transformers:
-        embeddings = opened_tensor_file.get_tensor("embedding.weight")
+    embedding_name = "embedding.weight" if from_sentence_transformers else "embeddings"
+    embeddings = opened_tensor_file.get_tensor(embedding_name)
+    try:
+        weights = opened_tensor_file.get_tensor("weights")
+    except Exception:
+        # Bare except because safetensors does not export its own errors.
         weights = None
+    try:
+        mapping = opened_tensor_file.get_tensor("mapping")
+    except Exception:
         mapping = None
+
+    if readme_path.exists():
+        metadata = _get_metadata_from_readme(readme_path)
     else:
-        embeddings = opened_tensor_file.get_tensor("embeddings")
-        try:
-            weights = opened_tensor_file.get_tensor("weights")
-        except Exception:
-            # Bare except because safetensors does not export its own errors.
-            weights = None
-        try:
-            mapping = opened_tensor_file.get_tensor("mapping")
-        except Exception:
-            mapping = None
+        metadata = {}
 
     tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
     config = json.load(open(config_path))
@@ -240,3 +242,28 @@ def push_folder_to_hub(
     huggingface_hub.upload_folder(repo_id=repo_id, folder_path=folder_path, token=token, path_in_repo=subfolder)
 
     logger.info(f"Pushed model to {repo_id}")
+
+
+def _get_latest_model_path(model_id: str) -> Path | None:
+    """
+    Gets the latest model path for a given identifier from the hugging face hub cache.
+
+    Returns None if there is no cached model. In this case, the model will be downloaded.
+    """
+    # Make path object
+    cache_dir = Path(HF_HUB_CACHE)
+    # This is specific to how HF stores the files.
+    normalized = model_id.replace("/", "--")
+    repo_dir = cache_dir / f"models--{normalized}" / "snapshots"
+
+    if not repo_dir.exists():
+        return None
+
+    # Find all directories.
+    snapshots = [p for p in repo_dir.iterdir() if p.is_dir()]
+    if not snapshots:
+        return None
+
+    # Get the latest directory by modification time.
+    latest_snapshot = max(snapshots, key=lambda p: p.stat().st_mtime)
+    return latest_snapshot

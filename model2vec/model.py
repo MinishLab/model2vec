@@ -12,8 +12,8 @@ from joblib import delayed
 from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
-from model2vec.quantization import DType
-from model2vec.utils import ProgressParallel, load_local_model
+from model2vec.quantization import DType, quantize_and_reduce_dim
+from model2vec.utils import ProgressParallel
 
 PathLike = Union[Path, str]
 
@@ -174,6 +174,7 @@ class StaticModel:
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
         vocabulary_quantization: int | None = None,
+        force_download: bool = True,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -190,6 +191,8 @@ class StaticModel:
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
         :param vocabulary_quantization: The number of clusters to use for vocabulary quantization.
+        :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
+            already present in the cache.
         :return: A StaticModel.
         """
         return _loading_helper(
@@ -202,6 +205,7 @@ class StaticModel:
             from_sentence_transformers=False,
             normalize=normalize,
             subfolder=subfolder,
+            force_download=force_download,
         )
 
     @classmethod
@@ -213,6 +217,7 @@ class StaticModel:
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
         vocabulary_quantization: int | None = None,
+        force_download: bool = True,
     ) -> StaticModel:
         """
         Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
@@ -228,6 +233,8 @@ class StaticModel:
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
         :param vocabulary_quantization: The number of clusters to use for vocabulary quantization.
+        :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
+            already present in the cache.
         :return: A StaticModel.
         """
         return _loading_helper(
@@ -240,6 +247,7 @@ class StaticModel:
             from_sentence_transformers=True,
             normalize=normalize,
             subfolder=None,
+            force_download=force_download,
         )
 
     @overload
@@ -467,33 +475,6 @@ class StaticModel:
             self.save_pretrained(temp_dir, model_name=repo_id)
             push_folder_to_hub(Path(temp_dir), subfolder=subfolder, repo_id=repo_id, private=private, token=token)
 
-    @classmethod
-    def load_local(cls: type[StaticModel], path: PathLike) -> StaticModel:
-        """
-        Loads a model from a local path.
-
-        You should only use this code path if you are concerned with start-up time.
-        Loading via the `from_pretrained` method is safer, and auto-downloads, but
-        also means we import a whole bunch of huggingface code that we don't need.
-
-        Additionally, huggingface will check the most recent version of the model,
-        which can be slow.
-
-        :param path: The path to load the model from. The path is a directory saved by the
-            `save_pretrained` method.
-        :return: A StaticModel
-        :raises: ValueError if the path is not a directory.
-        """
-        path = Path(path)
-        if not path.is_dir():
-            raise ValueError(f"Path {path} is not a directory.")
-
-        embeddings, tokenizer, config, weights, mapping = load_local_model(path)
-
-        return StaticModel(
-            vectors=embeddings, tokenizer=tokenizer, config=config, weights=weights, token_mapping=mapping
-        )
-
 
 def quantize_model(
     model: StaticModel,
@@ -552,12 +533,13 @@ def _loading_helper(
     cls: type[StaticModel],
     path: PathLike,
     token: str | None,
-    vocabulary_quantization: int | None = None,
-    quantize_to: str | DType | None = None,
-    dimensionality: int | None = None,
-    from_sentence_transformers: bool = False,
-    normalize: bool | None = None,
-    subfolder: str | None = None,
+    vocabulary_quantization: int | None,
+    quantize_to: str | DType | None,
+    dimensionality: int | None,
+    from_sentence_transformers: bool,
+    normalize: bool | None,
+    subfolder: str | None,
+    force_download: bool,
 ) -> StaticModel:
     """Helper function to load a model from a directory."""
     from model2vec.hf_utils import load_pretrained
@@ -570,6 +552,7 @@ def _loading_helper(
         token=token,
         from_sentence_transformers=from_sentence_transformers,
         subfolder=subfolder,
+        force_download=force_download,
     )
 
     model = cls(

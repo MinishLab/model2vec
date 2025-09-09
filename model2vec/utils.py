@@ -102,33 +102,3 @@ def setup_logging() -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[RichHandler(rich_tracebacks=True)],
     )
-
-
-def load_local_model(
-    folder: Path,
-) -> tuple[np.ndarray, Tokenizer, dict[str, str], np.ndarray | None, np.ndarray | None]:
-    """Load a local model."""
-    embeddings_path = folder / "model.safetensors"
-    tokenizer_path = folder / "tokenizer.json"
-    config_path = folder / "config.json"
-
-    opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(embeddings_path, framework="numpy"))
-    embeddings = opened_tensor_file.get_tensor("embeddings")
-    try:
-        weights = opened_tensor_file.get_tensor("weights")
-    except Exception:
-        # Bare except because safetensors does not export its own errors.
-        weights = None
-    try:
-        mapping = opened_tensor_file.get_tensor("mapping")
-    except Exception:
-        mapping = None
-
-    if config_path.exists():
-        config = json.load(open(config_path))
-    else:
-        config = {}
-
-    tokenizer: Tokenizer = Tokenizer.from_file(str(tokenizer_path))
-
-    return embeddings, tokenizer, config, weights, mapping
