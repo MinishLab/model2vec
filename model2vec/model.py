@@ -156,7 +156,7 @@ class StaticModel:
         subfolder: str | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
-        force_download: bool = False,
+        force_download: bool = True,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -209,7 +209,7 @@ class StaticModel:
         normalize: bool | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
-        force_download: bool = False,
+        force_download: bool = True,
     ) -> StaticModel:
         """
         Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
