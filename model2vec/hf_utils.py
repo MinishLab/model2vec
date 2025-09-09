@@ -97,10 +97,10 @@ def _create_model_card(
 
 def load_pretrained(
     folder_or_repo_path: str | Path,
-    subfolder: str | None = None,
-    token: str | None = None,
-    from_sentence_transformers: bool = False,
-    force_download: bool = False,
+    subfolder: str | None,
+    token: str | None,
+    from_sentence_transformers: bool,
+    force_download: bool,
 ) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any]]:
     """
     Loads a pretrained model from a folder.
