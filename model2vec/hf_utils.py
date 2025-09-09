@@ -100,7 +100,7 @@ def load_pretrained(
     subfolder: str | None = None,
     token: str | None = None,
     from_sentence_transformers: bool = False,
-    skip_metadata: bool = False,
+    force_download: bool = False,
 ) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any]]:
     """
     Loads a pretrained model from a folder.
@@ -111,7 +111,8 @@ def load_pretrained(
     :param subfolder: The subfolder to load from.
     :param token: The huggingface token to use.
     :param from_sentence_transformers: Whether to load the model from a sentence transformers model.
-    :param skip_metadata: Whether to skip loading metadata. This is useful if you don't need the metadata.
+    :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
+        already present in the cache.
     :raises: FileNotFoundError if the folder exists, but the file does not exist locally.
     :return: The embeddings, tokenizer, config, and metadata.
 
@@ -125,7 +126,8 @@ def load_pretrained(
         tokenizer_file = "tokenizer.json"
         config_name = "config.json"
 
-    if cached_folder := _get_latest_model_path(str(folder_or_repo_path)):
+    cached_folder = _get_latest_model_path(str(folder_or_repo_path))
+    if cached_folder and not force_download:
         logger.info(f"Found cached model at {cached_folder}, loading from cache.")
         folder_or_repo_path = cached_folder
     else:
@@ -177,7 +179,7 @@ def load_pretrained(
     embedding_key = "embedding.weight" if from_sentence_transformers else "embeddings"
     embeddings = opened_tensor_file.get_tensor(embedding_key)
 
-    if not skip_metadata and readme_path.exists():
+    if readme_path.exists():
         metadata = _get_metadata_from_readme(readme_path)
     else:
         metadata = {}

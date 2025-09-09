@@ -156,7 +156,7 @@ class StaticModel:
         subfolder: str | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
-        skip_metadata: bool = False,
+        force_download: bool = False,
     ) -> StaticModel:
         """
         Load a StaticModel from a local path or huggingface hub path.
@@ -172,8 +172,8 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
-        :param skip_metadata: Whether to skip loading metadata. This is useful if you don't need the metadata.
-            Loading metadata can be slow for models with lots of results in the README.md
+        :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
+            already present in the cache.
         :return: A StaticModel.
         """
         from model2vec.hf_utils import load_pretrained
@@ -183,7 +183,7 @@ class StaticModel:
             token=token,
             from_sentence_transformers=False,
             subfolder=subfolder,
-            skip_metadata=skip_metadata,
+            force_download=force_download,
         )
 
         embeddings = quantize_and_reduce_dim(
@@ -209,7 +209,7 @@ class StaticModel:
         normalize: bool | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
-        skip_metadata: bool = False,
+        force_download: bool = False,
     ) -> StaticModel:
         """
         Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
@@ -224,8 +224,8 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
-        :param skip_metadata: Whether to skip loading metadata. This is useful if you don't need the metadata.
-            Loading metadata can be slow for models with lots of results in the README.md
+        :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
+            already present in the cache.
         :return: A StaticModel.
         """
         from model2vec.hf_utils import load_pretrained
@@ -235,7 +235,7 @@ class StaticModel:
             token=token,
             from_sentence_transformers=True,
             subfolder=None,
-            skip_metadata=skip_metadata,
+            force_download=force_download,
         )
 
         embeddings = quantize_and_reduce_dim(
