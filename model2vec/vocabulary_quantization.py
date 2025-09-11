@@ -10,8 +10,7 @@ try:
     from sklearn.cluster import KMeans
 except ImportError:
     raise ImportError(
-        "scikit-learn is required for quantizing the vocabulary. "
-        "Please install model2vec with the quantization extra."
+        "scikit-learn is required for quantizing the vocabulary. Please install model2vec with the quantization extra."
     )
 
 

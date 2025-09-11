@@ -86,6 +86,8 @@ select = [
     "C90",
     # Pydocstyle: Enforce docstrings
     "D",
+    # Remove unused imports
+    "F",
     # Isort: Enforce import order
     "I",
     # Numpy: Enforce numpy style
@@ -96,7 +98,7 @@ select = [
 
 ignore = [
     # Allow self and cls to be untyped, and allow Any type
-    "ANN101", "ANN102", "ANN401",
+    "ANN001", "ANN002", "ANN401",
     # Pydocstyle ignores
     "D100", "D101", "D104", "D203", "D212", "D401",
     # Allow use of f-strings in logging
