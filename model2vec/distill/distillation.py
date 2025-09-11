@@ -7,7 +7,6 @@ from typing import cast
 
 import numpy as np
 from huggingface_hub import model_info
-from skeletoken import TokenizerModel
 from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
