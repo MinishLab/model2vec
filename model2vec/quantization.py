@@ -15,6 +15,14 @@ class DType(str, Enum):
     Int8 = "int8"
 
 
+dtype_map = {
+    DType.Float16: np.float16,
+    DType.Float32: np.float32,
+    DType.Float64: np.float64,
+    DType.Int8: np.int8,
+}
+
+
 def quantize_embeddings(embeddings: np.ndarray, quantize_to: DType) -> np.ndarray:
     """
     Quantize embeddings to a specified data type to reduce memory usage.
@@ -24,17 +32,28 @@ def quantize_embeddings(embeddings: np.ndarray, quantize_to: DType) -> np.ndarra
     :return: The quantized embeddings.
     :raises ValueError: If the quantization type is not valid.
     """
-    if quantize_to == DType.Float16:
-        return embeddings.astype(np.float16)
-    elif quantize_to == DType.Float32:
-        return embeddings.astype(np.float32)
-    elif quantize_to == DType.Float64:
-        return embeddings.astype(np.float64)
+    mapped_dtype = dtype_map[quantize_to]
+    if embeddings.dtype == mapped_dtype:
+        # Don't do anything if they match
+        return embeddings
+
+    # Handle float types
+    if quantize_to in {DType.Float16, DType.Float32, DType.Float64}:
+        return embeddings.astype(mapped_dtype)
     elif quantize_to == DType.Int8:
         # Normalize to [-128, 127] range for int8
         # We normalize to -127 to 127 to keep symmetry.
         scale = np.max(np.abs(embeddings)) / 127.0
-        quantized = np.round(embeddings / scale).astype(np.int8)
+        # Turn into float16 to minimize memory usage during computation
+        # we copy once.
+        buf = embeddings.astype(np.float16, copy=True)
+        # Divide by the scale
+        np.divide(buf, scale, out=buf)
+        # Round to int, copy to the buffer
+        np.rint(buf, out=buf)
+        # Clip to int8 range and convert to int8
+        np.clip(buf, -127, 127, out=buf)
+        quantized = buf.astype(np.int8)
         return quantized
     else:
         raise ValueError("Not a valid enum member of DType.")
