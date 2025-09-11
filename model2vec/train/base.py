@@ -16,7 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 class FinetunableStaticModel(nn.Module):
-    def __init__(self, *, vectors: torch.Tensor, tokenizer: Tokenizer, out_dim: int = 2, pad_id: int = 0) -> None:
+    def __init__(
+        self,
+        *,
+        vectors: torch.Tensor,
+        tokenizer: Tokenizer,
+        out_dim: int = 2,
+        pad_id: int = 0,
+        token_mapping: list[int] | None = None,
+        weights: torch.Tensor | None = None,
+        freeze: bool = False,
+    ) -> None:
         """
         Initialize a trainable StaticModel from a StaticModel.
 
@@ -24,6 +34,9 @@ class FinetunableStaticModel(nn.Module):
         :param tokenizer: The tokenizer.
         :param out_dim: The output dimension of the head.
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models
+        :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
+        :param weights: The weights of the model. If None, the weights are initialized to zeros.
+        :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
         """
         super().__init__()
         self.pad_id = pad_id
@@ -38,16 +51,22 @@ class FinetunableStaticModel(nn.Module):
             )
             self.vectors = vectors.float()
 
-        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=False, padding_idx=pad_id)
+        if token_mapping is not None:
+            self.token_mapping = torch.tensor(token_mapping, dtype=torch.int64)
+        else:
+            self.token_mapping = torch.arange(len(vectors), dtype=torch.int64)
+        self.token_mapping = nn.Parameter(self.token_mapping, requires_grad=False)
+        self.freeze = freeze
+        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=self.freeze, padding_idx=pad_id)
         self.head = self.construct_head()
-        self.w = self.construct_weights()
+        self.w = self.construct_weights() if weights is None else nn.Parameter(weights.float(), requires_grad=True)
         self.tokenizer = tokenizer
 
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""
-        weights = torch.zeros(len(self.vectors))
+        weights = torch.zeros(len(self.token_mapping))
         weights[self.pad_id] = -10_000
-        return nn.Parameter(weights)
+        return nn.Parameter(weights, requires_grad=not self.freeze)
 
     def construct_head(self) -> nn.Sequential:
         """Method should be overridden for various other classes."""
@@ -62,15 +81,24 @@ class FinetunableStaticModel(nn.Module):
         return cls.from_static_model(model=model, out_dim=out_dim, **kwargs)
 
     @classmethod
-    def from_static_model(cls: type[ModelType], *, model: StaticModel, out_dim: int = 2, **kwargs: Any) -> ModelType:
+    def from_static_model(
+        cls: type[ModelType], *, model: StaticModel, out_dim: int = 2, pad_token: str = "[PAD]", **kwargs: Any
+    ) -> ModelType:
         """Load the model from a static model."""
         model.embedding = np.nan_to_num(model.embedding)
+        weights = torch.from_numpy(model.weights) if model.weights is not None else None
         embeddings_converted = torch.from_numpy(model.embedding)
+        if model.token_mapping is not None:
+            token_mapping = model.token_mapping.tolist()
+        else:
+            token_mapping = None
         return cls(
             vectors=embeddings_converted,
-            pad_id=model.tokenizer.token_to_id("[PAD]"),
+            pad_id=model.tokenizer.token_to_id(pad_token),
             out_dim=out_dim,
             tokenizer=model.tokenizer,
+            token_mapping=token_mapping,
+            weights=weights,
             **kwargs,
         )
 
@@ -90,7 +118,8 @@ class FinetunableStaticModel(nn.Module):
         w = w * zeros
         # Add a small epsilon to avoid division by zero
         length = zeros.sum(1) + 1e-16
-        embedded = self.embeddings(input_ids)
+        input_ids_embeddings = self.token_mapping[input_ids]
+        embedded = self.embeddings(input_ids_embeddings)
         # Weigh each token
         embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
         # Mean pooling by dividing by the length
@@ -118,7 +147,7 @@ class FinetunableStaticModel(nn.Module):
         return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
 
     @property
-    def device(self) -> str:
+    def device(self) -> torch.device:
         """Get the device of the model."""
         return self.embeddings.weight.device
 
@@ -126,8 +155,11 @@ class FinetunableStaticModel(nn.Module):
         """Convert the model to a static model."""
         emb = self.embeddings.weight.detach().cpu().numpy()
         w = torch.sigmoid(self.w).detach().cpu().numpy()
+        token_mapping = self.token_mapping.numpy()
 
-        return StaticModel(emb * w[:, None], self.tokenizer, normalize=True)
+        return StaticModel(
+            vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=True, token_mapping=token_mapping
+        )
 
 
 class TextDataset(Dataset):
@@ -157,7 +189,7 @@ class TextDataset(Dataset):
         """Collate function."""
         texts, targets = zip(*batch)
 
-        tensors = [torch.LongTensor(x) for x in texts]
+        tensors: list[torch.Tensor] = [torch.LongTensor(x) for x in texts]
         padded = pad_sequence(tensors, batch_first=True, padding_value=0)
 
         return padded, torch.stack(targets)

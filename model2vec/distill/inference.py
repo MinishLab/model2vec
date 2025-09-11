@@ -11,8 +11,8 @@ import torch
 from sklearn.decomposition import PCA
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
-from transformers import PreTrainedModel
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+from transformers.modeling_utils import PreTrainedModel
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def create_embeddings(
     :param pad_token_id: The pad token id. Used to pad sequences.
     :return: The output embeddings.
     """
-    model = model.to(device)  # type: ignore
+    model = model.to(device)  # type: ignore  # Transformers error
 
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
@@ -117,7 +117,7 @@ def _encode_mean_using_model(model: PreTrainedModel, encodings: dict[str, torch.
 
 def post_process_embeddings(
     embeddings: np.ndarray, pca_dims: PCADimType, sif_coefficient: float | None = 1e-4
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     """Post process embeddings by applying PCA and SIF weighting by estimating the frequencies through Zipf's law."""
     if pca_dims is not None:
         if pca_dims == "auto":
@@ -154,6 +154,8 @@ def post_process_embeddings(
         logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
         inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
         proba = inv_rank / np.sum(inv_rank)
-        embeddings *= (sif_coefficient / (sif_coefficient + proba))[:, None]
+        weight = sif_coefficient / (sif_coefficient + proba)
+    else:
+        weight = np.ones(embeddings.shape[0])
 
-    return embeddings
+    return embeddings, weight

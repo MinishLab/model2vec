@@ -238,7 +238,7 @@ def test__post_process_embeddings(
         with pytest.raises(ValueError):
             post_process_embeddings(embeddings, pca_dims, None)
 
-    processed_embeddings = post_process_embeddings(embeddings, pca_dims, sif_coefficient)
+    processed_embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient)
 
     # Assert the shape is correct
     assert processed_embeddings.shape == expected_shape

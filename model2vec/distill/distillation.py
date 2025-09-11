@@ -18,6 +18,7 @@ from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
 from model2vec.tokenizer import clean_and_create_vocabulary, replace_vocabulary, turn_tokens_into_ids
 from model2vec.tokenizer.tokenizer import _patch_tokenizer
+from model2vec.vocabulary_quantization import quantize_vocabulary
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ def distill_from_model(
     token_remove_pattern: str | None = r"\[unused\d+\]",
     quantize_to: DType | str = DType.Float16,
     lower_case: bool = True,
+    vocabulary_quantization: int | None = None,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -56,6 +58,7 @@ def distill_from_model(
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param lower_case: If this is set, all tokens in the model vocabulary will be converted to lowercase, and
         a lowercase normalizer will be inserted. This almost always improves performance.
+    :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no quantization is performed.
     :return: A StaticModel
     :raises: ValueError if the vocabulary is empty after preprocessing.
 
@@ -106,8 +109,16 @@ def distill_from_model(
         pad_token_id = vocab[pad_token]
     embeddings = create_embeddings(tokenized=token_ids, model=model, device=device, pad_token_id=pad_token_id)
 
-    # Post process the embeddings by applying PCA and Zipf weighting.
-    embeddings = post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+    if vocabulary_quantization is not None:
+        _, weights = post_process_embeddings(np.asarray(embeddings), None, sif_coefficient=sif_coefficient)
+        embeddings, token_mapping, weights = quantize_vocabulary(
+            n_clusters=vocabulary_quantization, weights=weights, embeddings=np.asarray(embeddings)
+        )
+        embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
+    else:
+        # Post-process the embeddings.
+        embeddings, weights = post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+        token_mapping = None
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
@@ -140,6 +151,8 @@ def distill_from_model(
 
     return StaticModel(
         vectors=embeddings,
+        weights=weights,
+        token_mapping=token_mapping,
         tokenizer=backend_tokenizer,
         config=config,
         base_model_name=model_name,
@@ -186,6 +199,7 @@ def distill(
     trust_remote_code: bool = False,
     quantize_to: DType | str = DType.Float16,
     lower_case: bool = True,
+    vocabulary_quantization: int | None = None,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -209,6 +223,7 @@ def distill(
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param lower_case: If this is set, all tokens in the model vocabulary will be converted to lowercase, and
         a lowercase normalizer will be inserted. This almost always improves performance.
+    :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no quantization is performed.
     :return: A StaticModel
 
     """
@@ -228,4 +243,5 @@ def distill(
         sif_coefficient=sif_coefficient,
         quantize_to=quantize_to,
         lower_case=lower_case,
+        vocabulary_quantization=vocabulary_quantization,
     )
