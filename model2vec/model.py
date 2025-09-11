@@ -566,6 +566,11 @@ def _loading_helper(
         language=metadata.get("language"),
     )
 
+    # If no quantization or dimensionality reduction is requested,
+    # return the model as is.
+    if not any([vocabulary_quantization, quantize_to, dimensionality]):
+        return model
+
     return quantize_model(
         model=model,
         vocabulary_quantization=vocabulary_quantization,
