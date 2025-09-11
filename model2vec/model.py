@@ -506,6 +506,7 @@ def quantize_model(
         embeddings, token_mapping, weights = quantize_vocabulary(
             n_clusters=vocabulary_quantization, weights=model.weights, embeddings=model.embedding
         )
+        model.config["vocabulary_quantization"] = vocabulary_quantization
     else:
         embeddings = model.embedding
         token_mapping = model.token_mapping

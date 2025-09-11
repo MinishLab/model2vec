@@ -53,6 +53,9 @@ def save_pretrained(
 
     save_file(model_weights, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"), pretty=False)
+
+    # Add embedding dtype to config
+    config["embedding_dtype"] = np.dtype(embeddings.dtype).name
     json.dump(config, open(folder_path / "config.json", "w"), indent=4)
 
     # Create modules.json
