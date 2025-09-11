@@ -212,6 +212,13 @@ def test_load_pretrained_quantized(
     assert loaded_model.embedding.dtype == np.float32
     assert loaded_model.embedding.shape == mock_vectors.shape
 
+    # Load the model back from the same path
+    loaded_model = StaticModel.from_pretrained(save_path, quantize_to="float64")
+    # Assert that the loaded model has the same properties as the original one
+    assert loaded_model.embedding.dtype == np.float64
+    # Should not copy if same as original.
+    assert loaded_model.embedding is loaded_model.embedding
+
 
 def test_load_pretrained_dim(
     tmp_path: Path, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
