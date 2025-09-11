@@ -60,7 +60,7 @@ dev = [
     "ruff",
 ]
 
-distill = ["torch", "transformers", "scikit-learn", "skeletoken @ git+https://github.com/stephantul/skeletoken.git"]
+distill = ["torch", "transformers", "scikit-learn", "skeletoken"]
 onnx = ["onnx", "torch"]
 # train also installs inference
 train = ["torch", "lightning", "scikit-learn", "skops"]

@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import json
 import logging
 import re
 from importlib import import_module
 from importlib.metadata import metadata
-from pathlib import Path
 from typing import Any, Iterator, Protocol, cast
 
 import numpy as np
-import safetensors
 from joblib import Parallel
-from tokenizers import Tokenizer
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -78,12 +74,15 @@ def get_package_extras(package: str, extra: str) -> Iterator[str]:
             found_extra = rest[0].split("==")[-1].strip(" \"'")
             if found_extra == extra:
                 prefix, *_ = _DIVIDERS.split(name)
+                prefix = prefix.split("@")[0].strip()
                 yield prefix.strip()
 
 
 def importable(module: str, extra: str) -> None:
     """Check if a module is importable."""
     module = dict(_MODULE_MAP).get(module, module)
+    # Allows this to work with git installed modules.
+    module = module.split("@")[0].strip()
     try:
         import_module(module)
     except ImportError:

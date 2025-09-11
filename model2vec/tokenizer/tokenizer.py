@@ -56,18 +56,7 @@ def replace_vocabulary(tokenizer: Tokenizer, new_vocabulary: list[Token]) -> Tok
         new_added_tokens.append(added_token)
     for token in new_vocabulary:
         if token.is_multiword and token.form not in {tokenizer_model.unk_token, tokenizer_model.pad_token}:
-            token_id = tokenizer_model.model.vocab[token.form]
-            new_added_tokens.append(
-                AddedToken(
-                    content=token.form,
-                    single_word=False,
-                    lstrip=True,
-                    rstrip=True,
-                    normalized=True,
-                    special=False,
-                    id=token_id,
-                )
-            )
+            tokenizer_model.add_addedtoken(token.form, normalized=True, single_word=False)
 
     pre_tokenized_tokens = [x.normalized_form for x in new_vocabulary]
     tokenizer_model.added_tokens = AddedTokens(_remap_added_tokens(new_added_tokens, pre_tokenized_tokens))
@@ -234,32 +223,32 @@ def turn_tokens_into_ids(tokens: list[Token], tokenizer: Tokenizer) -> list[list
     """
     prefix, suffix = find_eos_bos(tokenizer)
 
-    prefix_id, suffix_id = None, None
+    prefix_ids, suffix_ids = None, None
     vocab = tokenizer.get_vocab()
     if prefix is not None:
-        prefix_id = vocab[prefix]
+        prefix_ids = [vocab[token] for token in prefix]
     if suffix is not None:
-        suffix_id = vocab[suffix]
+        suffix_ids = [vocab[token] for token in suffix]
 
     token_ids: list[list[int]] = []
     for token in tokens:
         token_sequence = []
-        if prefix_id is not None:
-            token_sequence.append(prefix_id)
+        if prefix_ids is not None:
+            token_sequence.extend(prefix_ids)
         if token.is_internal:
             token_id = vocab[token.form]
             token_sequence.append(token_id)
         else:
             token_sequence.extend(tokenizer.encode(token.form).ids)
-        if suffix_id is not None:
-            token_sequence.append(suffix_id)
+        if suffix_ids is not None:
+            token_sequence.extend(suffix_ids)
 
         token_ids.append(token_sequence)
 
     return token_ids
 
 
-def find_eos_bos(tokenizer: Tokenizer) -> tuple[str | None, str | None]:
+def find_eos_bos(tokenizer: Tokenizer) -> tuple[list[str] | None, list[str] | None]:
     """Finds the eos and bos tokens for a tokenizer."""
     model = TokenizerModel.from_tokenizer(tokenizer)
     return model.bos, model.eos

@@ -888,7 +888,8 @@ dev = [
 ]
 distill = [
     { name = "scikit-learn" },
-    { name = "skeletoken" },
+    { name = "skeletoken", version = "0.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "skeletoken", version = "0.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "torch" },
     { name = "transformers" },
 ]
@@ -934,7 +935,7 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'quantization'" },
     { name = "scikit-learn", marker = "extra == 'train'" },
     { name = "setuptools" },
-    { name = "skeletoken", marker = "extra == 'distill'", git = "https://github.com/stephantul/skeletoken.git" },
+    { name = "skeletoken", marker = "extra == 'distill'" },
     { name = "skops", marker = "extra == 'inference'" },
     { name = "skops", marker = "extra == 'train'" },
     { name = "tokenizers", specifier = ">=0.20" },
@@ -2246,10 +2247,35 @@ wheels = [
 [[package]]
 name = "skeletoken"
 version = "0.1.0"
-source = { git = "https://github.com/stephantul/skeletoken.git#cb0f274f4a619f7be44f32a9d7051f263d6a7dcb" }
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.13'",
+    "python_full_version == '3.12.*'",
+    "python_full_version == '3.11.*'",
+]
 dependencies = [
-    { name = "pydantic" },
-    { name = "tokenizers" },
+    { name = "pydantic", marker = "python_full_version >= '3.11'" },
+    { name = "tokenizers", marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f3/ac/71a7227224e84e2662dc0a6417fac1cf29988605ebef97a30e978c346ab3/skeletoken-0.1.0.tar.gz", hash = "sha256:a5181d09c5fbeb7b20c9efb6f3531d1d45abe0813d46638b9e1e3f585e731468", size = 156988 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/8d/b6c2606d243ae44a676f3133f53da0fff32a5555b77fa527d8de600039a7/skeletoken-0.1.0-py3-none-any.whl", hash = "sha256:12a6c9ab8c35cf9681f03437b60355956a5e4cd3742ea1c3c3233cbf7a85c5e7", size = 15458 },
+]
+
+[[package]]
+name = "skeletoken"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.11'",
+]
+dependencies = [
+    { name = "pydantic", marker = "python_full_version < '3.11'" },
+    { name = "tokenizers", marker = "python_full_version < '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f6/03/ad4480b25cfd50e1b686f0d08a8246310f28d27f7ca7022e4cf15a3efe63/skeletoken-0.2.0.tar.gz", hash = "sha256:49b6675560660bbc8a609a2bf19bf9a0d3b3d7c25f34f6c1679f17ee7a9f1423", size = 202773 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e4/1c/52265146bd7f04c1327f77010c74e9d2f333193b9caf8048746315bbc572/skeletoken-0.2.0-py3-none-any.whl", hash = "sha256:2f7848875623cf791977bb23724eef8170f7da680f23f6f3cbf8775a62c22d96", size = 26444 },
 ]
 
 [[package]]
