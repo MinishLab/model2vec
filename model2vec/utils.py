@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import json
 import logging
 import re
 from importlib import import_module
 from importlib.metadata import metadata
-from pathlib import Path
-from typing import Any, Iterator, Protocol, cast
+from typing import Any, Iterator, Protocol
 
 import numpy as np
-import safetensors
 from joblib import Parallel
-from tokenizers import Tokenizer
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)

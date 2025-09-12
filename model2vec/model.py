@@ -5,7 +5,7 @@ import os
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator, Sequence, Union, cast, overload
+from typing import Any, Iterator, Sequence, Union, overload
 
 import numpy as np
 from joblib import delayed
@@ -493,8 +493,6 @@ def quantize_model(
     :return: A new StaticModel with the quantized embeddings.
     :raises: ValueError if the model is already quantized.
     """
-    from model2vec.quantization import quantize_and_reduce_dim
-
     token_mapping: np.ndarray | None
     weights: np.ndarray | None
     if vocabulary_quantization is not None:
