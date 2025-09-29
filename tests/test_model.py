@@ -180,7 +180,9 @@ def test_load_pretrained(
     # Assert that the loaded model has the same properties as the original one
     np.testing.assert_array_equal(loaded_model.embedding, mock_vectors)
     assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
-    assert loaded_model.config == mock_config
+    for k, v in mock_config.items():
+        assert loaded_model.config.get(k) == v
+    assert "embedding_dtype" in loaded_model.config
 
 
 def test_load_pretrained_quantized(
@@ -198,6 +200,7 @@ def test_load_pretrained_quantized(
     # Assert that the loaded model has the same properties as the original one
     assert loaded_model.embedding.dtype == np.int8
     assert loaded_model.embedding.shape == mock_vectors.shape
+    assert loaded_model.embedding_dtype == "int8"
 
     # Load the model back from the same path
     loaded_model = StaticModel.from_pretrained(save_path, quantize_to="float16")
@@ -205,12 +208,14 @@ def test_load_pretrained_quantized(
     # Assert that the loaded model has the same properties as the original one
     assert loaded_model.embedding.dtype == np.float16
     assert loaded_model.embedding.shape == mock_vectors.shape
+    assert loaded_model.embedding_dtype == "float16"
 
     # Load the model back from the same path
     loaded_model = StaticModel.from_pretrained(save_path, quantize_to="float32")
     # Assert that the loaded model has the same properties as the original one
     assert loaded_model.embedding.dtype == np.float32
     assert loaded_model.embedding.shape == mock_vectors.shape
+    assert loaded_model.embedding_dtype == "float32"
 
     # Load the model back from the same path
     loaded_model = StaticModel.from_pretrained(save_path, quantize_to="float64")
@@ -234,7 +239,9 @@ def test_load_pretrained_dim(
     # Assert that the loaded model has the same properties as the original one
     np.testing.assert_array_equal(loaded_model.embedding, mock_vectors[:, :2])
     assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
-    assert loaded_model.config == mock_config
+    for k, v in mock_config.items():
+        assert loaded_model.config.get(k) == v
+    assert "embedding_dtype" in loaded_model.config
 
     # Load the model back from the same path
     loaded_model = StaticModel.from_pretrained(save_path, dimensionality=None)
@@ -242,7 +249,9 @@ def test_load_pretrained_dim(
     # Assert that the loaded model has the same properties as the original one
     np.testing.assert_array_equal(loaded_model.embedding, mock_vectors)
     assert loaded_model.tokenizer.get_vocab() == mock_tokenizer.get_vocab()
-    assert loaded_model.config == mock_config
+    for k, v in mock_config.items():
+        assert loaded_model.config.get(k) == v
+    assert "embedding_dtype" in loaded_model.config
 
     # Load the model back from the same path
     with pytest.raises(ValueError):
@@ -267,6 +276,7 @@ def test_load_pretrained_vocabulary_quantized(
     assert loaded_model.weights is not None
     assert loaded_model.weights.shape == (5,)
     assert loaded_model.token_mapping is not None
+    assert loaded_model.vocabulary_quantization == 3
     assert len(loaded_model.token_mapping) == mock_tokenizer.get_vocab_size()
     assert len(loaded_model.token_mapping) == len(loaded_model.weights)
     assert loaded_model.encode("word1 word2").shape == (2,)
