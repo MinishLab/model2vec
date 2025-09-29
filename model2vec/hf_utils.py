@@ -54,13 +54,18 @@ def save_pretrained(
     save_file(model_weights, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"), pretty=False)
 
-    # Add embedding dtype to config
-    config["embedding_dtype"] = np.dtype(embeddings.dtype).name
-    json.dump(config, open(folder_path / "config.json", "w"), indent=4)
+    # Create a copy of config and add dtype and vocab quantization
+    cfg = dict(config)
+    cfg["embedding_dtype"] = np.dtype(embeddings.dtype).name
+    if mapping is not None:
+        cfg["vocabulary_quantization"] = int(embeddings.shape[0])
+    else:
+        cfg.pop("vocabulary_quantization", None)
+    json.dump(cfg, open(folder_path / "config.json", "w"), indent=4)
 
     # Create modules.json
     modules = [{"idx": 0, "name": "0", "path": ".", "type": "sentence_transformers.models.StaticEmbedding"}]
-    if config.get("normalize"):
+    if cfg.get("normalize"):
         # If normalize=True, add sentence_transformers.models.Normalize
         modules.append({"idx": 1, "name": "1", "path": "1_Normalize", "type": "sentence_transformers.models.Normalize"})
     json.dump(modules, open(folder_path / "modules.json", "w"), indent=4)

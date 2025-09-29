@@ -111,6 +111,17 @@ class StaticModel:
             )
         self.config["normalize"] = value
 
+    @property
+    def embedding_dtype(self) -> str:
+        """Get the dtype (precision) of the embedding matrix."""
+        return np.dtype(self.embedding.dtype).name
+
+    @property
+    def vocabulary_quantization(self) -> int | None:
+        """Get the number of clusters used for vocabulary quantization, if applicable."""
+        is_quantized = (self.token_mapping is not None) or (len(self.embedding) != len(self.tokens))
+        return int(self.embedding.shape[0]) if is_quantized else None
+
     def save_pretrained(self, path: PathLike, model_name: str | None = None, subfolder: str | None = None) -> None:
         """
         Save the pretrained model.
@@ -493,8 +504,6 @@ def quantize_model(
     :return: A new StaticModel with the quantized embeddings.
     :raises: ValueError if the model is already quantized.
     """
-    from model2vec.quantization import quantize_and_reduce_dim
-
     token_mapping: np.ndarray | None
     weights: np.ndarray | None
     if vocabulary_quantization is not None:
@@ -506,7 +515,6 @@ def quantize_model(
         embeddings, token_mapping, weights = quantize_vocabulary(
             n_clusters=vocabulary_quantization, weights=model.weights, embeddings=model.embedding
         )
-        model.config["vocabulary_quantization"] = vocabulary_quantization
     else:
         embeddings = model.embedding
         token_mapping = model.token_mapping
@@ -521,7 +529,7 @@ def quantize_model(
     return StaticModel(
         vectors=embeddings,
         tokenizer=model.tokenizer,
-        config=model.config,
+        config=dict(model.config),
         weights=weights,
         token_mapping=token_mapping,
         normalize=model.normalize,
