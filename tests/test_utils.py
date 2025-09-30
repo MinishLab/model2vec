@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
-from typing import Any
+from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
-import numpy as np
 import pytest
-import safetensors
-import safetensors.numpy
-from tokenizers import Tokenizer
 
 from model2vec.distill.utils import select_optimal_device
 from model2vec.hf_utils import _get_metadata_from_readme
@@ -39,26 +33,36 @@ def test__get_metadata_from_readme_mocked_file_keys() -> None:
 
 
 @pytest.mark.parametrize(
-    "device, expected, cuda, mps",
+    "torch_version, device, expected, cuda, mps, should_raise",
     [
-        ("cpu", "cpu", True, True),
-        ("cpu", "cpu", True, False),
-        ("cpu", "cpu", False, True),
-        ("cpu", "cpu", False, False),
-        ("clown", "clown", False, False),
-        (None, "cuda", True, True),
-        (None, "cuda", True, False),
-        (None, "mps", False, True),
-        (None, "cpu", False, False),
+        ("2.7.0", "cpu", "cpu", True, True, False),
+        ("2.8.0", "cpu", "cpu", True, True, False),
+        ("2.7.0", "clown", "clown", False, False, False),
+        ("2.8.0", "clown", "clown", False, False, False),
+        ("2.7.0", "mps", "mps", False, True, False),
+        ("2.8.0", "mps", None, False, True, True),
+        ("2.7.0", None, "cuda", True, True, False),
+        ("2.7.0", None, "mps", False, True, False),
+        ("2.7.0", None, "cpu", False, False, False),
+        ("2.8.0", None, "cuda", True, True, False),
+        ("2.8.0", None, "cpu", False, True, False),
+        ("2.8.0", None, "cpu", False, False, False),
+        ("2.9.0", None, "cpu", False, True, False),
+        ("3.0.0", None, "cpu", False, True, False),
     ],
 )
-def test_select_optimal_device(device: str | None, expected: str, cuda: bool, mps: bool) -> None:
-    """Test whether the optimal device is selected."""
+def test_select_optimal_device(torch_version, device, expected, cuda, mps, should_raise) -> None:
+    """Test whether the optimal device is selected across versions and backends."""
     with (
         patch("torch.cuda.is_available", return_value=cuda),
         patch("torch.backends.mps.is_available", return_value=mps),
+        patch("torch.__version__", torch_version),
     ):
-        assert select_optimal_device(device) == expected
+        if should_raise:
+            with pytest.raises(RuntimeError):
+                select_optimal_device(device)
+        else:
+            assert select_optimal_device(device) == expected
 
 
 def test_importable() -> None:
