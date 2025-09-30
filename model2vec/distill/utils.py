@@ -26,7 +26,7 @@ def select_optimal_device(device: str | None) -> str:
         if device == "mps" and mps_broken:
             raise RuntimeError(
                 f"MPS is disabled for PyTorch {torch.__version__} due to known performance regressions. "
-                "Please use CPU or CUDA instead."
+                "Please use CPU or CUDA instead, or use a PyTorch version < 2.8.0."
             )
         else:
             return device
@@ -37,7 +37,7 @@ def select_optimal_device(device: str | None) -> str:
         if mps_broken:
             logger.warning(
                 f"MPS is available but PyTorch {torch.__version__} has known performance regressions. "
-                "Falling back to CPU."
+                "Falling back to CPU. Please use a PyTorch version < 2.8.0 to enable MPS support."
             )
             device = "cpu"
         else:
