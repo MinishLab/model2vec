@@ -59,29 +59,30 @@ def mock_transformer() -> PreTrainedModel:
     """Create a mock transformer model."""
 
     class MockPreTrainedModel:
-        def __init__(self) -> None:
+        def __init__(self, dim: int = 768, with_pooler: bool = True, pooler_value: float = 7.0) -> None:
             self.device = "cpu"
             self.name_or_path = "mock-model"
+            self.dim = dim
+            self.with_pooler = with_pooler
+            self.pooler_value = pooler_value
 
         def to(self, device: str) -> MockPreTrainedModel:
             self.device = device
             return self
 
-        def forward(self, *args: Any, **kwargs: Any) -> Any:
-            # Simulate a last_hidden_state output for a transformer model
-            batch_size, seq_length = kwargs["input_ids"].shape
-            # Return a tensor of shape (batch_size, seq_length, 768)
-            return type(
-                "BaseModelOutputWithPoolingAndCrossAttentions",
-                (object,),
-                {
-                    "last_hidden_state": torch.rand(batch_size, seq_length, 768)  # Simulate 768 hidden units
-                },
-            )
+        def eval(self) -> MockPreTrainedModel:
+            return self
 
-        def __call__(self, *args: Any, **kwargs: Any) -> Any:
-            # Simply call the forward method to simulate the same behavior as transformers models
-            return self.forward(*args, **kwargs)
+        def forward(self, *args: Any, **kwargs: Any) -> Any:
+            input_ids = kwargs["input_ids"]
+            B, T = input_ids.shape
+            hidden = torch.arange(T, dtype=torch.float32, device=self.device).repeat(B, self.dim, 1).transpose(1, 2)
+            out = {"last_hidden_state": hidden}
+            if self.with_pooler:
+                out["pooler_output"] = torch.full((B, self.dim), self.pooler_value, device=self.device)
+            return type("BaseModelOutputWithPoolingAndCrossAttentions", (object,), out)()
+
+        __call__ = forward
 
     return cast(PreTrainedModel, MockPreTrainedModel())
 
