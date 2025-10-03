@@ -69,15 +69,14 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 # Make sequences of token embeddings
 token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
-
-Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. First, install the `distillation` extras with:
+For advanced usage, see our [inference docs](https://minish.ai/packages/model2vec/inference). Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. First, install the `distillation` extras with:
 
 ```bash
 pip install model2vec[distill]
 ```
 
 
- Then, you can distill a model in ~30 seconds on a CPU with the following code snippet:
+Then, you can distill a model in ~30 seconds on a CPU with the following code snippet:
 
 ```python
 from model2vec.distill import distill
@@ -89,7 +88,7 @@ m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 ```
 
-After distillation, you can also fine-tune your own classification models on top of the distilled model, or on a pre-trained model. First, make sure you install the `training` extras with:
+For advanced usage, see our [distillation docs](https://minish.ai/packages/model2vec/distillation). After distillation, you can also fine-tune your own classification models on top of the distilled model, or on a pre-trained model. First, make sure you install the `training` extras with:
 
 ```bash
 pip install model2vec[train]
@@ -115,7 +114,7 @@ classifier.fit(ds["train"]["text"], ds["train"]["label"])
 classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["label"])
 ```
 
-For advanced usage, please refer to our [usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md).
+For advanced usage, see our [training docs](https://minish.ai/packages/model2vec/training).
 
 ## Updates & Announcements
 
@@ -151,10 +150,7 @@ The core idea is to forward pass a vocabulary through a sentence transformer mod
 
 ## Documentation
 
-Our official documentation can be found [here](https://github.com/MinishLab/model2vec/blob/main/docs/README.md). This includes:
-- [Usage documentation](https://github.com/MinishLab/model2vec/blob/main/docs/usage.md): provides a technical overview of how to use Model2Vec.
-- [Integrations documentation](https://github.com/MinishLab/model2vec/blob/main/docs/integrations.md): provides examples of how to use Model2Vec in various downstream libraries.
-- [Model2Vec technical documentation](https://github.com/MinishLab/model2vec/blob/main/docs/what_is_model2vec.md): provides a high-level overview of how Model2Vec works.
+Our official documentation can be found [here](https://minish.ai/packages/model2vec/introduction). This includes in-depth documentation on inference, distillation, training, and integrations.
 
 
 ## Model List
