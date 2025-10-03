@@ -11,7 +11,7 @@ from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
-from model2vec.distill.inference import PCADimType, create_embeddings, post_process_embeddings
+from model2vec.distill.inference import PCADimType, PoolingType, create_embeddings, post_process_embeddings
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
@@ -33,6 +33,7 @@ def distill_from_model(
     quantize_to: DType | str = DType.Float16,
     use_subword: bool | None = None,
     vocabulary_quantization: int | None = None,
+    pooling: PoolingType = PoolingType.MEAN,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -59,7 +60,12 @@ def distill_from_model(
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no quantization is performed.
-    :return: A StaticModel
+    :param pooling: The pooling strategy to use for creating embeddings. Can be one of:
+        'mean' (default): mean over all tokens. Robust and works well in most cases.
+        'last': use the last token's hidden state (often the [EOS] token). Common for decoder-style models.
+        'first': use the first token's hidden state ([CLS] token in BERT-style models).
+        'pooler': use the pooler output (if available). This is often a non-linear projection of the [CLS] token.
+    :return: A StaticModel.
     :raises: ValueError if the vocabulary is empty after preprocessing.
 
     """
@@ -114,7 +120,11 @@ def distill_from_model(
 
     # Create the embeddings
     embeddings = create_embeddings(
-        tokenized=token_ids, model=model, device=device, pad_token_id=tokenizer.get_vocab()[pad_token]
+        tokenized=token_ids,
+        model=model,
+        device=device,
+        pad_token_id=tokenizer.get_vocab()[pad_token],
+        pooling=pooling,
     )
 
     if vocabulary_quantization is not None:
@@ -142,6 +152,7 @@ def distill_from_model(
         "hidden_dim": embeddings.shape[1],
         "seq_length": 1000000,  # Set this to a high value since we don't have a sequence length limit.
         "normalize": True,
+        "pooling": pooling,
     }
 
     if os.path.exists(model_name):
@@ -226,6 +237,7 @@ def distill(
     quantize_to: DType | str = DType.Float16,
     use_subword: bool | None = None,
     vocabulary_quantization: int | None = None,
+    pooling: PoolingType = PoolingType.MEAN,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -251,6 +263,11 @@ def distill(
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no quantization is performed.
+    :param pooling: The pooling strategy to use for creating embeddings. Can be one of:
+        'mean' (default): mean over all tokens. Robust and works well in most cases.
+        'last': use the last token's hidden state (often the [EOS] token). Common for decoder-style models.
+        'first': use the first token's hidden state ([CLS] token in BERT-style models).
+        'pooler': use the pooler output (if available). This is often a non-linear projection of the [CLS] token.
     :return: A StaticModel
 
     """
@@ -272,4 +289,5 @@ def distill(
         quantize_to=quantize_to,
         use_subword=use_subword,
         vocabulary_quantization=vocabulary_quantization,
+        pooling=pooling,
     )

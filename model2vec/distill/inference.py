@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import inspect
 import logging
+from enum import Enum
 from pathlib import Path
-from typing import Literal, Protocol, Union
+from typing import Literal, Union
 
 import numpy as np
 import torch
@@ -16,16 +17,29 @@ from transformers.modeling_utils import PreTrainedModel
 
 logger = logging.getLogger(__name__)
 
-
 PathLike = Union[Path, str]
 PCADimType = Union[int, None, float, Literal["auto"]]
-
 
 _DEFAULT_BATCH_SIZE = 256
 
 
-class ModulewithWeights(Protocol):
-    weight: torch.nn.Parameter
+class PoolingType(str, Enum):
+    """
+    Pooling strategies for embedding creation.
+
+    - MEAN: masked mean over all tokens.
+    - LAST: last non-padding token (often EOS, common in decoder-style models).
+    - FIRST: first token hidden state (position 0). In BERT-style encoders,
+               this corresponds to the [CLS] token representation.
+    - POOLER: use the model's `pooler_output`. In BERT-like models this is
+               computed as the hidden state at [CLS], passed through a learned
+               dense layer + activation. Not all models provide this.
+    """
+
+    MEAN = "mean"
+    LAST = "last"
+    FIRST = "first"
+    POOLER = "pooler"
 
 
 def create_embeddings(
@@ -33,6 +47,7 @@ def create_embeddings(
     tokenized: list[list[int]],
     device: str,
     pad_token_id: int,
+    pooling: PoolingType = PoolingType.MEAN,
 ) -> np.ndarray:
     """
     Create output embeddings for a bunch of tokens using a pretrained model.
@@ -44,9 +59,11 @@ def create_embeddings(
     :param tokenized: All tokenized tokens.
     :param device: The torch device to use.
     :param pad_token_id: The pad token id. Used to pad sequences.
+    :param pooling: The pooling strategy to use.
     :return: The output embeddings.
+    :raises ValueError: If the pooling strategy is unknown.
     """
-    model = model.to(device)  # type: ignore  # Transformers error
+    model = model.to(device).eval()  # type: ignore  # Transformers error
 
     out_weights: np.ndarray
     intermediate_weights: list[np.ndarray] = []
@@ -62,56 +79,133 @@ def create_embeddings(
     pbar = tqdm(total=len(sorted_tokenized), desc="Encoding tokens", unit=" tokens")
 
     for batch_idx in range(0, len(sorted_tokenized), _DEFAULT_BATCH_SIZE):
-        batch = [torch.Tensor(x).long() for x in sorted_tokenized[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]]
+        batch_list = sorted_tokenized[batch_idx : batch_idx + _DEFAULT_BATCH_SIZE]
+        batch = [torch.tensor(x, dtype=torch.long) for x in batch_list]
 
         encoded = {}
         encoded["input_ids"] = pad_sequence(batch, batch_first=True, padding_value=pad_token_id)
-        encoded["attention_mask"] = encoded["input_ids"] != pad_token_id
+
+        # Create attention mask by using the lengths of each sequence
+        seq_len = encoded["input_ids"].size(1)
+        batch_lengths = torch.tensor([len(x) for x in batch_list], device=encoded["input_ids"].device)
+        token_positions = torch.arange(seq_len, device=encoded["input_ids"].device)
+        # Mark padding tokens with 0, and non-padding tokens with 1
+        attention_mask = token_positions.unsqueeze(0) < batch_lengths.unsqueeze(1)
+        encoded["attention_mask"] = attention_mask.to(dtype=torch.long)
 
         if add_token_type_ids:
+            # Add token_type_ids for models that support it
             encoded["token_type_ids"] = torch.zeros_like(encoded["input_ids"])
 
-        out = _encode_mean_using_model(model, encoded)
+        if pooling == PoolingType.MEAN:
+            out = _encode_mean_with_model(model, encoded)
+        elif pooling == PoolingType.LAST:
+            out = _encode_last_with_model(model, encoded)
+        elif pooling == PoolingType.FIRST:
+            out = _encode_first_with_model(model, encoded)
+        elif pooling == PoolingType.POOLER:
+            out = _encode_pooler_with_model(model, encoded)
+        else:
+            raise ValueError(f"Unknown pooling: {pooling}")
+
         intermediate_weights.extend(out.numpy())
         pbar.update(len(batch))
 
     # Sort the output back to the original order
     intermediate_weights = [intermediate_weights[i] for i in np.argsort(sort_order)]
     out_weights = np.stack(intermediate_weights)
-
     out_weights = np.nan_to_num(out_weights)
 
     return out_weights
 
 
-@torch.no_grad()
-def _encode_mean_using_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
+def _encode_with_model(
+    model: PreTrainedModel, encodings: dict[str, torch.Tensor]
+) -> tuple[torch.Tensor, torch.Tensor | None, dict[str, torch.Tensor]]:
     """
-    Encode a batch of tokens using a model.
+    Move inputs to the model device, run a forward pass, and standardize dtypes.
 
-    Note that if a token in the input batch does not have any embeddings, it will be output as a vector of zeros.
-    So detection of these is necessary.
+    :param model: The model to use.
+    :param encodings: The encoded tokens to turn into features.
+    :return: a tuple consisting of:
+      - hidden: last_hidden_state
+      - pooler: pooler_output if present, else None
+      - encodings_on_device: the device-moved encodings (for masks)
+    """
+    encodings_on_device = {k: v.to(model.device) for k, v in encodings.items()}
+    outputs: BaseModelOutputWithPoolingAndCrossAttentions = model(**encodings_on_device)
+    hidden: torch.Tensor = outputs.last_hidden_state  # type: ignore  # False positive
+    # NOTE: If the dtype is bfloat 16, we convert to float32,
+    # because numpy does not suport bfloat16
+    # See here: https://github.com/numpy/numpy/issues/19808
+    if hidden.dtype == torch.bfloat16:
+        hidden = hidden.float()
+    pooler = getattr(outputs, "pooler_output", None)
+    if pooler is not None and pooler.dtype == torch.bfloat16:
+        pooler = pooler.float()
+    return hidden, pooler, encodings_on_device
+
+
+@torch.inference_mode()
+def _encode_mean_with_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
+    """
+    Encode a batch of tokens using mean pooling.
 
     :param model: The model to use.
     :param encodings: The encoded tokens to turn into features.
     :return: The mean of the output for each token.
     """
-    encodings = {k: v.to(model.device) for k, v in encodings.items()}
-    encoded: BaseModelOutputWithPoolingAndCrossAttentions = model(**encodings)
-    out: torch.Tensor = encoded.last_hidden_state.cpu()  # type: ignore  # False positive
-    # NOTE: If the dtype is bfloat 16, we convert to float32,
-    # because numpy does not suport bfloat16
-    # See here: https://github.com/numpy/numpy/issues/19808
-    if out.dtype == torch.bfloat16:
-        out = out.float()
-
+    hidden, _, encodings_on_device = _encode_with_model(model, encodings)
     # Take the mean by averaging over the attention mask.
-    mask = encodings["attention_mask"].cpu().float()
-    mask /= mask.sum(1)[:, None]
+    mask = encodings_on_device["attention_mask"].cpu().float()
+    lengths = mask.sum(1, keepdim=True).clamp_min_(1.0)
+    mask = mask / lengths
+    return torch.bmm(mask.to(hidden.device)[:, None, :], hidden).squeeze(1).cpu()
 
-    result = torch.bmm(mask[:, None, :].float(), out).squeeze(1)
 
-    return result
+@torch.inference_mode()
+def _encode_last_with_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
+    """
+    Encode a batch of tokens using last token pooling.
+
+    :param model: The model to use.
+    :param encodings: The encoded tokens to turn into features.
+    :return: The last hidden state for each token.
+    """
+    hidden, _, encodings_on_device = _encode_with_model(model, encodings)
+    mask = encodings_on_device["attention_mask"].bool()
+    last_idx = (mask.sum(dim=1) - 1).clamp_min(0).long()
+    batch_indices = torch.arange(hidden.size(0), device=hidden.device)
+    return hidden[batch_indices, last_idx, :].cpu()
+
+
+@torch.inference_mode()
+def _encode_first_with_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
+    """
+    Encode a batch of tokens using first token (CLS) pooling.
+
+    :param model: The model to use.
+    :param encodings: The encoded tokens to turn into features.
+    :return: The first token representation for each token.
+    """
+    hidden, _, _ = _encode_with_model(model, encodings)
+    return hidden[:, 0, :].cpu()
+
+
+@torch.inference_mode()
+def _encode_pooler_with_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
+    """
+    Encode a batch of tokens using pooler output.
+
+    :param model: The model to use.
+    :param encodings: The encoded tokens to turn into features.
+    :return: The pooler output for each token.
+    :raises ValueError: If the model does not return pooler_output.
+    """
+    _, pooler, _ = _encode_with_model(model, encodings)
+    if pooler is None:
+        raise ValueError("POOLER pooling requested, but model did not return pooler_output.")
+    return pooler.cpu()
 
 
 def post_process_embeddings(
