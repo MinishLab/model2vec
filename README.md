@@ -88,7 +88,7 @@ m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
 m2v_model.save_pretrained("m2v_model")
 ```
 
-For advanced usage, see our [distillation docs](https://minish.ai/packages/model2vec/distillation). After distillation, you can also fine-tune your own classification models on top of the distilled model, or on a pre-trained model. First, make sure you install the `training` extras with:
+For advanced usage, see our [distillation docs](https://minish.ai/packages/model2vec/distillation), which includes some [distillation best practices](https://minish.ai/packages/model2vec/distillation#distillation-best-practices). After distillation, you can also fine-tune your own classification models on top of the distilled model, or on a pre-trained model. First, make sure you install the `training` extras with:
 
 ```bash
 pip install model2vec[train]
