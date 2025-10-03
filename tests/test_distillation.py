@@ -48,7 +48,7 @@ def test_distill_from_model(
     pca_dims: int | None,
     sif_coefficient: float | None,
 ) -> None:
-    """Test distill_from_model vs distill produce consistent outputs."""
+    """Test distill function with different parameters."""
     # Mock the return value of model_info to avoid calling the Hugging Face API
     mock_model_info.return_value = type("ModelInfo", (object,), {"cardData": {"language": "en"}})
     mock_auto_model.return_value = mock_transformer
@@ -112,7 +112,7 @@ def test_distill_removal_pattern(
     )
     assert len(static_model.embedding) == expected_vocab_size
 
-    # Weird/bad regex should raise
+    # Weird pattern.
     with pytest.raises(ValueError):
         _ = distill_from_model(
             model=mock_transformer,
