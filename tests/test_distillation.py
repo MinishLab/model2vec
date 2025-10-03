@@ -294,10 +294,10 @@ def test_clean_and_create_vocabulary(
 @pytest.mark.parametrize(
     "pooling,with_pooler,expected_rows",
     [
-        (PoolingType.MEAN, False, [1.0, 0.0]),  # len=3: mean(0,1,2)=1; len=1: mean(0) = 0
+        (PoolingType.MEAN, False, [1.0, 0.0]),  # len=3: mean(0,1,2)=1; len=1: mean(0)=0
         (PoolingType.LAST, False, [2.0, 0.0]),  # last of 3: 2; last of 1: 0
-        (PoolingType.CLS, False, [0.0, 0.0]),  # first position: 0
-        (PoolingType.CLS, True, [7.0, 7.0]),  # pooler_output is used
+        (PoolingType.FIRST, False, [0.0, 0.0]),  # first position: 0
+        (PoolingType.POOLER, True, [7.0, 7.0]),  # pooler_output used
     ],
 )
 def test_pooling_strategies(mock_transformer, pooling, with_pooler, expected_rows) -> None:
@@ -314,3 +314,17 @@ def test_pooling_strategies(mock_transformer, pooling, with_pooler, expected_row
     dim = out.shape[1]
     expected = np.stack([np.full((dim,), v, dtype=np.float32) for v in expected_rows])
     assert np.allclose(out, expected, rtol=1e-6, atol=0.0)
+
+
+def test_pooler_raises_without_pooler_output(mock_transformer) -> None:
+    """POOLER should raise when the model doesn't expose pooler_output."""
+    mock_transformer.with_pooler = False
+    tokenized = [[10, 11, 12], [20]]
+    with pytest.raises(ValueError, match="pooler_output"):
+        _ = create_embeddings(
+            model=mock_transformer,
+            tokenized=tokenized,
+            device="cpu",
+            pad_token_id=0,
+            pooling=PoolingType.POOLER,
+        )

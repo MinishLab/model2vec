@@ -24,11 +24,22 @@ _DEFAULT_BATCH_SIZE = 256
 
 
 class PoolingType(str, Enum):
-    """Pooling strategies for embedding creation."""
+    """
+    Pooling strategies for embedding creation.
+
+    - MEAN: masked mean over all tokens (ignores padding).
+    - LAST: last non-padding token (often EOS, common in decoder-style models).
+    - FIRST: first token hidden state (position 0). In BERT-style encoders,
+               this corresponds to the [CLS] token representation.
+    - POOLER: use the model's `pooler_output`. In BERT-like models this is
+               computed as the hidden state at [CLS], passed through a learned
+               dense layer + activation. Not all models provide this.
+    """
 
     MEAN = "mean"
     LAST = "last"
-    CLS = "cls"
+    FIRST = "first"
+    POOLER = "pooler"
 
 
 def create_embeddings(
@@ -74,16 +85,13 @@ def create_embeddings(
         encoded = {}
         encoded["input_ids"] = pad_sequence(batch, batch_first=True, padding_value=pad_token_id)
 
-        if pooling == PoolingType.MEAN:
-            # For mean pooling, mask out padding tokens
-            encoded["attention_mask"] = encoded["input_ids"] != pad_token_id
-        else:
-            # For "last"/"cls": build mask directly from true lengths to ensure
-            # the last non-pad token and CLS positions are chosen correctly
-            seq_len = encoded["input_ids"].size(1)
-            batch_lengths = torch.tensor([len(x) for x in batch_list], device=encoded["input_ids"].device)
-            token_positions = torch.arange(seq_len, device=encoded["input_ids"].device)
-            encoded["attention_mask"] = token_positions.unsqueeze(0) < batch_lengths.unsqueeze(1)
+        # Create attention mask by using the lengths of each sequence
+        seq_len = encoded["input_ids"].size(1)
+        batch_lengths = torch.tensor([len(x) for x in batch_list], device=encoded["input_ids"].device)
+        token_positions = torch.arange(seq_len, device=encoded["input_ids"].device)
+        # Mark padding tokens with 0, and non-padding tokens with 1
+        attention_mask = token_positions.unsqueeze(0) < batch_lengths.unsqueeze(1)
+        encoded["attention_mask"] = attention_mask.to(dtype=torch.long)
 
         if add_token_type_ids:
             # Add token_type_ids for models that support it
@@ -93,8 +101,10 @@ def create_embeddings(
             out = _encode_mean_with_model(model, encoded)
         elif pooling == PoolingType.LAST:
             out = _encode_last_with_model(model, encoded)
-        elif pooling == PoolingType.CLS:
-            out = _encode_cls_with_model(model, encoded)
+        elif pooling == PoolingType.FIRST:
+            out = _encode_first_with_model(model, encoded)
+        elif pooling == PoolingType.POOLER:
+            out = _encode_pooler_with_model(model, encoded)
         else:
             raise ValueError(f"Unknown pooling: {pooling}")
 
@@ -163,28 +173,39 @@ def _encode_last_with_model(model: PreTrainedModel, encodings: dict[str, torch.T
     :return: The last hidden state for each token.
     """
     hidden, _, encodings_on_device = _encode_with_model(model, encodings)
-    # Get the last hidden state for each token
     mask = encodings_on_device["attention_mask"].bool()
     last_idx = (mask.sum(dim=1) - 1).clamp_min(0).long()
-    b = torch.arange(hidden.size(0), device=hidden.device)
-    return hidden[b, last_idx, :].cpu()
+    batch_indices = torch.arange(hidden.size(0), device=hidden.device)
+    return hidden[batch_indices, last_idx, :].cpu()
 
 
 @torch.inference_mode()
-def _encode_cls_with_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
+def _encode_first_with_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
     """
-    Encode a batch of tokens using CLS pooling.
-
-    If the model has a pooler_output, use that,  otherwise, use the first token's hidden state.
+    Encode a batch of tokens using first token (CLS) pooling.
 
     :param model: The model to use.
     :param encodings: The encoded tokens to turn into features.
-    :return: The [CLS] token representation for each token.
+    :return: The first token representation for each token.
     """
-    hidden, pooler, _ = _encode_with_model(model, encodings)
-    if pooler is not None:
-        return pooler.cpu()
+    hidden, _, _ = _encode_with_model(model, encodings)
     return hidden[:, 0, :].cpu()
+
+
+@torch.inference_mode()
+def _encode_pooler_with_model(model: PreTrainedModel, encodings: dict[str, torch.Tensor]) -> torch.Tensor:
+    """
+    Encode a batch of tokens using pooler output.
+
+    :param model: The model to use.
+    :param encodings: The encoded tokens to turn into features.
+    :return: The pooler output for each token.
+    :raises ValueError: If the model does not return pooler_output.
+    """
+    _, pooler, _ = _encode_with_model(model, encodings)
+    if pooler is None:
+        raise ValueError("POOLER pooling requested, but model did not return pooler_output.")
+    return pooler.cpu()
 
 
 def post_process_embeddings(
