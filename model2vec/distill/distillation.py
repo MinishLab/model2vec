@@ -11,7 +11,7 @@ from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
-from model2vec.distill.inference import PCADimType, PoolingType, create_embeddings, post_process_embeddings
+from model2vec.distill.inference import PCADimType, PoolingMode, create_embeddings, post_process_embeddings
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
@@ -31,7 +31,7 @@ def distill_from_model(
     token_remove_pattern: str | None = r"\[unused\d+\]",
     quantize_to: DType | str = DType.Float16,
     vocabulary_quantization: int | None = None,
-    pooling: PoolingType = PoolingType.MEAN,
+    pooling: PoolingMode = PoolingMode.MEAN,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -55,7 +55,7 @@ def distill_from_model(
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled into a valid regex, we also throw an error.
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no quantization is performed.
-    :param pooling: The pooling strategy to use for creating embeddings. Can be one of:
+    :param pooling: The pooling mode to use for creating embeddings. Can be one of:
         'mean' (default): mean over all tokens. Robust and works well in most cases.
         'last': use the last token's hidden state (often the [EOS] token). Common for decoder-style models.
         'first': use the first token's hidden state ([CLS] token in BERT-style models).
@@ -209,7 +209,7 @@ def distill(
     trust_remote_code: bool = False,
     quantize_to: DType | str = DType.Float16,
     vocabulary_quantization: int | None = None,
-    pooling: PoolingType = PoolingType.MEAN,
+    pooling: PoolingMode = PoolingMode.MEAN,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -232,7 +232,7 @@ def distill(
     :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming from `transformers`. If this is True, we will load all components.
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no quantization is performed.
-    :param pooling: The pooling strategy to use for creating embeddings. Can be one of:
+    :param pooling: The pooling mode to use for creating embeddings. Can be one of:
         'mean' (default): mean over all tokens. Robust and works well in most cases.
         'last': use the last token's hidden state (often the [EOS] token). Common for decoder-style models.
         'first': use the first token's hidden state ([CLS] token in BERT-style models).

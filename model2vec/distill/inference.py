@@ -23,9 +23,9 @@ PCADimType = Union[int, None, float, Literal["auto"]]
 _DEFAULT_BATCH_SIZE = 256
 
 
-class PoolingType(str, Enum):
+class PoolingMode(str, Enum):
     """
-    Pooling strategies for embedding creation.
+    Pooling modes for embedding creation.
 
     - MEAN: masked mean over all tokens.
     - LAST: last non-padding token (often EOS, common in decoder-style models).
@@ -47,7 +47,7 @@ def create_embeddings(
     tokenized: list[list[int]],
     device: str,
     pad_token_id: int,
-    pooling: PoolingType = PoolingType.MEAN,
+    pooling: PoolingMode = PoolingMode.MEAN,
 ) -> np.ndarray:
     """
     Create output embeddings for a bunch of tokens using a pretrained model.
@@ -59,9 +59,9 @@ def create_embeddings(
     :param tokenized: All tokenized tokens.
     :param device: The torch device to use.
     :param pad_token_id: The pad token id. Used to pad sequences.
-    :param pooling: The pooling strategy to use.
+    :param pooling: The pooling mode to use.
     :return: The output embeddings.
-    :raises ValueError: If the pooling strategy is unknown.
+    :raises ValueError: If the pooling mode is unknown.
     """
     model = model.to(device).eval()  # type: ignore  # Transformers error
 
@@ -97,13 +97,13 @@ def create_embeddings(
             # Add token_type_ids for models that support it
             encoded["token_type_ids"] = torch.zeros_like(encoded["input_ids"])
 
-        if pooling == PoolingType.MEAN:
+        if pooling == PoolingMode.MEAN:
             out = _encode_mean_with_model(model, encoded)
-        elif pooling == PoolingType.LAST:
+        elif pooling == PoolingMode.LAST:
             out = _encode_last_with_model(model, encoded)
-        elif pooling == PoolingType.FIRST:
+        elif pooling == PoolingMode.FIRST:
             out = _encode_first_with_model(model, encoded)
-        elif pooling == PoolingType.POOLER:
+        elif pooling == PoolingMode.POOLER:
             out = _encode_pooler_with_model(model, encoded)
         else:
             raise ValueError(f"Unknown pooling: {pooling}")

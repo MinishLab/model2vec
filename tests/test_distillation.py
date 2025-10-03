@@ -12,7 +12,7 @@ from transformers import BertTokenizerFast
 from transformers.modeling_utils import PreTrainedModel
 
 from model2vec.distill.distillation import distill, distill_from_model
-from model2vec.distill.inference import PoolingType, create_embeddings, post_process_embeddings
+from model2vec.distill.inference import PoolingMode, create_embeddings, post_process_embeddings
 from model2vec.model import StaticModel
 from model2vec.tokenizer import clean_and_create_vocabulary
 
@@ -260,10 +260,10 @@ def test_clean_and_create_vocabulary(
 @pytest.mark.parametrize(
     "pooling,with_pooler,expected_rows",
     [
-        (PoolingType.MEAN, False, [1.0, 0.0]),  # len=3: mean(0,1,2)=1; len=1: mean(0)=0
-        (PoolingType.LAST, False, [2.0, 0.0]),  # last of 3: 2; last of 1: 0
-        (PoolingType.FIRST, False, [0.0, 0.0]),  # first position: 0
-        (PoolingType.POOLER, True, [7.0, 7.0]),  # pooler_output used
+        (PoolingMode.MEAN, False, [1.0, 0.0]),  # len=3: mean(0,1,2)=1; len=1: mean(0)=0
+        (PoolingMode.LAST, False, [2.0, 0.0]),  # last of 3: 2; last of 1: 0
+        (PoolingMode.FIRST, False, [0.0, 0.0]),  # first position: 0
+        (PoolingMode.POOLER, True, [7.0, 7.0]),  # pooler_output used
     ],
 )
 def test_pooling_strategies(mock_transformer, pooling, with_pooler, expected_rows) -> None:
@@ -292,5 +292,5 @@ def test_pooler_raises_without_pooler_output(mock_transformer) -> None:
             tokenized=tokenized,
             device="cpu",
             pad_token_id=0,
-            pooling=PoolingType.POOLER,
+            pooling=PoolingMode.POOLER,
         )
