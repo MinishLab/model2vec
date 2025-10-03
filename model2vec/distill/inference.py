@@ -27,7 +27,7 @@ class PoolingType(str, Enum):
     """
     Pooling strategies for embedding creation.
 
-    - MEAN: masked mean over all tokens (ignores padding).
+    - MEAN: masked mean over all tokens.
     - LAST: last non-padding token (often EOS, common in decoder-style models).
     - FIRST: first token hidden state (position 0). In BERT-style encoders,
                this corresponds to the [CLS] token representation.
