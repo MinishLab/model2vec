@@ -60,7 +60,7 @@ def distill_from_model(
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no quantization is performed.
-    :param pooling: The pooling strategy to use for creating embeddings. Can be one of "mean", "last", or "cls".
+    :param pooling: The pooling strategy to use for creating embeddings. Can be one of "mean" (default), "last", "first", or "pooler".
     :return: A StaticModel
     :raises: ValueError if the vocabulary is empty after preprocessing.
 
@@ -259,7 +259,7 @@ def distill(
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param use_subword: DEPRECATED: If this is not set to None, we show a warning. It doesn't do anything.
     :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no quantization is performed.
-    :param pooling: The pooling strategy to use for creating embeddings. Can be one of "mean", "last", or "cls".
+    :param pooling: The pooling strategy to use for creating embeddings. Can be one of "mean" (default), "last", "first", or "pooler".
     :return: A StaticModel
 
     """

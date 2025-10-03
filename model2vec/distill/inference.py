@@ -218,7 +218,8 @@ def post_process_embeddings(
         if pca_dims > embeddings.shape[1]:
             logger.warning(
                 f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]}). "
-                "Applying PCA, but not reducing dimensionality. If this is not desired, set `pca_dims` to None."
+                "Applying PCA, but not reducing dimensionality. Is this is not desired, please set `pca_dims` to None. "
+                "Applying PCA will probably improve performance, so consider just leaving it."
             )
             pca_dims = embeddings.shape[1]
         if pca_dims >= embeddings.shape[0]:
@@ -226,14 +227,21 @@ def post_process_embeddings(
                 f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
             )
         elif pca_dims <= embeddings.shape[1]:
+            if isinstance(pca_dims, float):
+                logger.info(f"Applying PCA with {pca_dims} explained variance.")
+            else:
+                logger.info(f"Applying PCA with n_components {pca_dims}")
+
             orig_dims = embeddings.shape[1]
             p = PCA(n_components=pca_dims, svd_solver="full")
             embeddings = p.fit_transform(embeddings)
+
             if embeddings.shape[1] < orig_dims:
-                logger.info(
-                    f"Reduced dimensionality {orig_dims} -> {embeddings.shape[1]} "
-                    f"(explained var ratio: {np.sum(p.explained_variance_ratio_):.3f})."
-                )
+                explained_variance_ratio = np.sum(p.explained_variance_ratio_)
+                explained_variance = np.sum(p.explained_variance_)
+                logger.info(f"Reduced dimensionality from {orig_dims} to {embeddings.shape[1]}.")
+                logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
+                logger.info(f"Explained variance: {explained_variance:.3f}.")
 
     if sif_coefficient is not None:
         logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
