@@ -41,6 +41,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["model2vec"]
 include-package-data = true
+license-files = []
 
 [tool.setuptools.package-data]
 model2vec = [

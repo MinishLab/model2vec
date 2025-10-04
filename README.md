@@ -84,7 +84,7 @@ Then, you can distill a model in ~30 seconds on a CPU with the following code sn
 from model2vec.distill import distill
 
 # Distill a Sentence Transformer model, in this case the BAAI/bge-base-en-v1.5 model
-m2v_model = distill(model_name="BAAI/bge-base-en-v1.5", pca_dims=256)
+m2v_model = distill(model_name="BAAI/bge-base-en-v1.5")
 
 # Save the model
 m2v_model.save_pretrained("m2v_model")
