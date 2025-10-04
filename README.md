@@ -31,6 +31,9 @@
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE">
       <img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT">
     </a>
+    <a href="https://github.com/MinishLab/model2vec/stargazers">
+      <img src="https://img.shields.io/github/stars/minishlab/model2vec.svg" alt=Stars">
+    </a>
   </h2>
 </div>
 
