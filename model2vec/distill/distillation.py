@@ -31,7 +31,7 @@ def distill_from_model(
     token_remove_pattern: str | None = r"\[unused\d+\]",
     quantize_to: DType | str = DType.Float16,
     vocabulary_quantization: int | None = None,
-    pooling: PoolingMode = PoolingMode.MEAN,
+    pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.
@@ -209,7 +209,7 @@ def distill(
     trust_remote_code: bool = False,
     quantize_to: DType | str = DType.Float16,
     vocabulary_quantization: int | None = None,
-    pooling: PoolingMode = PoolingMode.MEAN,
+    pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> StaticModel:
     """
     Distill a staticmodel from a sentence transformer.

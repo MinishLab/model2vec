@@ -47,7 +47,7 @@ def create_embeddings(
     tokenized: list[list[int]],
     device: str,
     pad_token_id: int,
-    pooling: PoolingMode = PoolingMode.MEAN,
+    pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> np.ndarray:
     """
     Create output embeddings for a bunch of tokens using a pretrained model.
