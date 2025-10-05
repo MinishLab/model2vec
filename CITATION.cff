@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use Model2Vec in your research, please cite it as below."
+title: "Model2Vec: Fast State-of-the-Art Static Embeddings"
+authors:
+  - family-names: "Tulkens"
+    given-names: "Stephan"
+  - family-names: "van Dongen"
+    given-names: "Thomas"
+doi: 10.5281/zenodo.17270888
+license: MIT
+url: "https://github.com/MinishLab/model2vec"
+repository-code: "https://github.com/MinishLab/model2vec"
+date-released: "2024-09-20"
+
+preferred-citation:
+  type: software
+  title: "Model2Vec: Fast State-of-the-Art Static Embeddings"
+  authors:
+    - family-names: "Tulkens"
+      given-names: "Stephan"
+    - family-names: "van Dongen"
+      given-names: "Thomas"
+  year: 2024
+  publisher: Zenodo
+  doi: 10.5281/zenodo.17270888
+  url: "https://github.com/MinishLab/model2vec"
+  license: MIT
