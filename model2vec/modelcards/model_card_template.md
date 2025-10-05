@@ -70,8 +70,7 @@ It works by passing a vocabulary through a sentence transformer model, then redu
 - [Model2Vec Repo](https://github.com/MinishLab/model2vec)
 - [Model2Vec Base Models](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e)
 - [Model2Vec Results](https://github.com/MinishLab/model2vec/tree/main/results)
-- [Model2Vec Tutorials](https://github.com/MinishLab/model2vec/tree/main/tutorials)
-- [Website](https://minishlab.github.io/)
+- [Model2Vec Docs](https://minish.ai/packages/model2vec/introduction)
 
 
 ## Library Authors
@@ -82,10 +81,13 @@ Model2Vec was developed by the [Minish Lab](https://github.com/MinishLab) team c
 
 Please cite the [Model2Vec repository](https://github.com/MinishLab/model2vec) if you use this model in your work.
 ```
-@article{minishlab2024model2vec,
-  author = {Tulkens, Stephan and {van Dongen}, Thomas},
-  title = {Model2Vec: Fast State-of-the-Art Static Embeddings},
-  year = {2024},
-  url = {https://github.com/MinishLab/model2vec}
+@software{minishlab2024model2vec,
+  author       = {Stephan Tulkens and {van Dongen}, Thomas},
+  title        = {Model2Vec: Fast State-of-the-Art Static Embeddings},
+  year         = {2024},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.17270888},
+  url          = {https://github.com/MinishLab/model2vec},
+  license      = {MIT}
 }
 ```
