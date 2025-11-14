@@ -41,7 +41,7 @@
 
 
 
-Model2Vec is a technique to turn any sentence transformer into a small, fast static embedding model. Model2Vec reduces model size by a factor up to 50 and makes models up to 500 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is the most performant static embedding model in the world. See our [results](results/README.md), read our [docs](https://minish.ai/packages/model2vec/introduction), or dive in to see how it works.
+Model2Vec is a technique to turn any sentence transformer into a small, fast static embedding model. Model2Vec reduces model size by a factor up to 50 and makes models up to 500 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model in the world. See our [results](results/README.md), read our [docs](https://minish.ai/packages/model2vec/introduction), or dive in to see how it works.
 
 <div align="center">
 <h3>
@@ -62,8 +62,8 @@ You can start using Model2Vec by loading one of our [flagship models from the Hu
 ```python
 from model2vec import StaticModel
 
-# Load a model from the HuggingFace hub (in this case the potion-base-8M model)
-model = StaticModel.from_pretrained("minishlab/potion-base-8M")
+# Load a model from the HuggingFace hub (in this case the potion-base-32M model)
+model = StaticModel.from_pretrained("minishlab/potion-base-32M")
 
 # Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
