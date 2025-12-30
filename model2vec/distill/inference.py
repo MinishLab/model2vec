@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import inspect
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal
 
 import numpy as np
 import torch
@@ -17,8 +16,8 @@ from transformers.modeling_utils import PreTrainedModel
 
 logger = logging.getLogger(__name__)
 
-PathLike = Union[Path, str]
-PCADimType = Union[int, None, float, Literal["auto"]]
+PathLike = Path | str
+PCADimType = int | None | float | Literal["auto"]
 
 _DEFAULT_BATCH_SIZE = 256
 

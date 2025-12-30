@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Sequence, TypeVar, Union, cast
+from typing import TypeVar, cast
 
 import huggingface_hub
 import numpy as np
@@ -293,14 +294,14 @@ def evaluate_single_or_multi_label(
     """
     if _is_multi_label_shaped(y):
         # Cast because the type checker doesn't understand that y is a list of lists.
-        y = cast(Union[list[list[str]], list[list[int]]], y)
+        y = cast(list[list[str]] | list[list[int]], y)
         classes = sorted(set([label for labels in y for label in labels]))
         mlb = MultiLabelBinarizer(classes=classes)
         y_transformed = mlb.fit_transform(y)
         predictions_transformed = mlb.transform(predictions)
     else:
         if all(isinstance(label, (str, int)) for label in y):
-            y = cast(Union[list[str], list[int]], y)
+            y = cast(list[str] | list[int], y)
             classes = sorted(set(y))
         y_transformed = np.array(y)
         predictions_transformed = np.array(predictions)

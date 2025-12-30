@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import math
 import os
+from collections.abc import Iterator, Sequence
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator, Sequence, Union, overload
+from typing import Any, overload
 
 import numpy as np
 from joblib import delayed
@@ -15,7 +16,7 @@ from tqdm import tqdm
 from model2vec.quantization import DType, quantize_and_reduce_dim
 from model2vec.utils import ProgressParallel
 
-PathLike = Union[Path, str]
+PathLike = Path | str
 
 logger = getLogger(__name__)
 

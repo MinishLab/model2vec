@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterator
 from importlib import import_module
 from importlib.metadata import metadata
-from typing import Any, Iterator, Protocol
+from typing import Any, Protocol
 
 import numpy as np
 from joblib import Parallel
