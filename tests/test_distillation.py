@@ -115,8 +115,8 @@ def test_distill_removal_pattern(
     mock_model_info.return_value = type("ModelInfo", (object,), {"cardData": {"language": "en"}})
     mock_auto_model.return_value = mock_transformer
 
-    # Because the added [MASK] gets removed
-    expected_vocab_size = mock_berttokenizer.vocab_size - 1
+    # Because the added [MASK], [CLS] and [SEP] get removed
+    expected_vocab_size = mock_berttokenizer.vocab_size - 3
 
     static_model = distill_from_model(
         model=mock_transformer,
@@ -161,14 +161,14 @@ def test_distill_removal_pattern(
 @pytest.mark.parametrize(
     "vocabulary, pca_dims, sif_coefficient, expected_shape",
     [
-        (None, 256, None, (30521, 256)),  # PCA applied, SIF off
-        (None, "auto", None, (30521, 768)),  # PCA 'auto', SIF off
-        (None, "auto", 1e-4, (30521, 768)),  # PCA 'auto', SIF on
+        (None, 256, None, (30519, 256)),  # PCA applied, SIF off
+        (None, "auto", None, (30519, 768)),  # PCA 'auto', SIF off
+        (None, "auto", 1e-4, (30519, 768)),  # PCA 'auto', SIF on
         (None, "auto", 0, None),  # invalid SIF (too low) -> raises
         (None, "auto", 1, None),  # invalid SIF (too high) -> raises
-        (None, 1024, None, (30521, 768)),  # PCA set high (no reduction)
-        (["wordA", "wordB"], 4, None, (30523, 4)),  # Custom vocab, PCA applied
-        (None, None, None, (30521, 768)),  # No PCA, SIF off
+        (None, 1024, None, (30519, 768)),  # PCA set high (no reduction)
+        (["wordA", "wordB"], 4, None, (30521, 4)),  # Custom vocab, PCA applied
+        (None, None, None, (30519, 768)),  # No PCA, SIF off
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
