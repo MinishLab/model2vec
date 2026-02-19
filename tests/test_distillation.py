@@ -104,6 +104,7 @@ def test_distill_removal_pattern_all_tokens(
 
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
 @patch("transformers.AutoModel.from_pretrained")
+@pytest.mark.parametrize("mock_transformer", [{"vocab_size": 35022}], indirect=True)
 def test_distill_removal_pattern(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
@@ -114,7 +115,8 @@ def test_distill_removal_pattern(
     mock_model_info.return_value = type("ModelInfo", (object,), {"cardData": {"language": "en"}})
     mock_auto_model.return_value = mock_transformer
 
-    expected_vocab_size = mock_berttokenizer.vocab_size
+    # Because the added [MASK] gets removed
+    expected_vocab_size = mock_berttokenizer.vocab_size - 1
 
     static_model = distill_from_model(
         model=mock_transformer,
@@ -159,18 +161,19 @@ def test_distill_removal_pattern(
 @pytest.mark.parametrize(
     "vocabulary, pca_dims, sif_coefficient, expected_shape",
     [
-        (None, 256, None, (30522, 256)),  # PCA applied, SIF off
-        (None, "auto", None, (30522, 768)),  # PCA 'auto', SIF off
-        (None, "auto", 1e-4, (30522, 768)),  # PCA 'auto', SIF on
+        (None, 256, None, (30521, 256)),  # PCA applied, SIF off
+        (None, "auto", None, (30521, 768)),  # PCA 'auto', SIF off
+        (None, "auto", 1e-4, (30521, 768)),  # PCA 'auto', SIF on
         (None, "auto", 0, None),  # invalid SIF (too low) -> raises
         (None, "auto", 1, None),  # invalid SIF (too high) -> raises
-        (None, 1024, None, (30522, 768)),  # PCA set high (no reduction)
-        (["wordA", "wordB"], 4, None, (30524, 4)),  # Custom vocab, PCA applied
-        (None, None, None, (30522, 768)),  # No PCA, SIF off
+        (None, 1024, None, (30521, 768)),  # PCA set high (no reduction)
+        (["wordA", "wordB"], 4, None, (30523, 4)),  # Custom vocab, PCA applied
+        (None, None, None, (30521, 768)),  # No PCA, SIF off
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
 @patch("transformers.AutoModel.from_pretrained")
+@pytest.mark.parametrize("mock_transformer", [{"vocab_size": 30522}], indirect=True)
 def test_distill(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,

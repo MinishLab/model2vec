@@ -62,16 +62,24 @@ def mock_tokenizermodel() -> TokenizerModel:
 
 
 @pytest.fixture
-def mock_transformer() -> PreTrainedModel:
+def mock_transformer(request: pytest.FixtureRequest) -> PreTrainedModel:
     """Create a mock transformer model."""
+    params = getattr(request, "param", {}) or {}
+    # Default vocab size
+    vocab_size: int = params.get("vocab_size", 30522)
+    dim: int = params.get("dim", 768)
+    with_pooler: bool = params.get("with_pooler", True)
+    pooler_value: float = params.get("pooler_value", 7.0)
 
     class MockPreTrainedModel:
-        def __init__(self, dim: int = 768, with_pooler: bool = True, pooler_value: float = 7.0) -> None:
+        def __init__(self, vocab_size: int, dim: int, with_pooler: bool, pooler_value: float) -> None:
             self.device = "cpu"
             self.name_or_path = "mock-model"
             self.dim = dim
             self.with_pooler = with_pooler
             self.pooler_value = pooler_value
+            self.input_embs = torch.nn.Embedding(vocab_size, dim)
+            self.config: dict[str, Any] = {}
 
         def to(self, device: str) -> MockPreTrainedModel:
             self.device = device
@@ -91,7 +99,29 @@ def mock_transformer() -> PreTrainedModel:
 
         __call__ = forward
 
-    return cast(PreTrainedModel, MockPreTrainedModel())
+        def get_input_embeddings(self) -> torch.nn.Embedding:
+            return self.input_embs
+
+        def resize_token_embeddings(self, vocab_size: int) -> None:
+            curr_size = len(self.input_embs.weight)
+            if vocab_size == curr_size:
+                return
+            if vocab_size < curr_size:
+                self.input_embs.weight.data = self.input_embs.weight.data[: vocab_size + 1]
+            else:
+                self.input_embs.weight.data = torch.cat(
+                    [self.input_embs.weight, torch.zeros(vocab_size - curr_size, self.dim)], dim=0
+                )
+
+    return cast(
+        PreTrainedModel,
+        MockPreTrainedModel(
+            dim=dim,
+            with_pooler=with_pooler,
+            pooler_value=pooler_value,
+            vocab_size=vocab_size,
+        ),
+    )
 
 
 @pytest.fixture(scope="session")

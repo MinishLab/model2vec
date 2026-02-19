@@ -8,6 +8,7 @@ from typing import cast
 import numpy as np
 from huggingface_hub.hf_api import model_info
 from skeletoken import TokenizerModel
+from skeletoken.external.transformers import reshape_embeddings
 from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
@@ -77,10 +78,11 @@ def distill_from_model(
 
     device = select_optimal_device(device)
     original_tokenizer_model = TokenizerModel.from_transformers_tokenizer(tokenizer)
+    original_tokenizer_model = original_tokenizer_model.prune_added_tokens()
 
     # Clean the vocabulary by removing duplicate tokens and tokens that are in the internal vocabulary.
     # Copy the original tokenizer model.
-    tokenizer_model = original_tokenizer_model.model_copy(deep=True)
+    tokenizer_model = original_tokenizer_model.deep_copy()
     if tokenizer_model.adds_prefix_space is not None:
         tokenizer_model.adds_prefix_space = True
 
@@ -88,6 +90,7 @@ def distill_from_model(
     tokenizer_model = clean_and_create_vocabulary(tokenizer_model, vocabulary, token_remove_regex=token_remove_regex)
     # Remove the post processor, this is not necessary.
     tokenizer_model.post_processor = None
+    # Reshape the model
 
     # All tokens in a single list.
     all_tokens = tokenizer_model.sorted_vocabulary
@@ -97,12 +100,15 @@ def distill_from_model(
     # Turn all _new_ tokens into ids using the original tokenizer
     token_ids = turn_tokens_into_ids(all_tokens, original_tokenizer_model)
 
+    # Reshape the transformer
+    model = reshape_embeddings(model, original_tokenizer_model)
+
     # Create the embeddings using the ids from the original tokenizer.
     embeddings = create_embeddings(
         tokenized=token_ids,
         model=model,
         device=device,
-        pad_token_id=tokenizer_model.pad_token_id or 0,
+        pad_token_id=original_tokenizer_model.pad_token_id or 0,
         pooling=pooling,
     )
 

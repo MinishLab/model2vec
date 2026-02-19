@@ -1,9 +1,7 @@
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import numpy as np
 import pytest
-import safetensors
 from tokenizers import Tokenizer
 
 from model2vec import StaticModel
