@@ -14,7 +14,7 @@ from tokenizers import Tokenizer
 from model2vec.modelcards import create_model_card as make_model_card
 from model2vec.modelcards import get_metadata_from_readme
 from model2vec.persistence.datamodels import FOLDER_LAYOUTS, Layout
-from model2vec.persistence.hf import get_latest_model_path
+from model2vec.persistence.hf import maybe_get_cached_model_path
 from model2vec.utils import SafeOpenProtocol
 
 logger = logging.getLogger(__name__)
@@ -98,13 +98,18 @@ def load_pretrained(
     :return: The embeddings, tokenizer, config, metadata, weights and mapping.
 
     """
-    cached_folder = get_latest_model_path(str(folder_or_repo_path))
-    if cached_folder and not force_download:
-        logger.info(f"Found cached model at {cached_folder}, loading from cache.")
-        folder_or_repo_path = cached_folder
-    else:
-        logger.info(f"No cached model found for {folder_or_repo_path}, loading from local or hub.")
-        folder_or_repo_path = Path(folder_or_repo_path)
+    # Logic: by setting cached_folder, we no longer have a valid hub identifier.
+    # So, in _get_paths, we always hit a local folder, and never pull from the hub.
+    # If force_download is False, we never set the cached_folder.
+    if not force_download:
+        cached_folder = maybe_get_cached_model_path(str(folder_or_repo_path))
+        if cached_folder:
+            logger.info(f"Found cached model at {cached_folder}, loading from cache.")
+            folder_or_repo_path = cached_folder
+        else:
+            logger.info(f"No cached model found for {folder_or_repo_path}, loading from hub.")
+
+    folder_or_repo_path = Path(folder_or_repo_path)
 
     selected_layout = _get_paths(folder_or_repo_path, subfolder, token)
     readme_path = folder_or_repo_path / "README.md"

@@ -29,7 +29,7 @@ def push_folder_to_hub(
     logger.info(f"Pushed model to {repo_id}")
 
 
-def get_latest_model_path(model_id: str) -> Path | None:
+def maybe_get_cached_model_path(model_id: str) -> Path | None:
     """
     Gets the latest model path for a given identifier from the hugging face hub cache.
 
