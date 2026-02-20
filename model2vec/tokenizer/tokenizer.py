@@ -89,7 +89,8 @@ def turn_tokens_into_ids(tokens: list[str], model: TokenizerModel) -> list[list[
 
     token_ids: list[list[int]] = []
     for token in tokens:
-        if token_id := vocabulary.get(token):
+        token_id = vocabulary.get(token)
+        if token_id is not None:
             token_ids.append([*prefix, token_id, *suffix])
         else:
             token_ids.append(tokenizer.encode(token).ids)
