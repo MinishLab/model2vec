@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+import warnings
 from collections.abc import Iterator, Sequence
 from logging import getLogger
 from pathlib import Path
@@ -131,7 +132,7 @@ class StaticModel:
         :param model_name: The model name to use in the Model Card.
         :param subfolder: The subfolder to save to.
         """
-        from model2vec.hf_utils import save_pretrained
+        from model2vec.persistence import save_pretrained
 
         save_pretrained(
             folder_path=Path(path),
@@ -214,7 +215,6 @@ class StaticModel:
             vocabulary_quantization=vocabulary_quantization,
             quantize_to=quantize_to,
             dimensionality=dimensionality,
-            from_sentence_transformers=False,
             normalize=normalize,
             subfolder=subfolder,
             force_download=force_download,
@@ -231,24 +231,12 @@ class StaticModel:
         vocabulary_quantization: int | None = None,
         force_download: bool = True,
     ) -> StaticModel:
-        """
-        Load a StaticModel trained with sentence transformers from a local path or huggingface hub path.
-
-        NOTE: if you load a private model from the huggingface hub, you need to pass a token.
-
-        :param path: The path to load your static model from.
-        :param token: The huggingface token to use.
-        :param normalize: Whether to normalize the embeddings.
-        :param quantize_to: The dtype to quantize the model to. If None, no quantization is done.
-            If a string is passed, it is converted to a DType.
-        :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
-            This is useful if you want to load a model with a lower dimensionality.
-            Note that this only applies if you have trained your model using mrl or PCA.
-        :param vocabulary_quantization: The number of clusters to use for vocabulary quantization.
-        :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
-            already present in the cache.
-        :return: A StaticModel.
-        """
+        """Deprecated: use from_pretrained."""
+        warnings.warn(
+            "StaticModel.from_sentence_transformers() is deprecated; use from_pretrained() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return _loading_helper(
             cls=cls,
             path=path,
@@ -256,7 +244,6 @@ class StaticModel:
             vocabulary_quantization=vocabulary_quantization,
             quantize_to=quantize_to,
             dimensionality=dimensionality,
-            from_sentence_transformers=True,
             normalize=normalize,
             subfolder=None,
             force_download=force_download,
@@ -481,7 +468,7 @@ class StaticModel:
         :param token: The huggingface token to use.
         :param subfolder: The subfolder to push to.
         """
-        from model2vec.hf_utils import push_folder_to_hub
+        from model2vec.persistence import push_folder_to_hub
 
         with TemporaryDirectory() as temp_dir:
             self.save_pretrained(temp_dir, model_name=repo_id)
@@ -546,21 +533,16 @@ def _loading_helper(
     vocabulary_quantization: int | None,
     quantize_to: str | DType | None,
     dimensionality: int | None,
-    from_sentence_transformers: bool,
     normalize: bool | None,
     subfolder: str | None,
     force_download: bool,
 ) -> StaticModel:
     """Helper function to load a model from a directory."""
-    from model2vec.hf_utils import load_pretrained
-
-    if from_sentence_transformers and subfolder is not None:
-        raise ValueError("Subfolder is not supported for sentence transformers models.")
+    from model2vec.persistence import load_pretrained
 
     embeddings, tokenizer, config, metadata, weights, mapping = load_pretrained(
         folder_or_repo_path=path,
         token=token,
-        from_sentence_transformers=from_sentence_transformers,
         subfolder=subfolder,
         force_download=force_download,
     )
