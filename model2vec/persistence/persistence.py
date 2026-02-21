@@ -98,20 +98,14 @@ def load_pretrained(
     :return: The embeddings, tokenizer, config, metadata, weights and mapping.
 
     """
-    # Logic: by setting cached_folder, we no longer have a valid hub identifier.
-    # So, in _get_paths, we always hit a local folder, and never pull from the hub.
-    # If force_download is False, we never set the cached_folder.
-    if not force_download:
-        cached_folder = maybe_get_cached_model_path(str(folder_or_repo_path))
-        if cached_folder:
-            logger.info(f"Found cached model at {cached_folder}, loading from cache.")
-            folder_or_repo_path = cached_folder
-        else:
-            logger.info(f"No cached model found for {folder_or_repo_path}, loading from hub.")
-
     folder_or_repo_path = Path(folder_or_repo_path)
 
-    selected_layout = _get_paths(folder_or_repo_path, subfolder, token)
+    # We resolve a folder or repo path to an actual local folder.
+    folder = _resolve_folder(
+        folder_or_repo_path=folder_or_repo_path, token=token, force_download=force_download, subfolder=subfolder
+    )
+
+    selected_layout = _get_paths(folder)
     readme_path = folder_or_repo_path / "README.md"
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(selected_layout.embeddings, framework="numpy"))
@@ -139,19 +133,23 @@ def load_pretrained(
     return embeddings, tokenizer, config, metadata, weights, mapping
 
 
-def _resolve_folder(folder_or_repo_path: Path, subfolder: str | None, token: str | None) -> Path:
+def _resolve_folder(folder_or_repo_path: Path, subfolder: str | None, token: str | None, force_download: bool) -> Path:
     """Resolve a folder locally or from hugging face hub."""
-    local_candidate = folder_or_repo_path / subfolder if subfolder else folder_or_repo_path
-    if local_candidate.exists():
-        folder = local_candidate
-    else:
-        folder = Path(huggingface_hub.snapshot_download(str(folder_or_repo_path), repo_type="model", token=token))
-    return folder / subfolder if subfolder else folder
+    if folder_or_repo_path.exists():
+        return folder_or_repo_path
+    # We now know we're dealing with either an invalid path, or
+    # a HF model ID.
+    if not force_download:
+        if folder := maybe_get_cached_model_path(str(folder_or_repo_path)):
+            return folder
+
+    folder = Path(huggingface_hub.snapshot_download(str(folder_or_repo_path), repo_type="model", token=token))
+
+    return folder
 
 
-def _get_paths(folder_or_repo_path: Path, subfolder: str | None, token: str | None) -> Layout:
-    folder = _resolve_folder(folder_or_repo_path, subfolder, token)
-
+def _get_paths(folder: Path) -> Layout:
+    """Get all paths by trying out multiple layouts."""
     for layout in FOLDER_LAYOUTS:
         layout = layout.with_parent(folder)
         if layout.is_valid():

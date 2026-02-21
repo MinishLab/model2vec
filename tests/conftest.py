@@ -14,6 +14,7 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model2vec.inference import StaticModelPipeline
+from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 
 _TOKENIZER_TYPES = ["wordpiece", "bpe", "unigram"]
@@ -110,6 +111,17 @@ def mock_config() -> dict[str, Any]:
 def mock_inference_pipeline(mock_trained_pipeline: StaticModelForClassification) -> StaticModelPipeline:
     """Mock pipeline."""
     return mock_trained_pipeline.to_pipeline()
+
+
+@pytest.fixture(scope="session")
+def mock_static_model() -> StaticModel:
+    """A small static model to test saving/loading."""
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    generator = np.random.RandomState(42)
+    vectors = generator.randn(len(tokenizer.get_vocab()), 12)
+    model = StaticModel(vectors=vectors, tokenizer=tokenizer)
+
+    return model
 
 
 @pytest.fixture(

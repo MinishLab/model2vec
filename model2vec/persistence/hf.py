@@ -35,6 +35,9 @@ def maybe_get_cached_model_path(model_id: str) -> Path | None:
 
     Returns None if there is no cached model. In this case, the model will be downloaded.
     """
+    # Early exit: a model_id must have a single '/'
+    if model_id.count("/") != 1:
+        return None
     # Make path object
     cache_dir = Path(HF_HUB_CACHE)
     # This is specific to how HF stores the files.
