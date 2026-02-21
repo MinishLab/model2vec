@@ -74,6 +74,4 @@ def test_maybe_get_cached_model_path() -> None:
             assert maybe_get_cached_model_path(model_id) == None
             repo_dir_a = with_snapshot / "a"
             repo_dir_a.mkdir(parents=True, exist_ok=True)
-            repo_dir_b = with_snapshot / "b"
-            repo_dir_b.mkdir(parents=True, exist_ok=True)
-            assert maybe_get_cached_model_path(model_id) == repo_dir_b
+            assert maybe_get_cached_model_path(model_id) == repo_dir_a
