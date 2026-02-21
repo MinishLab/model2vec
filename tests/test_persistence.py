@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from model2vec.model import StaticModel
+from model2vec.persistence.hf import maybe_get_cached_model_path
 
 
 def test_local_loading(mock_static_model: StaticModel) -> None:
@@ -49,3 +50,30 @@ def test_garbage(mock_static_model: StaticModel) -> None:
         shutil.move(dir_name_path / "model.safetensors", dir_name_path / "model.safetenso")
         with pytest.raises(ValueError):
             StaticModel.from_pretrained(dir_name)
+
+
+def test_maybe_get_cached_model_path() -> None:
+    """Test cached model path."""
+    model_id = "t/t"
+    with TemporaryDirectory() as temp_dir:
+        with patch("model2vec.persistence.hf.HF_HUB_CACHE", temp_dir):
+            # No slash
+            assert maybe_get_cached_model_path("t") is None
+            # More than 1 slash
+            assert maybe_get_cached_model_path("t/t/t") is None
+            # Not created yet
+            assert maybe_get_cached_model_path(model_id) is None
+            normalized = model_id.replace("/", "--")
+            repo_dir = Path(temp_dir) / f"models--{normalized}"
+            repo_dir.mkdir(parents=True)
+            # Snapshot not created
+            assert maybe_get_cached_model_path(model_id) is None
+            with_snapshot = repo_dir / "snapshots"
+            with_snapshot.mkdir(parents=True, exist_ok=True)
+            # No snapshots yet
+            assert maybe_get_cached_model_path(model_id) == None
+            repo_dir_a = with_snapshot / "a"
+            repo_dir_a.mkdir(parents=True, exist_ok=True)
+            repo_dir_b = with_snapshot / "b"
+            repo_dir_b.mkdir(parents=True, exist_ok=True)
+            assert maybe_get_cached_model_path(model_id) == repo_dir_b
