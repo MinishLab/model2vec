@@ -101,12 +101,13 @@ def load_pretrained(
     folder_or_repo_path = Path(folder_or_repo_path)
 
     # We resolve a folder or repo path to an actual local folder.
-    folder = _resolve_folder(
-        folder_or_repo_path=folder_or_repo_path, token=token, force_download=force_download, subfolder=subfolder
-    )
+    folder = _resolve_folder(folder_or_repo_path=folder_or_repo_path, token=token, force_download=force_download)
+
+    if subfolder:
+        folder = folder / subfolder
 
     selected_layout = _get_paths(folder)
-    readme_path = folder_or_repo_path / "README.md"
+    readme_path = folder / "README.md"
 
     opened_tensor_file = cast(SafeOpenProtocol, safetensors.safe_open(selected_layout.embeddings, framework="numpy"))
     embedding_name = "embedding.weight" if selected_layout.is_sentence_transformers else "embeddings"
@@ -133,7 +134,7 @@ def load_pretrained(
     return embeddings, tokenizer, config, metadata, weights, mapping
 
 
-def _resolve_folder(folder_or_repo_path: Path, subfolder: str | None, token: str | None, force_download: bool) -> Path:
+def _resolve_folder(folder_or_repo_path: Path, token: str | None, force_download: bool) -> Path:
     """Resolve a folder locally or from hugging face hub."""
     if folder_or_repo_path.exists():
         return folder_or_repo_path

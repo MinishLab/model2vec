@@ -17,12 +17,12 @@ def test_local_loading(mock_static_model: StaticModel) -> None:
         with patch(
             "model2vec.persistence.persistence.huggingface_hub.snapshot_download",
         ) as mock_snapshot:
-            mock_snapshot.return_value = dir_name
+            mock_snapshot.return_value = Path(dir_name)
             # Patch the cache to return the local path, simulate a cache hit
             # we pass a fake model name to actually hit the cache and snapshot download paths
             with patch("model2vec.persistence.persistence.maybe_get_cached_model_path") as cache:
                 # Simulate cache hit
-                cache.return_value = dir_name
+                cache.return_value = Path(dir_name)
                 s = StaticModel.from_pretrained("haha", force_download=True)
                 assert s.tokens == mock_static_model.tokens
                 s = StaticModel.from_pretrained("haha", force_download=False)
@@ -50,6 +50,17 @@ def test_garbage(mock_static_model: StaticModel) -> None:
         shutil.move(dir_name_path / "model.safetensors", dir_name_path / "model.safetenso")
         with pytest.raises(ValueError):
             StaticModel.from_pretrained(dir_name)
+
+
+def test_subfolder_loading(mock_static_model: StaticModel) -> None:
+    """Test that garbage loading crashes."""
+    with TemporaryDirectory() as dir_name:
+        dir_name_path = Path(dir_name)
+        mock_static_model.save_pretrained(dir_name_path / "subfolder")
+        with pytest.raises(ValueError):
+            StaticModel.from_pretrained(dir_name)
+        model = StaticModel.from_pretrained(dir_name, subfolder="subfolder")
+        assert isinstance(model, StaticModel)
 
 
 def test_maybe_get_cached_model_path() -> None:
