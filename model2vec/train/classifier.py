@@ -84,9 +84,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         if linear_modules:
             *initial, last = linear_modules
             for module in initial:
-                if isinstance(module, nn.Linear):
-                    nn.init.kaiming_uniform_(module.weight, nonlinearity="relu")
-                    nn.init.zeros_(module.bias)
+                nn.init.kaiming_uniform_(module.weight, nonlinearity="relu")
+                nn.init.zeros_(module.bias)
             # Final layer does not kaiming
             nn.init.xavier_uniform_(last.weight)
             nn.init.zeros_(last.bias)
