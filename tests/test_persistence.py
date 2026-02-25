@@ -53,7 +53,7 @@ def test_garbage(mock_static_model: StaticModel) -> None:
 
 
 def test_subfolder_loading(mock_static_model: StaticModel) -> None:
-    """Test that garbage loading crashes."""
+    """Test that subfolder loading works."""
     with TemporaryDirectory() as dir_name:
         dir_name_path = Path(dir_name)
         mock_static_model.save_pretrained(dir_name_path / "subfolder")
