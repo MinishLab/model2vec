@@ -80,10 +80,16 @@ class StaticModelForClassification(FinetunableStaticModel):
             # We always have a layer mapping from hidden to out.
             modules.append(nn.Linear(self.hidden_dim, self.out_dim))
 
-        for module in modules:
-            if isinstance(module, nn.Linear):
-                nn.init.kaiming_uniform_(module.weight)
-                nn.init.zeros_(module.bias)
+        linear_modules = [module for module in modules if isinstance(module, nn.Linear)]
+        if linear_modules:
+            *initial, last = linear_modules
+            for module in initial:
+                if isinstance(module, nn.Linear):
+                    nn.init.kaiming_uniform_(module.weight, nonlinearity="relu")
+                    nn.init.zeros_(module.bias)
+            # Final layer does not kaiming
+            nn.init.xavier_uniform_(last.weight)
+            nn.init.zeros_(last.bias)
 
         return nn.Sequential(*modules)
 
