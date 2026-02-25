@@ -66,15 +66,17 @@ class StaticModelForClassification(FinetunableStaticModel):
 
     def construct_head(self) -> nn.Sequential:
         """Constructs a simple classifier head."""
-        if self.n_layers == 0:
-            return nn.Sequential(nn.Linear(self.embed_dim, self.out_dim))
-        modules = [
-            nn.Linear(self.embed_dim, self.hidden_dim),
-            nn.ReLU(),
-        ]
-        for _ in range(self.n_layers - 1):
-            modules.extend([nn.Linear(self.hidden_dim, self.hidden_dim), nn.ReLU()])
-        modules.extend([nn.Linear(self.hidden_dim, self.out_dim)])
+        modules = []
+        if self.n_layers > 0:
+            # If we have a hidden layer, we should first project to hidden_dim
+            modules = [
+                nn.Linear(self.embed_dim, self.hidden_dim),
+                nn.ReLU(),
+            ]
+            for _ in range(self.n_layers - 1):
+                modules.extend([nn.Linear(self.hidden_dim, self.hidden_dim), nn.ReLU()])
+        # We always have a layer mapping from hidden to out.
+        modules.append(nn.Linear(self.hidden_dim, self.out_dim))
 
         for module in modules:
             if isinstance(module, nn.Linear):
