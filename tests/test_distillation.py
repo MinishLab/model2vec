@@ -92,14 +92,17 @@ def test_distill_removal_pattern_all_tokens(
     mock_model_info.return_value = type("ModelInfo", (object,), {"cardData": {"language": "en"}})
     mock_auto_model.return_value = mock_transformer
 
-    with pytest.raises(ValueError):
-        distill_from_model(
-            model=mock_transformer,
-            tokenizer=mock_berttokenizer,
-            vocabulary=None,
-            device="cpu",
-            token_remove_pattern=r".*",
-        )
+    # Even if we remove all tokens, we can't remove the [UNK] token
+    model = distill_from_model(
+        model=mock_transformer,
+        tokenizer=mock_berttokenizer,
+        vocabulary=None,
+        device="cpu",
+        token_remove_pattern=r".*",
+    )
+
+    # So the only token left is the [UNK] token.
+    assert model.tokens == ("[UNK]",)
 
 
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
