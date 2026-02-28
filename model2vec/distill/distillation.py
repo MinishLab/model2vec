@@ -91,7 +91,7 @@ def distill_from_model(
     # Remove the post processor, this is not necessary.
     tokenizer_model.post_processor = None
     # Prune again now that the post processor is gone.
-    # We can't do this before because we need the post preocessor and associated
+    # We can't do this before because we need the post processor and associated
     # tokens before to add eos/bos.
     tokenizer_model = tokenizer_model.prune_added_tokens()
 
