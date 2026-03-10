@@ -386,9 +386,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         X = random_state.randn(n_items, static_model.dim)
         y = self.classes
 
-        converted = make_pipeline(MLPClassifier(hidden_layer_sizes=(self.hidden_dim,) * self.n_layers))
-        converted.fit(X, y)
-        mlp_head: MLPClassifier = converted[-1]
+        mlp_head = MLPClassifier(hidden_layer_sizes=(self.hidden_dim,) * self.n_layers)
+        mlp_head.fit(X, y)
 
         for index, layer in enumerate([module for module in self.head if isinstance(module, nn.Linear)]):
             mlp_head.coefs_[index] = layer.weight.detach().cpu().numpy().T
@@ -402,7 +401,8 @@ class StaticModelForClassification(FinetunableStaticModel):
         # Set to softmax or sigmoid
         mlp_head.out_activation_ = "logistic" if self.multilabel else "softmax"
 
-        return StaticModelPipeline(static_model, converted)
+        pipeline = make_pipeline(mlp_head)
+        return StaticModelPipeline(static_model, pipeline)
 
 
 class _ClassifierLightningModule(pl.LightningModule):
