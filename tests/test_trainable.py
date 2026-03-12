@@ -1,3 +1,4 @@
+import logging
 from tempfile import TemporaryDirectory
 
 import numpy as np
@@ -235,7 +236,7 @@ def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
             mock_trained_pipeline.evaluate(["dog cat", "dog"], [1, 1])  # type: ignore
 
 
-def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer) -> None:
+def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer, caplog: pytest.LogCaptureFixture) -> None:
     """Test loading from a static model with a pad token."""
     model = TokenizerModel.from_tokenizer(mock_tokenizer)
     t = model.to_tokenizer()
@@ -258,3 +259,10 @@ def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer) -> None:
     t = model.to_tokenizer()
     token_id = get_probable_pad_token_id(t)
     assert token_id == model.vocabulary["[PAD]"]
+
+    model = model.remove_token_from_vocabulary("[PAD]")
+    t = model.to_tokenizer()
+    with caplog.at_level(logging.WARNING, logger="model2vec.train.utils"):
+        token_id = get_probable_pad_token_id(t)
+    assert token_id == 0
+    assert "No known pad token found, using 0 as default" in caplog.text
