@@ -70,6 +70,21 @@ def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: To
         assert s.w.shape[0] == mock_vectors.shape[0]
 
 
+def test_pad_token(mock_tokenizer: Tokenizer) -> None:
+    """Test initializion from a static model."""
+    tokenizer_model = TokenizerModel.from_tokenizer(mock_tokenizer)
+    tokenizer_model.pad_token = "[HELLO]"
+    tokenizer = tokenizer_model.to_tokenizer()
+    vectors = np.random.RandomState().randn(6, 10)
+    model = StaticModel(vectors=vectors, tokenizer=tokenizer)
+    s = StaticModelForClassification.from_static_model(model=model, pad_token="[HELLO]")
+    assert s.w.shape[0] == vectors.shape[0]
+    assert s.pad_id == 5
+
+    with pytest.raises(KeyError):
+        StaticModelForClassification.from_static_model(model=model, pad_token="[BRR]")
+
+
 def test_encode(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the encode function."""
     result = mock_trained_pipeline._encode(torch.tensor([[0, 1], [1, 0]]).long())
@@ -238,30 +253,30 @@ def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
 
 def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer, caplog: pytest.LogCaptureFixture) -> None:
     """Test loading from a static model with a pad token."""
-    model = TokenizerModel.from_tokenizer(mock_tokenizer)
-    t = model.to_tokenizer()
+    tokenizer_model = TokenizerModel.from_tokenizer(mock_tokenizer)
+    t = tokenizer_model.to_tokenizer()
     token_id = get_probable_pad_token_id(t)
     assert token_id == 0
 
     # Adds new token
-    model.pad_token = "haha"
-    t = model.to_tokenizer()
+    tokenizer_model.pad_token = "haha"
+    t = tokenizer_model.to_tokenizer()
     token_id = get_probable_pad_token_id(t)
     assert token_id == 5
 
-    model.pad_token = "word1"
-    t = model.to_tokenizer()
+    tokenizer_model.pad_token = "word1"
+    t = tokenizer_model.to_tokenizer()
     token_id = get_probable_pad_token_id(t)
     assert token_id == 1
 
     # Remove padding token
-    model.pad_token = None
-    t = model.to_tokenizer()
+    tokenizer_model.pad_token = None
+    t = tokenizer_model.to_tokenizer()
     token_id = get_probable_pad_token_id(t)
-    assert token_id == model.vocabulary["[PAD]"]
+    assert token_id == tokenizer_model.vocabulary["[PAD]"]
 
-    model = model.remove_token_from_vocabulary("[PAD]")
-    t = model.to_tokenizer()
+    tokenizer_model = tokenizer_model.remove_token_from_vocabulary("[PAD]")
+    t = tokenizer_model.to_tokenizer()
     with caplog.at_level(logging.WARNING, logger="model2vec.train.utils"):
         token_id = get_probable_pad_token_id(t)
     assert token_id == 0
