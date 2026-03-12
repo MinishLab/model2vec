@@ -158,7 +158,7 @@ class StaticModelForClassification(FinetunableStaticModel):
         X_val: list[str] | None = None,
         y_val: LabelType | None = None,
         class_weight: torch.Tensor | None = None,
-        seed: int = _DEFAULT_RANDOM_SEED,
+        random_seed: int = _DEFAULT_RANDOM_SEED,
     ) -> StaticModelForClassification:
         """
         Fit a model.
@@ -188,11 +188,11 @@ class StaticModelForClassification(FinetunableStaticModel):
         :param y_val: The labels to be used for validation.
         :param class_weight: The weight of the classes. If None, all classes are weighted equally. Must
             have the same length as the number of classes.
-        :param seed: The random seed to use. Defaults to 42.
+        :param random_seed: The random seed to use. Defaults to 42.
         :return: The fitted model.
         :raises ValueError: If either X_val or y_val are provided, but not both.
         """
-        pl.seed_everything(seed)
+        pl.seed_everything(random_seed)
         logger.info("Re-initializing model.")
 
         # Determine whether the task is multilabel based on the type of y.
