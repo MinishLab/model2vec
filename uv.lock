@@ -934,7 +934,7 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'quantization'" },
     { name = "scikit-learn", marker = "extra == 'train'" },
     { name = "setuptools" },
-    { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.3.1" },
+    { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.3.2" },
     { name = "skops", marker = "extra == 'inference'" },
     { name = "skops", marker = "extra == 'train'" },
     { name = "tokenizers", specifier = ">=0.20" },
@@ -2263,7 +2263,7 @@ wheels = [
 
 [[package]]
 name = "skeletoken"
-version = "0.3.1"
+version = "0.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
@@ -2272,9 +2272,9 @@ dependencies = [
     { name = "tokenizers" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/49/d3/5c30ca5c615a9a0bbc3a0e045fb0885cf97ddfac152f86eb3e24e4519d92/skeletoken-0.3.1.tar.gz", hash = "sha256:bcd9da7789dc738cbc77f3c94f1b535486f1d455ed2d51e6d92431d7e583b4d9", size = 233048, upload-time = "2026-02-27T13:08:59.88Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/a6/71abc874578c9a3290faa04ad8db7eb60e05b3f5052f6dbec525b28bc133/skeletoken-0.3.2.tar.gz", hash = "sha256:24a423e8f789719f62f5e69e040a062f7467f932626119c14ad4b87184457b46", size = 234150, upload-time = "2026-03-12T15:03:02.096Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/ab/4078e1a90aafab6f4b642ef2583c693c806f9dd555213b701a22a0a18bbb/skeletoken-0.3.1-py3-none-any.whl", hash = "sha256:804021822f0da0aea272cf5f425f5fc96a2795b29b3f33d821f0e42fd700857b", size = 39430, upload-time = "2026-02-27T13:08:58.312Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/77/555503fd8e5cbef7a824481f7154bf90979c4d1b0604ce9de0221d8d38a1/skeletoken-0.3.2-py3-none-any.whl", hash = "sha256:483d6b76bb508b7de7aa2c00b17915804a2bb1b106393efc9ac73fe3de162690", size = 40302, upload-time = "2026-03-12T15:03:00.92Z" },
 ]
 
 [[package]]

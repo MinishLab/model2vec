@@ -1,14 +1,17 @@
+import logging
 from tempfile import TemporaryDirectory
 
 import numpy as np
 import pytest
 import torch
+from skeletoken import TokenizerModel
 from tokenizers import Tokenizer
 from transformers import AutoTokenizer
 
 from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 from model2vec.train.base import FinetunableStaticModel, TextDataset
+from model2vec.train.utils import get_probable_pad_token_id
 
 
 @pytest.mark.parametrize("n_layers", [0, 1, 2, 3])
@@ -65,6 +68,21 @@ def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: To
         s = StaticModelForClassification.from_pretrained(model_name=temp_dir)
         assert s.vectors.shape == mock_vectors.shape
         assert s.w.shape[0] == mock_vectors.shape[0]
+
+
+def test_pad_token(mock_tokenizer: Tokenizer) -> None:
+    """Test initializion from a static model."""
+    tokenizer_model = TokenizerModel.from_tokenizer(mock_tokenizer)
+    tokenizer_model.pad_token = "[HELLO]"
+    tokenizer = tokenizer_model.to_tokenizer()
+    vectors = np.random.RandomState().randn(6, 10)
+    model = StaticModel(vectors=vectors, tokenizer=tokenizer)
+    s = StaticModelForClassification.from_static_model(model=model, pad_token="[HELLO]")
+    assert s.w.shape[0] == vectors.shape[0]
+    assert s.pad_id == 5
+
+    with pytest.raises(KeyError):
+        StaticModelForClassification.from_static_model(model=model, pad_token="[BRR]")
 
 
 def test_encode(mock_trained_pipeline: StaticModelForClassification) -> None:
@@ -231,3 +249,35 @@ def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
         else:
             # Ignore the type error since we don't support int labels in our typing, but the code does
             mock_trained_pipeline.evaluate(["dog cat", "dog"], [1, 1])  # type: ignore
+
+
+def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer, caplog: pytest.LogCaptureFixture) -> None:
+    """Test loading from a static model with a pad token."""
+    tokenizer_model = TokenizerModel.from_tokenizer(mock_tokenizer)
+    t = tokenizer_model.to_tokenizer()
+    token_id = get_probable_pad_token_id(t)
+    assert token_id == 0
+
+    # Adds new token
+    tokenizer_model.pad_token = "haha"
+    t = tokenizer_model.to_tokenizer()
+    token_id = get_probable_pad_token_id(t)
+    assert token_id == 5
+
+    tokenizer_model.pad_token = "word1"
+    t = tokenizer_model.to_tokenizer()
+    token_id = get_probable_pad_token_id(t)
+    assert token_id == 1
+
+    # Remove padding token
+    tokenizer_model.pad_token = None
+    t = tokenizer_model.to_tokenizer()
+    token_id = get_probable_pad_token_id(t)
+    assert token_id == tokenizer_model.vocabulary["[PAD]"]
+
+    tokenizer_model = tokenizer_model.remove_token_from_vocabulary("[PAD]")
+    t = tokenizer_model.to_tokenizer()
+    with caplog.at_level(logging.WARNING, logger="model2vec.train.utils"):
+        token_id = get_probable_pad_token_id(t)
+    assert token_id == 0
+    assert "No known pad token found, using 0 as default" in caplog.text
