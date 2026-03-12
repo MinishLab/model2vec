@@ -11,6 +11,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 
 from model2vec import StaticModel
+from model2vec.train.utils import get_probable_pad_token_id
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ class FinetunableStaticModel(nn.Module):
 
     @classmethod
     def from_static_model(
-        cls: type[ModelType], *, model: StaticModel, out_dim: int = 2, pad_token: str = "[PAD]", **kwargs: Any
+        cls: type[ModelType], *, model: StaticModel, out_dim: int = 2, pad_token: str | None = None, **kwargs: Any
     ) -> ModelType:
         """Load the model from a static model."""
         model.embedding = np.nan_to_num(model.embedding)
@@ -92,9 +93,13 @@ class FinetunableStaticModel(nn.Module):
             token_mapping = model.token_mapping.tolist()
         else:
             token_mapping = None
+        if pad_token is not None:
+            pad_id = model.tokenizer.get_vocab()[pad_token]
+        else:
+            pad_id = get_probable_pad_token_id(model.tokenizer)
         return cls(
             vectors=embeddings_converted,
-            pad_id=model.tokenizer.token_to_id(pad_token),
+            pad_id=pad_id,
             out_dim=out_dim,
             tokenizer=model.tokenizer,
             token_mapping=token_mapping,

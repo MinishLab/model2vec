@@ -3,12 +3,14 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pytest
 import torch
+from skeletoken import TokenizerModel
 from tokenizers import Tokenizer
 from transformers import AutoTokenizer
 
 from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 from model2vec.train.base import FinetunableStaticModel, TextDataset
+from model2vec.train.utils import get_probable_pad_token_id
 
 
 @pytest.mark.parametrize("n_layers", [0, 1, 2, 3])
@@ -231,3 +233,28 @@ def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
         else:
             # Ignore the type error since we don't support int labels in our typing, but the code does
             mock_trained_pipeline.evaluate(["dog cat", "dog"], [1, 1])  # type: ignore
+
+
+def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer) -> None:
+    """Test loading from a static model with a pad token."""
+    model = TokenizerModel.from_tokenizer(mock_tokenizer)
+    t = model.to_tokenizer()
+    token_id = get_probable_pad_token_id(t)
+    assert token_id == 0
+
+    # Adds new token
+    model.pad_token = "haha"
+    t = model.to_tokenizer()
+    token_id = get_probable_pad_token_id(t)
+    assert token_id == 5
+
+    model.pad_token = "word1"
+    t = model.to_tokenizer()
+    token_id = get_probable_pad_token_id(t)
+    assert token_id == 1
+
+    # Remove padding token
+    model.pad_token = None
+    t = model.to_tokenizer()
+    token_id = get_probable_pad_token_id(t)
+    assert token_id == model.vocabulary["[PAD]"]
