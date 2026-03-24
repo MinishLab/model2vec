@@ -122,15 +122,15 @@ def main(save_path: str, n_texts: int) -> None:
     texts = ds["text"][:n_texts]
 
     summarized_results = [
-        {"Model": "potion-base-2M", "Average score": 44.77, "Samples per second": None, "Params (Million)": 1.875},
-        {"Model": "GloVe 6B 300d", "Average score": 42.36, "Samples per second": None, "Params (Million)": 120.000},
-        {"Model": "potion-base-4M", "Average score": 48.23, "Samples per second": None, "Params (Million)": 3.750},
-        {"Model": "all-MiniLM-L6-v2", "Average score": 56.09, "Samples per second": None, "Params (Million)": 23.000},
-        {"Model": "potion-base-8M", "Average score": 50.03, "Samples per second": None, "Params (Million)": 7.500},
-        {"Model": "bge-base-en-v1.5", "Average score": 63.56, "Samples per second": None, "Params (Million)": 109.000},
-        {"Model": "M2V_base_output", "Average score": 45.34, "Samples per second": None, "Params (Million)": 7.500},
-        {"Model": "BPEmb-50k-300d", "Average score": 37.78, "Samples per second": None, "Params (Million)": 15.000},
-        {"Model": "potion-base-32M", "Average score": 51.66, "Samples per second": None, "Params (Million)": 32.300},
+        {"Model": "potion-base-2M", "Average score": 47.49, "Samples per second": None, "Params (Million)": 1.875},
+        {"Model": "GloVe 6B 300d", "Average score": 45.82, "Samples per second": None, "Params (Million)": 120.000},
+        {"Model": "potion-base-4M", "Average score": 49.77, "Samples per second": None, "Params (Million)": 3.750},
+        {"Model": "all-MiniLM-L6-v2", "Average score": 55.93, "Samples per second": None, "Params (Million)": 23.000},
+        {"Model": "potion-base-8M", "Average score": 51.08, "Samples per second": None, "Params (Million)": 7.500},
+        {"Model": "bge-base-en-v1.5", "Average score": 60.77, "Samples per second": None, "Params (Million)": 109.000},
+        {"Model": "M2V_base_output", "Average score": 47.96, "Samples per second": None, "Params (Million)": 7.500},
+        {"Model": "BPEmb-50k-300d", "Average score": 41.74, "Samples per second": None, "Params (Million)": 15.000},
+        {"Model": "potion-base-32M", "Average score": 52.13, "Samples per second": None, "Params (Million)": 32.300},
     ]
 
     timings = {}
