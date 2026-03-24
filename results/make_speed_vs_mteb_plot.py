@@ -106,20 +106,11 @@ def benchmark_model(name: str, info: list[str], texts: list[str]) -> dict[str, f
     return {"docs_per_second": docs_per_second, "total_time": total_time}
 
 
-def main(save_path: str, n_texts: int) -> None:
+def main(save_path: str, n_texts: int, force_benchmark: bool) -> None:
     """Benchmark text embedding models and generate a plot."""
-    # Define the models to benchmark
-    models: dict[str, list[str]] = {
-        "BPEmb-50k-300d": ["", "BPEmb"],
-        "all-MiniLM-L6-v2": ["sentence-transformers/all-MiniLM-L6-v2", "ST"],
-        "bge-base-en-v1.5": ["BAAI/bge-base-en-v1.5", "ST"],
-        "GloVe 6B 300d": ["sentence-transformers/average_word_embeddings_glove.6B.300d", "ST"],
-        "potion-base-8M": ["minishlab/potion-base-8M", "M2V"],
-    }
-
-    # Load the dataset
-    ds = load_dataset("wikimedia/wikipedia", data_files="20231101.en/train-00000-of-00041.parquet")["train"]
-    texts = ds["text"][:n_texts]
+    save_dir = Path(save_path)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    json_path = save_dir / "speed_benchmark_results.json"
 
     summarized_results = [
         {"Model": "potion-base-2M", "Average score": 47.49, "Samples per second": None, "Params (Million)": 1.875},
@@ -128,46 +119,56 @@ def main(save_path: str, n_texts: int) -> None:
         {"Model": "all-MiniLM-L6-v2", "Average score": 55.93, "Samples per second": None, "Params (Million)": 23.000},
         {"Model": "potion-base-8M", "Average score": 51.08, "Samples per second": None, "Params (Million)": 7.500},
         {"Model": "bge-base-en-v1.5", "Average score": 60.77, "Samples per second": None, "Params (Million)": 109.000},
-        {"Model": "M2V_base_output", "Average score": 47.96, "Samples per second": None, "Params (Million)": 7.500},
         {"Model": "BPEmb-50k-300d", "Average score": 41.74, "Samples per second": None, "Params (Million)": 15.000},
         {"Model": "potion-base-32M", "Average score": 52.13, "Samples per second": None, "Params (Million)": 32.300},
     ]
 
-    timings = {}
+    if not force_benchmark and json_path.exists():
+        logger.info(f"Loading cached timings from {json_path} (use --force-benchmark to re-run)")
+        with open(json_path) as file:
+            timings = json.load(file)
+    else:
+        # Define the models to benchmark
+        models: dict[str, list[str]] = {
+            "BPEmb-50k-300d": ["", "BPEmb"],
+            "all-MiniLM-L6-v2": ["sentence-transformers/all-MiniLM-L6-v2", "ST"],
+            "bge-base-en-v1.5": ["BAAI/bge-base-en-v1.5", "ST"],
+            "GloVe 6B 300d": ["sentence-transformers/average_word_embeddings_glove.6B.300d", "ST"],
+            "potion-base-8M": ["minishlab/potion-base-8M", "M2V"],
+        }
 
-    for name, info in models.items():
-        timing = benchmark_model(name, info, texts)
-        timings[name] = timing
-        # Update summarized results
-        for result in summarized_results:
-            if result["Model"] == name:
-                result["Samples per second"] = timing["docs_per_second"]
+        # Load the dataset
+        ds = load_dataset("wikimedia/wikipedia", data_files="20231101.en/train-00000-of-00041.parquet")["train"]
+        texts = ds["text"][:n_texts]
 
-    # Set potion-base-8M as the reference speed for the other potion models
+        timings = {}
+        for name, info in models.items():
+            timing = benchmark_model(name, info, texts)
+            timings[name] = timing
+
+        with open(json_path, "w") as file:
+            json.dump(timings, file, indent=4)
+        logger.info(f"Timings saved to {json_path}")
+
+    for result in summarized_results:
+        name = str(result["Model"])
+        if name in timings:
+            result["Samples per second"] = timings[name]["docs_per_second"]
+
+    # Set potion-base-8M as the reference speed for the other M2V models
     potion_base_8m_speed = next(
         result["Samples per second"] for result in summarized_results if result["Model"] == "potion-base-8M"
     )
-    for model_name in ["M2V_base_output", "potion-base-2M", "potion-base-4M", "potion-base-32M"]:
+    for model_name in ["potion-base-2M", "potion-base-4M", "potion-base-32M"]:
         for result in summarized_results:
             if result["Model"] == model_name:
                 result["Samples per second"] = potion_base_8m_speed
-
-    # Ensure save_path is a directory
-    save_dir = Path(save_path)
-    save_dir.mkdir(parents=True, exist_ok=True)
-
-    # Save timings to JSON
-    json_path = save_dir / "speed_benchmark_results.json"
-    with open(json_path, "w") as file:
-        json.dump(timings, file, indent=4)
 
     # Create and save the plot
     df = pd.DataFrame(summarized_results)
     plot = make_plot(df)
     plot_path = save_dir / "speed_vs_mteb_plot.png"
     plot.save(plot_path, width=12, height=10)
-
-    logger.info(f"Timings saved to {json_path}")
     logger.info(f"Plot saved to {plot_path}")
 
 
@@ -179,6 +180,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n-texts", type=int, default=100_000, help="Number of texts to use from the dataset for benchmarking."
     )
+    parser.add_argument(
+        "--force-benchmark",
+        action="store_true",
+        help="Re-run the speed benchmark even if cached results exist.",
+    )
     args = parser.parse_args()
 
-    main(save_path=args.save_path, n_texts=args.n_texts)
+    main(save_path=args.save_path, n_texts=args.n_texts, force_benchmark=args.force_benchmark)

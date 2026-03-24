@@ -42,7 +42,7 @@ The figure below shows the relationship between the number of sentences per seco
 This plot shows that the potion and M2V models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
 NOTE: for fairness of comparison, we disabled multiprocessing for Model2Vec for this benchmark. All sentence-transformers models are run with the [sentence-transformers](https://github.com/UKPLab/sentence-transformers) library's default settings for `encode`.
 
-| ![Description](../assets/images/speed_vs_mteb_score_v3.png) |
+| ![Description](../assets/images/speed_vs_mteb_plot.png) |
 |:--:|
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
