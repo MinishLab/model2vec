@@ -1,7 +1,6 @@
 """Script to benchmark the speed of various text embedding models and generate a plot of the MTEB score vs samples per second."""
 
 import argparse
-import json
 import logging
 from pathlib import Path
 from time import perf_counter
@@ -57,7 +56,7 @@ def make_plot(df: pd.DataFrame) -> ggplot:
     """Create a plot of the MTEB score vs samples per second."""
     df["label_y"] = (
         df["Average score"]
-        + 0.5  # a constant "base" offset for all bubbles
+        + 0.2  # a constant "base" offset for all bubbles
         + 0.08 * np.sqrt(df["Params (Million)"])
     )
     plot = (
@@ -106,68 +105,66 @@ def benchmark_model(name: str, info: list[str], texts: list[str]) -> dict[str, f
     return {"docs_per_second": docs_per_second, "total_time": total_time}
 
 
-def main(save_path: str, n_texts: int) -> None:
+def main(save_path: str, n_texts: int, force_benchmark: bool) -> None:
     """Benchmark text embedding models and generate a plot."""
-    # Define the models to benchmark
-    models: dict[str, list[str]] = {
-        "BPEmb-50k-300d": ["", "BPEmb"],
-        "all-MiniLM-L6-v2": ["sentence-transformers/all-MiniLM-L6-v2", "ST"],
-        "bge-base-en-v1.5": ["BAAI/bge-base-en-v1.5", "ST"],
-        "GloVe 6B 300d": ["sentence-transformers/average_word_embeddings_glove.6B.300d", "ST"],
-        "potion-base-8M": ["minishlab/potion-base-8M", "M2V"],
-    }
-
-    # Load the dataset
-    ds = load_dataset("wikimedia/wikipedia", data_files="20231101.en/train-00000-of-00041.parquet")["train"]
-    texts = ds["text"][:n_texts]
-
-    summarized_results = [
-        {"Model": "potion-base-2M", "Average score": 44.77, "Samples per second": None, "Params (Million)": 1.875},
-        {"Model": "GloVe 6B 300d", "Average score": 42.36, "Samples per second": None, "Params (Million)": 120.000},
-        {"Model": "potion-base-4M", "Average score": 48.23, "Samples per second": None, "Params (Million)": 3.750},
-        {"Model": "all-MiniLM-L6-v2", "Average score": 56.09, "Samples per second": None, "Params (Million)": 23.000},
-        {"Model": "potion-base-8M", "Average score": 50.03, "Samples per second": None, "Params (Million)": 7.500},
-        {"Model": "bge-base-en-v1.5", "Average score": 63.56, "Samples per second": None, "Params (Million)": 109.000},
-        {"Model": "M2V_base_output", "Average score": 45.34, "Samples per second": None, "Params (Million)": 7.500},
-        {"Model": "BPEmb-50k-300d", "Average score": 37.78, "Samples per second": None, "Params (Million)": 15.000},
-        {"Model": "potion-base-32M", "Average score": 51.66, "Samples per second": None, "Params (Million)": 32.300},
-    ]
-
-    timings = {}
-
-    for name, info in models.items():
-        timing = benchmark_model(name, info, texts)
-        timings[name] = timing
-        # Update summarized results
-        for result in summarized_results:
-            if result["Model"] == name:
-                result["Samples per second"] = timing["docs_per_second"]
-
-    # Set potion-base-8M as the reference speed for the other potion models
-    potion_base_8m_speed = next(
-        result["Samples per second"] for result in summarized_results if result["Model"] == "potion-base-8M"
-    )
-    for model_name in ["M2V_base_output", "potion-base-2M", "potion-base-4M", "potion-base-32M"]:
-        for result in summarized_results:
-            if result["Model"] == model_name:
-                result["Samples per second"] = potion_base_8m_speed
-
-    # Ensure save_path is a directory
     save_dir = Path(save_path)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save timings to JSON
-    json_path = save_dir / "speed_benchmark_results.json"
-    with open(json_path, "w") as file:
-        json.dump(timings, file, indent=4)
+    # Cached speeds (samples/sec, measured on CPU with 1k Wikipedia texts).
+    # Re-run with --force-benchmark to update these values.
+    cached_speeds: dict[str, float] = {
+        "BPEmb-50k-300d": 84.39,
+        "all-MiniLM-L6-v2": 62.00,
+        "bge-base-en-v1.5": 7.42,
+        "GloVe 6B 300d": 538.39,
+        "potion-base-8M": 5165.96,
+    }
+
+    summarized_results = [
+        {"Model": "potion-base-2M", "Average score": 47.49, "Samples per second": None, "Params (Million)": 1.875},
+        {"Model": "GloVe 6B 300d", "Average score": 45.82, "Samples per second": None, "Params (Million)": 120.000},
+        {"Model": "potion-base-4M", "Average score": 49.77, "Samples per second": None, "Params (Million)": 3.750},
+        {"Model": "all-MiniLM-L6-v2", "Average score": 55.93, "Samples per second": None, "Params (Million)": 23.000},
+        {"Model": "potion-base-8M", "Average score": 51.08, "Samples per second": None, "Params (Million)": 7.500},
+        {"Model": "bge-base-en-v1.5", "Average score": 60.77, "Samples per second": None, "Params (Million)": 109.000},
+        {"Model": "BPEmb-50k-300d", "Average score": 41.74, "Samples per second": None, "Params (Million)": 15.000},
+        {"Model": "potion-base-32M", "Average score": 52.13, "Samples per second": None, "Params (Million)": 32.300},
+    ]
+
+    if force_benchmark:
+        models: dict[str, list[str]] = {
+            "BPEmb-50k-300d": ["", "BPEmb"],
+            "all-MiniLM-L6-v2": ["sentence-transformers/all-MiniLM-L6-v2", "ST"],
+            "bge-base-en-v1.5": ["BAAI/bge-base-en-v1.5", "ST"],
+            "GloVe 6B 300d": ["sentence-transformers/average_word_embeddings_glove.6B.300d", "ST"],
+            "potion-base-8M": ["minishlab/potion-base-8M", "M2V"],
+        }
+        ds = load_dataset("wikimedia/wikipedia", data_files="20231101.en/train-00000-of-00041.parquet")["train"]
+        texts = ds["text"][:n_texts]
+        for name, info in models.items():
+            timing = benchmark_model(name, info, texts)
+            cached_speeds[name] = float(timing["docs_per_second"])
+        logger.info("Updated speeds: %s", cached_speeds)
+
+    for result in summarized_results:
+        name = str(result["Model"])
+        if name in cached_speeds:
+            result["Samples per second"] = cached_speeds[name]
+
+    # Set potion-base-8M as the reference speed for the other M2V models
+    potion_base_8m_speed = next(
+        result["Samples per second"] for result in summarized_results if result["Model"] == "potion-base-8M"
+    )
+    for model_name in ["potion-base-2M", "potion-base-4M", "potion-base-32M"]:
+        for result in summarized_results:
+            if result["Model"] == model_name:
+                result["Samples per second"] = potion_base_8m_speed
 
     # Create and save the plot
     df = pd.DataFrame(summarized_results)
     plot = make_plot(df)
     plot_path = save_dir / "speed_vs_mteb_plot.png"
     plot.save(plot_path, width=12, height=10)
-
-    logger.info(f"Timings saved to {json_path}")
     logger.info(f"Plot saved to {plot_path}")
 
 
@@ -179,6 +176,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n-texts", type=int, default=100_000, help="Number of texts to use from the dataset for benchmarking."
     )
+    parser.add_argument(
+        "--force-benchmark",
+        action="store_true",
+        help="Re-run the speed benchmark even if cached results exist.",
+    )
     args = parser.parse_args()
 
-    main(save_path=args.save_path, n_texts=args.n_texts)
+    main(save_path=args.save_path, n_texts=args.n_texts, force_benchmark=args.force_benchmark)
