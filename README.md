@@ -174,6 +174,8 @@ We provide a number of models that can be used out of the box. These models are 
 
 We have performed extensive experiments to evaluate the performance of Model2Vec models. The results are documented in the [results](results/README.md) folder. The results are presented in the following sections:
 - [MTEB Results](results/README.md#mteb-results)
+- [MMTEB Results](results/README.md#mmteb-results)
+- [Retrieval Results](results/README.md#retrieval-results)
 - [Training Results](results/README.md#training-results)
 - [Ablations](results/README.md#ablations)
 
