@@ -279,7 +279,6 @@ class _BaseFinetuneable(nn.Module):
         max_epochs: int | None,
         device: str,
     ) -> None:
-        n_train_batches = len(train_dataset) // batch_size
         callbacks: list[Callback] = []
         if early_stopping_patience is not None:
             callback = EarlyStopping(
@@ -290,13 +289,18 @@ class _BaseFinetuneable(nn.Module):
             )
             callbacks.append(callback)
 
-        # If the dataset is small, we check the validation set every epoch.
-        # If the dataset is large, we check the validation set every 250 batches.
-        if n_train_batches < 250:
-            val_check_interval = None
-            check_val_every_epoch = 1
-        else:
-            val_check_interval = max(250, 2 * len(val_dataset) // batch_size)
+        n_train_batches = len(train_dataset) // batch_size
+        target_checks_per_epoch = 4
+        min_train_steps_between_val = 250
+
+        val_check_interval: int | None = None
+        check_val_every_epoch: int | None = 1
+        # If we have more than 250 batches, smoothly interpolate
+        if n_train_batches > min_train_steps_between_val:
+            val_check_interval = max(
+                min_train_steps_between_val,
+                n_train_batches // target_checks_per_epoch,
+            )
             check_val_every_epoch = None
 
         with TemporaryDirectory() as tempdir:
