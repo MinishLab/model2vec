@@ -5,24 +5,39 @@ from unittest.mock import patch
 
 import pytest
 
-from model2vec.inference import StaticModelPipeline
+from model2vec.inference.model import HeadType, StaticModelPipeline
 
 
 def test_init_predict(mock_inference_pipeline: StaticModelPipeline) -> None:
     """Test successful init and predict with StaticModelPipeline."""
     target: list[str] | list[list[str]]
-    if mock_inference_pipeline.multilabel:
+    if mock_inference_pipeline.classifier_type == HeadType.MULTILABEL:
+        assert mock_inference_pipeline.classes_ is not None
         if isinstance(mock_inference_pipeline.classes_[0], str):
             target = [["a", "b"]]
         else:
             target = [[0, 1]]  # type: ignore
     else:
+        assert mock_inference_pipeline.classes_ is not None
         if isinstance(mock_inference_pipeline.classes_[0], str):
             target = ["b"]
         else:
             target = [1]  # type: ignore
     assert mock_inference_pipeline.predict("dog").tolist() == target
     assert mock_inference_pipeline.predict(["dog"]).tolist() == target
+
+
+def test_init_predict_projector(mock_inference_pipeline_projector: StaticModelPipeline) -> None:
+    """Test successful init and predict with StaticModelPipeline."""
+    assert mock_inference_pipeline_projector.classifier_type == HeadType.PROJECTOR
+    assert mock_inference_pipeline_projector.classes_ is None
+    with pytest.raises(ValueError):
+        mock_inference_pipeline_projector.predict_proba(["dog"])
+    with pytest.raises(ValueError):
+        mock_inference_pipeline_projector.evaluate(["dog"], ["a"])
+
+    prediction = mock_inference_pipeline_projector.predict(["dog"])
+    assert prediction.shape == (1, 32)
 
 
 def test_init_predict_proba(mock_inference_pipeline: StaticModelPipeline) -> None:
@@ -34,12 +49,14 @@ def test_init_predict_proba(mock_inference_pipeline: StaticModelPipeline) -> Non
 def test_init_evaluate(mock_inference_pipeline: StaticModelPipeline) -> None:
     """Test successful init and evaluate with StaticModelPipeline."""
     target: list[str] | list[list[str]]
-    if mock_inference_pipeline.multilabel:
+    if mock_inference_pipeline.classifier_type == HeadType.MULTILABEL:
+        assert mock_inference_pipeline.classes_ is not None
         if isinstance(mock_inference_pipeline.classes_[0], str):
             target = [["a", "b"]]
         else:
             target = [[0, 1]]  # type: ignore
     else:
+        assert mock_inference_pipeline.classes_ is not None
         if isinstance(mock_inference_pipeline.classes_[0], str):
             target = ["b"]
         else:
@@ -53,12 +70,14 @@ def test_roundtrip_save(mock_inference_pipeline: StaticModelPipeline) -> None:
         mock_inference_pipeline.save_pretrained(temp_dir)
         loaded = StaticModelPipeline.from_pretrained(temp_dir)
         target: list[str] | list[list[str]]
-        if mock_inference_pipeline.multilabel:
+        if mock_inference_pipeline.classifier_type == HeadType.MULTILABEL:
+            assert mock_inference_pipeline.classes_ is not None
             if isinstance(mock_inference_pipeline.classes_[0], str):
                 target = [["a", "b"]]
             else:
                 target = [[0, 1]]  # type: ignore
         else:
+            assert mock_inference_pipeline.classes_ is not None
             if isinstance(mock_inference_pipeline.classes_[0], str):
                 target = ["b"]
             else:

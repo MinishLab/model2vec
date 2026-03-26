@@ -10,8 +10,10 @@ from transformers import AutoTokenizer
 
 from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
-from model2vec.train.base import FinetunableStaticModel, TextDataset
-from model2vec.train.utils import get_probable_pad_token_id
+from model2vec.train.base import _BaseFinetuneable
+from model2vec.train.dataset import TextDataset
+from model2vec.train.similarity import StaticModelForSimilarity
+from model2vec.train.utils import get_probable_pad_token_id, train_test_split
 
 
 @pytest.mark.parametrize("n_layers", [0, 1, 2, 3])
@@ -34,7 +36,9 @@ def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: T
 def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test successful initialization of the base class."""
     vectors_torched = torch.from_numpy(mock_vectors)
-    s = FinetunableStaticModel(vectors=vectors_torched, tokenizer=mock_tokenizer)
+    s = _BaseFinetuneable(
+        vectors=vectors_torched, tokenizer=mock_tokenizer, hidden_dim=256, out_dim=2, n_layers=0, pad_id=0
+    )
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
 
@@ -42,16 +46,43 @@ def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) ->
     assert head[0].in_features == mock_vectors.shape[1]
 
 
+def test_init_base_class_weights(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test successful initialization of the base class."""
+    vectors_torched = torch.from_numpy(mock_vectors)
+    s = _BaseFinetuneable(
+        vectors=vectors_torched,
+        tokenizer=mock_tokenizer,
+        hidden_dim=256,
+        out_dim=2,
+        n_layers=0,
+        pad_id=0,
+        token_mapping=torch.randint(0, mock_vectors.shape[0], (mock_vectors.shape[0],)).tolist(),
+    )
+    assert s.vectors.shape == mock_vectors.shape
+    assert s.w.shape[0] == mock_vectors.shape[0]
+
+    with pytest.raises(ValueError):
+        _BaseFinetuneable(
+            vectors=vectors_torched,
+            tokenizer=mock_tokenizer,
+            hidden_dim=256,
+            out_dim=2,
+            n_layers=0,
+            pad_id=0,
+            token_mapping=torch.randint(0, mock_vectors.shape[0], (10,)).tolist(),
+        )
+
+
 def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test initializion from a static model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
-    s = FinetunableStaticModel.from_static_model(model=model)
+    s = _BaseFinetuneable.from_static_model(model=model)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
 
     with TemporaryDirectory() as temp_dir:
         model.save_pretrained(temp_dir)
-        s = FinetunableStaticModel.from_pretrained(model_name=temp_dir)
+        s = _BaseFinetuneable.from_pretrained(model_name=temp_dir)
         assert s.vectors.shape == mock_vectors.shape
         assert s.w.shape[0] == mock_vectors.shape[0]
 
@@ -164,9 +195,25 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
     assert np.allclose(p1, p2)
 
 
-def test_train_test_split(mock_trained_pipeline: StaticModelForClassification) -> None:
+def test_convert_to_pipeline_similarity(mock_trained_similarity_pipeline: StaticModelForSimilarity) -> None:
+    """Convert a model to a pipeline."""
+    mock_trained_similarity_pipeline.eval()
+    pipeline = mock_trained_similarity_pipeline.to_pipeline()
+    encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
+    encoded_model = (
+        mock_trained_similarity_pipeline(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))[1]
+        .detach()
+        .numpy()
+    )
+    assert np.allclose(encoded_pipeline, encoded_model)
+    a = pipeline.predict(["dog cat", "dog"]).tolist()
+    b = mock_trained_similarity_pipeline.encode(["dog cat", "dog"]).tolist()
+    assert np.allclose(a, b)
+
+
+def test_train_test_split() -> None:
     """Test the train test split function."""
-    a, b, c, d = mock_trained_pipeline._train_test_split(["0", "1", "2", "3"], ["1", "1", "0", "0"], 0.5)
+    a, b, c, d = train_test_split(["0", "1", "2", "3"], ["1", "1", "0", "0"], 0.5)
     assert len(a) == 2
     assert len(b) == 2
     assert len(c) == len(a)
