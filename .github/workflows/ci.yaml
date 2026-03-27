@@ -11,10 +11,10 @@ jobs:
     name: Run tests with pytest
     runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        os: ["ubuntu-latest"]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
       fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "windows-latest"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -25,24 +25,33 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
 
-      - name: Create and activate a virtual environment (Unix)
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Create virtual environment
+        run: uv venv .venv
+
+      - name: Add venv to PATH (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          uv venv .venv
           echo "VIRTUAL_ENV=.venv" >> $GITHUB_ENV
           echo "$PWD/.venv/bin" >> $GITHUB_PATH
 
-      # Install dependencies using uv pip
+      - name: Add venv to PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "VIRTUAL_ENV=.venv" >> $env:GITHUB_ENV
+          "$pwd\.venv\Scripts" >> $env:GITHUB_PATH
+
       - name: Install dependencies
         run: make install-no-pre-commit
 
-      # Run tests with coverage
       - name: Run tests under coverage
         run: |
           coverage run --source=model2vec -m pytest
           coverage report
 
-      # Upload results to Codecov
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v4
         with:
