@@ -214,7 +214,6 @@ class StaticModelForClassification(_BaseFinetuneable):
             weights = [total / (n_classes * counts[c]) for c in self.classes_]
         else:
             weights = [class_weight[c] for c in self.classes_]
-        print(dict(zip(self.classes_, weights)))
         return torch.tensor(weights, dtype=torch.float32)
 
     def evaluate(
