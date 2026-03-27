@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
 import pytest
@@ -16,20 +15,19 @@ def test__get_metadata_from_readme_not_exists() -> None:
     assert get_metadata_from_readme(Path("zzz")) == {}
 
 
-def test__get_metadata_from_readme_mocked_file() -> None:
+def test__get_metadata_from_readme_mocked_file(tmp_path: Path) -> None:
     """Test getting metadata from a README."""
-    with NamedTemporaryFile() as f:
-        f.write(b"---\nkey: value\n---\n")
-        f.flush()
-        assert get_metadata_from_readme(Path(f.name))["key"] == "value"
+    path = tmp_path / "README.md"
+    path.write_text("---\nkey: value\n---\n", encoding="utf-8")
+
+    assert get_metadata_from_readme(path)["key"] == "value"
 
 
-def test__get_metadata_from_readme_mocked_file_keys() -> None:
+def test__get_metadata_from_readme_mocked_file_keys(tmp_path: Path) -> None:
     """Test getting metadata from a README."""
-    with NamedTemporaryFile() as f:
-        f.write(b"")
-        f.flush()
-        assert set(get_metadata_from_readme(Path(f.name))) == set()
+    path = tmp_path / "README.md"
+    path.write_text("b", encoding="utf-8")
+    assert set(get_metadata_from_readme(path)) == set()
 
 
 @pytest.mark.parametrize(
