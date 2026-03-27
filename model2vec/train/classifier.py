@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from itertools import chain
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import lightning as pl
 import numpy as np
@@ -36,6 +37,7 @@ class StaticModelForClassification(_BaseFinetuneable):
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
+        normalize: bool = True,
     ) -> None:
         """Initialize a standard classifier model."""
         # Alias: Follows scikit-learn. Set to dummy classes
@@ -52,6 +54,7 @@ class StaticModelForClassification(_BaseFinetuneable):
             freeze=freeze,
             hidden_dim=hidden_dim,
             n_layers=n_layers,
+            normalize=normalize,
         )
 
     @property
@@ -118,7 +121,8 @@ class StaticModelForClassification(_BaseFinetuneable):
         device: str = "auto",
         X_val: list[str] | None = None,
         y_val: LabelType | None = None,
-        class_weight: torch.Tensor | None = None,
+        class_weight: Literal["balanced"] | dict[str, float] | torch.Tensor | None = None,
+        validation_steps: int | None = None,
         random_seed: int = _DEFAULT_RANDOM_SEED,
     ) -> StaticModelForClassification:
         """
@@ -161,17 +165,25 @@ class StaticModelForClassification(_BaseFinetuneable):
         self._initialize()
 
         if class_weight is not None:
-            if len(class_weight) != len(self.classes_):
-                raise ValueError("class_weight must have the same length as the number of classes.")
+            if isinstance(class_weight, torch.Tensor):
+                logger.warning("You are passing a tensor as class weight. This will be removed in an upcoming version.")
+                if len(class_weight) != len(self.classes_):
+                    raise ValueError("class_weight must have the same length as the number of classes.")
+                class_weight = {self.classes_[idx]: w for idx, w in enumerate(class_weight.tolist())}
+            resolved_class_weight = self._determine_class_weight(class_weight, y)
+        else:
+            resolved_class_weight = None
 
         train_dataset, val_dataset = self._create_datasets(X, y, X_val, y_val, test_size)
         batch_size = self._determine_batch_size(batch_size, len(train_dataset))
 
         c: pl.LightningModule
         if self.multilabel:
-            c = MultiLabelClassifierLightningModule(self, learning_rate=learning_rate, class_weight=class_weight)
+            c = MultiLabelClassifierLightningModule(
+                self, learning_rate=learning_rate, class_weight=resolved_class_weight
+            )
         else:
-            c = ClassifierLightningModule(self, learning_rate=learning_rate, class_weight=class_weight)
+            c = ClassifierLightningModule(self, learning_rate=learning_rate, class_weight=resolved_class_weight)
 
         self._train(
             module=c,
@@ -182,9 +194,28 @@ class StaticModelForClassification(_BaseFinetuneable):
             min_epochs=min_epochs,
             max_epochs=max_epochs,
             device=device,
+            validation_steps=validation_steps,
         )
 
         return self
+
+    def _determine_class_weight(
+        self, class_weight: dict[str, float] | Literal["balanced"], y: LabelType
+    ) -> torch.Tensor:
+        """Determine the class weight for the classifier."""
+        if class_weight == "balanced":
+            if self.multilabel:
+                counts = Counter(chain.from_iterable(y))
+            else:
+                counts = Counter(y)
+            total = sum(counts.values())
+            n_classes = len(counts)
+            # Reciprocal weight: upweight rare classes, downweight frequent ones
+            weights = [total / (n_classes * counts[c]) for c in self.classes_]
+        else:
+            weights = [class_weight[c] for c in self.classes_]
+        print(dict(zip(self.classes_, weights)))
+        return torch.tensor(weights, dtype=torch.float32)
 
     def evaluate(
         self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False

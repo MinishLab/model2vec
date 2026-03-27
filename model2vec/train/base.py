@@ -39,6 +39,7 @@ class _BaseFinetuneable(nn.Module):
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
+        normalize: bool = True,
     ) -> None:
         """
         Initialize a trainable StaticModel from a StaticModel.
@@ -52,6 +53,7 @@ class _BaseFinetuneable(nn.Module):
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
         :param weights: The weights of the model. If None, the weights are initialized to zeros.
         :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
+        :param normalize: Whether to normalize the embeddings.
         :raises ValueError: If the vectors are not a 2D tensor.
         :raises ValueError: If the token_mapping is not None and the length does not match the number of vectors.
         """
@@ -61,6 +63,7 @@ class _BaseFinetuneable(nn.Module):
         self.embed_dim = vectors.shape[1]
         self.hidden_dim = hidden_dim
         self.n_layers = n_layers
+        self.normalize = normalize
 
         self.vectors = vectors
         if self.vectors.dtype != torch.float32:
@@ -185,7 +188,9 @@ class _BaseFinetuneable(nn.Module):
         # Mean pooling by dividing by the length
         embedded = embedded / length[:, None]
 
-        return nn.functional.normalize(embedded)
+        if self.normalize:
+            return nn.functional.normalize(embedded)
+        return embedded
 
     @torch.no_grad()
     def _encode_single_batch(self, X: list[str]) -> torch.Tensor:
@@ -232,7 +237,7 @@ class _BaseFinetuneable(nn.Module):
         token_mapping = self.token_mapping.numpy()
 
         return StaticModel(
-            vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=True, token_mapping=token_mapping
+            vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=self.normalize, token_mapping=token_mapping
         )
 
     def to_pipeline(self) -> StaticModelPipeline:
@@ -278,6 +283,7 @@ class _BaseFinetuneable(nn.Module):
         min_epochs: int | None,
         max_epochs: int | None,
         device: str,
+        validation_steps: int | None,
     ) -> None:
         callbacks: list[Callback] = []
         if early_stopping_patience is not None:
@@ -289,18 +295,22 @@ class _BaseFinetuneable(nn.Module):
             )
             callbacks.append(callback)
 
-        n_train_batches = len(train_dataset) // batch_size
-        target_checks_per_epoch = 4
-        min_train_steps_between_val = 250
-
         val_check_interval: int | None = None
         check_val_every_epoch: int | None = 1
-        # If we have more than 250 batches, smoothly interpolate
-        if n_train_batches > min_train_steps_between_val:
-            val_check_interval = max(
-                min_train_steps_between_val,
-                n_train_batches // target_checks_per_epoch,
-            )
+        if validation_steps is None:
+            n_train_batches = len(train_dataset) // batch_size
+            target_checks_per_epoch = 4
+            min_train_steps_between_val = 250
+
+            # If we have more than 250 batches, smoothly interpolate
+            if n_train_batches > min_train_steps_between_val:
+                val_check_interval = max(
+                    min_train_steps_between_val,
+                    n_train_batches // target_checks_per_epoch,
+                )
+                check_val_every_epoch = None
+        else:
+            val_check_interval = validation_steps
             check_val_every_epoch = None
 
         with TemporaryDirectory() as tempdir:
@@ -346,7 +356,7 @@ class _BaseFinetuneable(nn.Module):
         truncate_length = max_length * 10
         batch_size = 1024
         tokenized: list[list[int]] = []
-        for batch_idx in trange(0, len(X), 1024, desc="Tokenizing data."):
+        for batch_idx in trange(0, len(X), 1024, desc="Tokenizing data"):
             batch = [x[:truncate_length] for x in X[batch_idx : batch_idx + batch_size]]
             encoded = self.tokenizer.encode_batch_fast(batch, add_special_tokens=False)
             tokenized.extend([encoding.ids[:max_length] for encoding in encoded])
