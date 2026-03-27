@@ -144,9 +144,7 @@ def _resolve_folder(folder_or_repo_path: Path, token: str | None, force_download
         if folder := maybe_get_cached_model_path(str(folder_or_repo_path)):
             return folder
 
-    folder = Path(
-        huggingface_hub.snapshot_download(str(folder_or_repo_path.as_posix()), repo_type="model", token=token)
-    )
+    folder = Path(huggingface_hub.snapshot_download(str(folder_or_repo_path), repo_type="model", token=token))
 
     return folder
 

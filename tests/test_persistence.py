@@ -23,16 +23,17 @@ def test_local_loading(mock_static_model: StaticModel) -> None:
             with patch("model2vec.persistence.persistence.maybe_get_cached_model_path") as cache:
                 # Simulate cache hit
                 cache.return_value = Path(dir_name)
-                s = StaticModel.from_pretrained("haha", force_download=True)
+                s = StaticModel.from_pretrained("my_org/haha", force_download=True)
+                assert mock_snapshot.call_args[0] == ("my_org/haha",)
                 assert s.tokens == mock_static_model.tokens
-                s = StaticModel.from_pretrained("haha", force_download=False)
+                s = StaticModel.from_pretrained("my_org/haha", force_download=False)
                 assert s.tokens == mock_static_model.tokens
 
                 # Simulate cache miss
                 cache.return_value = None
-                s = StaticModel.from_pretrained("haha", force_download=True)
+                s = StaticModel.from_pretrained("my_org/haha", force_download=True)
                 assert s.tokens == mock_static_model.tokens
-                s = StaticModel.from_pretrained("haha", force_download=False)
+                s = StaticModel.from_pretrained("my_org/haha", force_download=False)
                 assert s.tokens == mock_static_model.tokens
 
                 # Called twice, only when `force_download` is False
