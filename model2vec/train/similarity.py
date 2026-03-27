@@ -27,6 +27,7 @@ class StaticModelForSimilarity(_BaseFinetuneable):
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
+        normalize: bool = True,
     ) -> None:
         """Initialize a standard similarity model."""
         super().__init__(
@@ -39,6 +40,7 @@ class StaticModelForSimilarity(_BaseFinetuneable):
             freeze=freeze,
             hidden_dim=hidden_dim,
             n_layers=n_layers,
+            normalize=normalize,
         )
 
     def fit(
@@ -54,6 +56,7 @@ class StaticModelForSimilarity(_BaseFinetuneable):
         device: str = "auto",
         X_val: list[str] | None = None,
         y_val: torch.Tensor | None = None,
+        validation_steps: int | None = None,
         random_seed: int = _DEFAULT_RANDOM_SEED,
     ) -> StaticModelForSimilarity:
         """
@@ -81,6 +84,7 @@ class StaticModelForSimilarity(_BaseFinetuneable):
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :param X_val: The texts to be used for validation.
         :param y_val: The vectors to be used for validation.
+        :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
         :return: The fitted model.
         """
@@ -104,6 +108,7 @@ class StaticModelForSimilarity(_BaseFinetuneable):
             min_epochs=min_epochs,
             max_epochs=max_epochs,
             device=device,
+            validation_steps=validation_steps,
         )
 
         return self

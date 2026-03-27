@@ -153,6 +153,7 @@ class StaticModelForClassification(_BaseFinetuneable):
         :param y_val: The labels to be used for validation.
         :param class_weight: The weight of the classes. If None, all classes are weighted equally. Must
             have the same length as the number of classes.
+        :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
         :return: The fitted model.
         :raises ValueError: If either X_val or y_val are provided, but not both.
@@ -205,8 +206,10 @@ class StaticModelForClassification(_BaseFinetuneable):
         """Determine the class weight for the classifier."""
         if class_weight == "balanced":
             if self.multilabel:
+                y = cast(list[list[str]], y)
                 counts = Counter(chain.from_iterable(y))
             else:
+                y = cast(list[str], y)
                 counts = Counter(y)
             total = sum(counts.values())
             n_classes = len(counts)
