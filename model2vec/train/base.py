@@ -234,10 +234,18 @@ class _BaseFinetuneable(nn.Module):
         """Convert the model to a static model."""
         emb = self.embeddings.weight.detach().cpu().numpy()
         w = torch.sigmoid(self.w).detach().cpu().numpy()
-        token_mapping = self.token_mapping.numpy()
-
+        # If the weights and emb are the same length, the model was not quantized before training.
+        if len(w) == len(emb):
+            emb = emb * w[:, None]
+            return StaticModel(
+                vectors=emb, weights=None, tokenizer=self.tokenizer, normalize=self.normalize, token_mapping=None
+            )
         return StaticModel(
-            vectors=emb, weights=w, tokenizer=self.tokenizer, normalize=self.normalize, token_mapping=token_mapping
+            vectors=emb,
+            weights=w,
+            tokenizer=self.tokenizer,
+            normalize=self.normalize,
+            token_mapping=self.token_mapping.numpy(),
         )
 
     def to_pipeline(self) -> StaticModelPipeline:
