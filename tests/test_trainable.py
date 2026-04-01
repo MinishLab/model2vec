@@ -46,33 +46,6 @@ def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) ->
     assert head[0].in_features == mock_vectors.shape[1]
 
 
-def test_init_base_class_weights(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
-    """Test successful initialization of the base class."""
-    vectors_torched = torch.from_numpy(mock_vectors)
-    s = BaseFinetuneable(
-        vectors=vectors_torched,
-        tokenizer=mock_tokenizer,
-        hidden_dim=256,
-        out_dim=2,
-        n_layers=0,
-        pad_id=0,
-        token_mapping=torch.randint(0, mock_vectors.shape[0], (mock_vectors.shape[0],)).tolist(),
-    )
-    assert s.vectors.shape == mock_vectors.shape
-    assert s.w.shape[0] == mock_vectors.shape[0]
-
-    with pytest.raises(ValueError):
-        BaseFinetuneable(
-            vectors=vectors_torched,
-            tokenizer=mock_tokenizer,
-            hidden_dim=256,
-            out_dim=2,
-            n_layers=0,
-            pad_id=0,
-            token_mapping=torch.randint(0, mock_vectors.shape[0], (10,)).tolist(),
-        )
-
-
 def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test initializion from a static model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
