@@ -165,7 +165,7 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
     assert a == b
     p1 = pipeline.predict_proba(["dog cat", "dog"])
     p2 = mock_trained_pipeline.predict_proba(["dog cat", "dog"])
-    assert np.allclose(p1, p2)
+    assert np.allclose(p1, p2, rtol=1e-5)
 
 
 def test_convert_to_pipeline_similarity(mock_trained_similarity_pipeline: StaticModelForSimilarity) -> None:
@@ -179,9 +179,9 @@ def test_convert_to_pipeline_similarity(mock_trained_similarity_pipeline: Static
         .numpy()
     )
     assert np.allclose(encoded_pipeline, encoded_model)
-    a = pipeline.predict(["dog cat", "dog"]).tolist()
-    b = mock_trained_similarity_pipeline.encode(["dog cat", "dog"]).tolist()
-    assert np.allclose(a, b)
+    p1 = pipeline.predict(["dog cat", "dog"]).tolist()
+    p2 = mock_trained_similarity_pipeline.encode(["dog cat", "dog"]).tolist()
+    assert np.allclose(p1, p2, rtol=1e-5)
 
 
 def test_train_test_split() -> None:
