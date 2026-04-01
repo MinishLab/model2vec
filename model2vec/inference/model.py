@@ -11,7 +11,7 @@ import huggingface_hub
 import numpy as np
 import skops.io
 from sklearn.metrics import classification_report
-from sklearn.neural_network import MLPClassifier
+from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MultiLabelBinarizer
 
@@ -38,12 +38,15 @@ class StaticModelPipeline:
 
         last_head = self.head[-1]
         self.classes_: None | np.ndarray = None
-        if isinstance(last_head, MLPClassifier):
+        if isinstance(last_head, MLPRegressor):
+            self.classifier_type = HeadType.PROJECTOR
+        elif isinstance(last_head, MLPClassifier):
             activation = last_head.out_activation_
             self.classifier_type = HeadType.MULTILABEL if activation == "logistic" else HeadType.CLASSIFIER
             self.classes_ = self.head.classes_
         else:
-            self.classifier_type = HeadType.PROJECTOR
+            # Default to classifier: the assumption is the user is unlikely to use multilabel here.
+            self.classifier_type = HeadType.CLASSIFIER
 
     @classmethod
     def from_pretrained(

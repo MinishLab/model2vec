@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from collections import Counter
-from typing import TYPE_CHECKING
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 from sklearn.model_selection import train_test_split as sklearn_split
@@ -14,12 +16,13 @@ from torch import nn
 from model2vec.inference import StaticModelPipeline
 
 if TYPE_CHECKING:
-    from model2vec.train.base import _BaseFinetuneable
+    from model2vec.train.base import BaseFinetuneable
     from model2vec.train.classifier import StaticModelForClassification
 
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_RANDOM_SEED = 42
 _KNOWN_PAD_TOKENS = ("[PAD]", "<pad>")
 
 
@@ -37,7 +40,7 @@ def get_probable_pad_token_id(tokenizer: Tokenizer) -> int:
     return 0
 
 
-def to_pipeline(model: "_BaseFinetuneable | StaticModelForClassification") -> StaticModelPipeline:
+def to_pipeline(model: "BaseFinetuneable | StaticModelForClassification") -> StaticModelPipeline:
     """Convert the model to an sklearn pipeline."""
     from model2vec.train.classifier import StaticModelForClassification
 
@@ -88,3 +91,23 @@ def train_test_split(
         else:
             stratify_data = y
     return sklearn_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=stratify_data)  # type: ignore
+
+
+def suppress_lightning_warnings(func: Callable) -> Callable:
+    """Suppresses annoying lightning warnings."""
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Callable:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", module="lightning")
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
+class TipFilter(logging.Filter):
+    """logging filter to suppress tip messages from lightning."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Filter out tip messages from lightning."""
+        return "💡 Tip" not in record.getMessage()

@@ -6,15 +6,17 @@ import lightning as pl
 import torch
 from tokenizers import Tokenizer
 
-from model2vec.train.base import _BaseFinetuneable
+from model2vec.train.base import BaseFinetuneable
 from model2vec.train.lightning_modules import StaticLightningModule
+from model2vec.train.utils import _DEFAULT_RANDOM_SEED
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_RANDOM_SEED = 42
 
+class StaticModelForSimilarity(BaseFinetuneable):
+    val_metric = "val_loss"
+    early_stopping_direction = "min"
 
-class StaticModelForSimilarity(_BaseFinetuneable):
     def __init__(
         self,
         *,

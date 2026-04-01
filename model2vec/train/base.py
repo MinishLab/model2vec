@@ -18,12 +18,12 @@ from tqdm import trange
 from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
 from model2vec.train.dataset import TextDataset
-from model2vec.train.utils import get_probable_pad_token_id, to_pipeline, train_test_split
+from model2vec.train.utils import get_probable_pad_token_id, suppress_lightning_warnings, to_pipeline, train_test_split
 
 logger = logging.getLogger(__name__)
 
 
-class _BaseFinetuneable(nn.Module):
+class BaseFinetuneable(nn.Module):
     val_metric = "val_loss"
     early_stopping_direction = "min"
 
@@ -54,8 +54,6 @@ class _BaseFinetuneable(nn.Module):
         :param weights: The weights of the model. If None, the weights are initialized to zeros.
         :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
         :param normalize: Whether to normalize the embeddings.
-        :raises ValueError: If the vectors are not a 2D tensor.
-        :raises ValueError: If the token_mapping is not None and the length does not match the number of vectors.
         """
         super().__init__()
         self.pad_id = pad_id
@@ -74,8 +72,6 @@ class _BaseFinetuneable(nn.Module):
             self.vectors = vectors.float()
 
         if token_mapping is not None:
-            if len(token_mapping) != len(vectors):
-                raise ValueError("token_mapping must have the same length as vectors")
             self.token_mapping = torch.tensor(token_mapping, dtype=torch.int64)
         else:
             self.token_mapping = torch.arange(len(vectors), dtype=torch.int64)
@@ -134,7 +130,7 @@ class _BaseFinetuneable(nn.Module):
         cls: type[ModelType], path: str = "minishlab/potion-base-32m", *, token: str | None = None, **kwargs: Any
     ) -> ModelType:
         """Load the model from a pretrained model2vec model."""
-        if model_name := kwargs.pop("model_name"):
+        if model_name := kwargs.pop("model_name", None):
             logger.warning("The 'model_name' argument is deprecated. Use 'path' instead.")
             path = model_name
         model = StaticModel.from_pretrained(path, token=token)
@@ -281,6 +277,7 @@ class _BaseFinetuneable(nn.Module):
 
         return train_texts, validation_texts, train_labels, validation_labels
 
+    @suppress_lightning_warnings
     def _train(
         self,
         module: LightningModule,
@@ -303,23 +300,9 @@ class _BaseFinetuneable(nn.Module):
             )
             callbacks.append(callback)
 
-        val_check_interval: int | None = None
-        check_val_every_epoch: int | None = 1
-        if validation_steps is None:
-            n_train_batches = len(train_dataset) // batch_size
-            target_checks_per_epoch = 4
-            min_train_steps_between_val = 250
-
-            # If we have more than 250 batches, smoothly interpolate
-            if n_train_batches > min_train_steps_between_val:
-                val_check_interval = max(
-                    min_train_steps_between_val,
-                    n_train_batches // target_checks_per_epoch,
-                )
-                check_val_every_epoch = None
-        else:
-            val_check_interval = validation_steps
-            check_val_every_epoch = None
+        val_check_interval, check_val_every_epoch = self._determine_val_check_interval(
+            validation_steps, len(train_dataset), batch_size
+        )
 
         with TemporaryDirectory() as tempdir:
             trainer = pl.Trainer(
@@ -349,6 +332,30 @@ class _BaseFinetuneable(nn.Module):
 
         self.load_state_dict(state_dict)
         self.eval()
+
+    @staticmethod
+    def _determine_val_check_interval(
+        validation_steps: int | None, train_length: int, batch_size: int
+    ) -> tuple[int | None, int | None]:
+        val_check_interval: int | None = None
+        check_val_every_epoch: int | None = 1
+        if validation_steps is None:
+            n_train_batches = train_length // batch_size
+            target_checks_per_epoch = 4
+            min_train_steps_between_val = 250
+
+            # If we have more than 250 batches, smoothly interpolate
+            if n_train_batches > min_train_steps_between_val:
+                val_check_interval = max(
+                    min_train_steps_between_val,
+                    n_train_batches // target_checks_per_epoch,
+                )
+                check_val_every_epoch = None
+        else:
+            val_check_interval = validation_steps
+            check_val_every_epoch = None
+
+        return val_check_interval, check_val_every_epoch
 
     def _prepare_dataset(self, X: list[str], y: torch.Tensor, max_length: int = 512) -> TextDataset:
         """
@@ -397,4 +404,4 @@ class _BaseFinetuneable(nn.Module):
         return train_dataset, val_dataset
 
 
-ModelType = TypeVar("ModelType", bound=_BaseFinetuneable)
+ModelType = TypeVar("ModelType", bound=BaseFinetuneable)

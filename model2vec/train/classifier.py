@@ -12,16 +12,16 @@ from tokenizers import Tokenizer
 from tqdm import trange
 
 from model2vec.inference import evaluate_single_or_multi_label
-from model2vec.train.base import _BaseFinetuneable
+from model2vec.train.base import BaseFinetuneable
 from model2vec.train.lightning_modules import ClassifierLightningModule, MultiLabelClassifierLightningModule
+from model2vec.train.utils import _DEFAULT_RANDOM_SEED
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_RANDOM_SEED = 42
 LabelType = list[str] | list[list[str]]
 
 
-class StaticModelForClassification(_BaseFinetuneable):
+class StaticModelForClassification(BaseFinetuneable):
     val_metric = "val_accuracy"
     early_stopping_direction = "max"
 

@@ -83,7 +83,7 @@ class MultiLabelClassifierLightningModule(StaticLightningModule):
         super().__init__(model, learning_rate)
         self.model = model
         self.learning_rate = learning_rate
-        self.loss_function = nn.BCEWithLogitsLoss(weight=class_weight)
+        self.loss_function = nn.BCEWithLogitsLoss(pos_weight=class_weight)
 
     def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         """Validation step computing loss and accuracy."""

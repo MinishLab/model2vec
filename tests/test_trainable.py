@@ -10,7 +10,7 @@ from transformers import AutoTokenizer
 
 from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
-from model2vec.train.base import _BaseFinetuneable
+from model2vec.train.base import BaseFinetuneable
 from model2vec.train.dataset import TextDataset
 from model2vec.train.similarity import StaticModelForSimilarity
 from model2vec.train.utils import get_probable_pad_token_id, train_test_split
@@ -36,7 +36,7 @@ def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: T
 def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test successful initialization of the base class."""
     vectors_torched = torch.from_numpy(mock_vectors)
-    s = _BaseFinetuneable(
+    s = BaseFinetuneable(
         vectors=vectors_torched, tokenizer=mock_tokenizer, hidden_dim=256, out_dim=2, n_layers=0, pad_id=0
     )
     assert s.vectors.shape == mock_vectors.shape
@@ -49,7 +49,7 @@ def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) ->
 def test_init_base_class_weights(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test successful initialization of the base class."""
     vectors_torched = torch.from_numpy(mock_vectors)
-    s = _BaseFinetuneable(
+    s = BaseFinetuneable(
         vectors=vectors_torched,
         tokenizer=mock_tokenizer,
         hidden_dim=256,
@@ -62,7 +62,7 @@ def test_init_base_class_weights(mock_vectors: np.ndarray, mock_tokenizer: Token
     assert s.w.shape[0] == mock_vectors.shape[0]
 
     with pytest.raises(ValueError):
-        _BaseFinetuneable(
+        BaseFinetuneable(
             vectors=vectors_torched,
             tokenizer=mock_tokenizer,
             hidden_dim=256,
@@ -76,13 +76,13 @@ def test_init_base_class_weights(mock_vectors: np.ndarray, mock_tokenizer: Token
 def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test initializion from a static model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
-    s = _BaseFinetuneable.from_static_model(model=model)
+    s = BaseFinetuneable.from_static_model(model=model)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
 
     with TemporaryDirectory() as temp_dir:
         model.save_pretrained(temp_dir)
-        s = _BaseFinetuneable.from_pretrained(model_name=temp_dir)
+        s = BaseFinetuneable.from_pretrained(model_name=temp_dir)
         assert s.vectors.shape == mock_vectors.shape
         assert s.w.shape[0] == mock_vectors.shape[0]
 
@@ -328,3 +328,62 @@ def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer, caplog: pytest.Log
         token_id = get_probable_pad_token_id(t)
     assert token_id == 0
     assert "No known pad token found, using 0 as default" in caplog.text
+
+
+def test_determine_class_weight(mock_trained_pipeline: StaticModelForClassification) -> None:
+    """Test what the class weights are."""
+    w_dict = dict(zip(mock_trained_pipeline.classes, [0.5, 3]))
+    c1, c2 = mock_trained_pipeline.classes_
+    y: list[str] | list[list[str]]
+    if mock_trained_pipeline.multilabel:
+        y = [*[[c1]] * 100, *[[c2]] * 50]
+    else:
+        y = [*[c1] * 100, *[c2] * 50]
+    w = mock_trained_pipeline._determine_class_weight(w_dict, y)
+    assert isinstance(w, torch.Tensor)
+    assert w.tolist() == [0.5, 3]
+
+    w = mock_trained_pipeline._determine_class_weight(w_dict, y)
+    assert isinstance(w, torch.Tensor)
+    assert w.tolist() == [0.5, 3]
+
+    w = mock_trained_pipeline._determine_class_weight("balanced", y)
+    assert isinstance(w, torch.Tensor)
+    assert w.tolist() == [0.75, 1.5]
+
+
+def test_determine_interval() -> None:
+    """Test the training interval and check_val_every_epoch are determined correctly."""
+    # Lower than 250 batches, so we only check at the end of the epoch
+    val_check_interval, check_val_every_epoch = StaticModelForClassification._determine_val_check_interval(
+        validation_steps=None, train_length=1000, batch_size=20
+    )
+    assert val_check_interval is None
+    assert check_val_every_epoch == 1
+
+    # More than 250 batches, but low train batches, so we check four times per epoch
+    val_check_interval, check_val_every_epoch = StaticModelForClassification._determine_val_check_interval(
+        validation_steps=None, train_length=1000, batch_size=1
+    )
+    assert val_check_interval == 250
+    assert check_val_every_epoch is None
+
+    # More than 250 batches, but low train batches, so we check four times per epoch
+    val_check_interval, check_val_every_epoch = StaticModelForClassification._determine_val_check_interval(
+        validation_steps=None, train_length=1200, batch_size=1
+    )
+    assert val_check_interval == 300
+    assert check_val_every_epoch is None
+
+    val_check_interval, check_val_every_epoch = StaticModelForClassification._determine_val_check_interval(
+        validation_steps=None, train_length=100000, batch_size=20
+    )
+    assert val_check_interval == 1250
+    assert check_val_every_epoch is None
+
+    # Set by the user, so nothing matters.
+    val_check_interval, check_val_every_epoch = StaticModelForClassification._determine_val_check_interval(
+        validation_steps=100, train_length=1000, batch_size=32
+    )
+    assert val_check_interval == 100
+    assert check_val_every_epoch is None
