@@ -37,6 +37,7 @@ rng = np.random.default_rng()
         (None, 1024, None),  # Subword, PCA set high, SIF off
         (None, None, 1e-4),  # No PCA, SIF on
         (None, 0.9, 1e-4),  # PCA as float (variance), SIF on
+        (["star wars"], 8, None),  # Multiword vocabulary
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -78,6 +79,12 @@ def test_distill_from_model(
     assert static_model.config == static_model2.config
     assert json.loads(static_model.tokenizer.to_str()) == json.loads(static_model2.tokenizer.to_str())
     assert static_model.base_model_name == static_model2.base_model_name
+
+    for token in vocabulary or []:
+        # Normalized tokens are for single-word tokens.
+        # Other tokens are added as addedtokens, as is.
+        normalized = static_model.tokenizer.normalizer.normalize_str(token)
+        assert token in static_model.tokens or normalized in static_model.tokens
 
 
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")

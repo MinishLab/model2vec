@@ -13,7 +13,18 @@ def clean_and_create_vocabulary(
     vocabulary_to_add: list[str],
     token_remove_regex: re.Pattern[str] | None,
 ) -> TokenizerModel:
-    """Clean a vocabulary by removing duplicates and tokens that were already in the vocabulary."""
+    """
+    Clean a vocabulary by removing duplicates and tokens that were already in the vocabulary.
+
+    This function removes duplicate tokens and tokens that are already in the model's vocabulary.
+    It also removes the tokenizer's post-processor, which we do not use anyway.
+
+    :param model: The tokenizer model to clean.
+    :param vocabulary_to_add: The vocabulary to add to the model. Any tokens in this vocabulary that
+        are split according to the pretokenizer are added as multiword tokens.
+    :param token_remove_regex: A regex pattern to remove tokens from the vocabulary.
+    :return: The cleaned tokenizer model.
+    """
     seen_tokens = set()
 
     n_duplicate = 0
@@ -39,7 +50,9 @@ def clean_and_create_vocabulary(
         if len(preprocessed) > 1:
             tokens_as_str = [f"'{subword}'" for subword in preprocessed]
             split_into = ",".join(tokens_as_str)
-            logger.warning(f"Token '{token}' was split into multiple tokens after preprocessing: [{split_into}]")
+            logger.warning(
+                f"Token '{token}' was split into multiple tokens after preprocessing: [{split_into}], adding it as a multi-word token."
+            )
             added_tokens_to_add.append(token)
             continue
         token = preprocessed[0]
@@ -54,6 +67,8 @@ def clean_and_create_vocabulary(
         seen_tokens.add(token)
         tokens_to_add.append(token)
 
+    model.post_processor = None
+    model = model.prune_added_tokens()
     model = model.add_tokens_to_vocabulary(tokens_to_add, preprocess_tokens=True)
     model = model.add_addedtokens(added_tokens_to_add, is_special=False, single_word=False, normalized=True)
 
