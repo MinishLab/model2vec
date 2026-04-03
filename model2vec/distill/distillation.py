@@ -88,12 +88,6 @@ def distill_from_model(
 
     # Create the vocabulary in the new tokenizer.
     tokenizer_model = clean_and_create_vocabulary(tokenizer_model, vocabulary, token_remove_regex=token_remove_regex)
-    # Remove the post processor, this is not necessary.
-    tokenizer_model.post_processor = None
-    # Prune again now that the post processor is gone.
-    # We can't do this before because we need the post processor and associated
-    # tokens before to add eos/bos.
-    tokenizer_model = tokenizer_model.prune_added_tokens()
 
     # All tokens in a single list.
     all_tokens = tokenizer_model.sorted_vocabulary
