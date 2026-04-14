@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 from pytest import LogCaptureFixture
 from skeletoken import TokenizerModel
-from transformers import BertTokenizerFast
+from transformers import BertTokenizer
 from transformers.modeling_utils import PreTrainedModel
-from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
+from transformers.tokenization_utils_tokenizers import PreTrainedTokenizerFast
 
 from model2vec.distill.distillation import distill, distill_from_model
 from model2vec.distill.inference import PoolingMode, create_embeddings, post_process_embeddings
@@ -38,6 +38,7 @@ rng = np.random.default_rng()
         (None, None, 1e-4),  # No PCA, SIF on
         (None, 0.9, 1e-4),  # PCA as float (variance), SIF on
         (["star wars"], 8, None),  # Multiword vocabulary
+        (["..."], 8, None),  # Crashing multiword vocabulary
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
@@ -92,7 +93,7 @@ def test_distill_from_model(
 def test_distill_removal_pattern_all_tokens(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
-    mock_berttokenizer: BertTokenizerFast,
+    mock_berttokenizer: BertTokenizer,
     mock_transformer: PreTrainedModel,
 ) -> None:
     """Test the removal pattern."""
