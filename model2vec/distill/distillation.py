@@ -9,9 +9,8 @@ import numpy as np
 from huggingface_hub.hf_api import model_info
 from skeletoken import TokenizerModel
 from skeletoken.external.transformers import reshape_embeddings
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizerFast
 from transformers.modeling_utils import PreTrainedModel
-from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model2vec.distill.inference import PCADimType, PoolingMode, create_embeddings, post_process_embeddings
 from model2vec.distill.utils import select_optimal_device
