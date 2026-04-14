@@ -53,6 +53,9 @@ def clean_and_create_vocabulary(
             logger.warning(
                 f"Token '{token}' was split into multiple tokens after preprocessing: [{split_into}], adding it as a multi-word token."
             )
+            if token in model.vocabulary:
+                # If the unprocessed token (incorrectly) is in the vocabulary, we should remove it.
+                model.remove_token_from_vocabulary(token)
             added_tokens_to_add.append(token)
             continue
         token = preprocessed[0]
