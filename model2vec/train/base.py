@@ -18,7 +18,13 @@ from tqdm import trange
 from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
 from model2vec.train.dataset import TextDataset
-from model2vec.train.utils import get_probable_pad_token_id, suppress_lightning_warnings, to_pipeline, train_test_split
+from model2vec.train.utils import (
+    get_probable_pad_token_id,
+    logit,
+    suppress_lightning_warnings,
+    to_pipeline,
+    train_test_split,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +92,7 @@ class BaseFinetuneable(nn.Module):
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""
         if self._weights is not None:
-            # Invert sigmoid
-            w = -torch.log((1 / self._weights) - 1)
+            w = logit(self._weights)
             return nn.Parameter(w.float(), requires_grad=True)
         weights = torch.zeros(len(self.token_mapping))
         weights[self.pad_id] = -10_000
