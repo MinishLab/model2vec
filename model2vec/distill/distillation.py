@@ -118,6 +118,8 @@ def distill_from_model(
     else:
         # Post-process the embeddings.
         embeddings, weights = post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+        embeddings = embeddings * weights[:, None]
+        weights = None
         token_mapping = None
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
