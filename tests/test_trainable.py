@@ -13,7 +13,7 @@ from model2vec.train import StaticModelForClassification
 from model2vec.train.base import BaseFinetuneable
 from model2vec.train.dataset import TextDataset
 from model2vec.train.similarity import StaticModelForSimilarity
-from model2vec.train.utils import get_probable_pad_token_id, train_test_split
+from model2vec.train.utils import get_probable_pad_token_id, logit, train_test_split
 
 
 @pytest.mark.parametrize("n_layers", [0, 1, 2, 3])
@@ -72,6 +72,17 @@ def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: To
         s = StaticModelForClassification.from_pretrained(model_name=temp_dir)
         assert s.vectors.shape == mock_vectors.shape
         assert s.w.shape[0] == mock_vectors.shape[0]
+
+
+def test_init_classifier_from_model_w(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test initializion from a static model."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, weights=np.ones(len(mock_vectors)))
+    s = StaticModelForClassification.from_static_model(model=model)
+    assert s._weights is not None
+    assert torch.all(s._weights == torch.ones(len(mock_vectors)))
+    w = s.construct_weights()
+    assert w.shape[0] == mock_vectors.shape[0]
+    assert torch.all(w == logit(torch.ones(len(mock_vectors))))
 
 
 def test_pad_token(mock_tokenizer: Tokenizer) -> None:
@@ -360,3 +371,9 @@ def test_determine_interval() -> None:
     )
     assert val_check_interval == 100
     assert check_val_every_epoch is None
+
+
+def test_logit() -> None:
+    """Test on random data."""
+    x = torch.arange(10).float() / 10
+    assert torch.allclose(logit(torch.sigmoid(x)), x, atol=1e-6)

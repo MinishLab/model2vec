@@ -18,7 +18,13 @@ from tqdm import trange
 from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
 from model2vec.train.dataset import TextDataset
-from model2vec.train.utils import get_probable_pad_token_id, suppress_lightning_warnings, to_pipeline, train_test_split
+from model2vec.train.utils import (
+    get_probable_pad_token_id,
+    logit,
+    suppress_lightning_warnings,
+    to_pipeline,
+    train_test_split,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,11 +85,15 @@ class BaseFinetuneable(nn.Module):
         self.freeze = freeze
         self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=self.freeze, padding_idx=pad_id)
         self.head = self.construct_head()
-        self.w = self.construct_weights() if weights is None else nn.Parameter(weights.float(), requires_grad=True)
+        self._weights = weights
+        self.w = self.construct_weights()
         self.tokenizer = tokenizer
 
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""
+        if self._weights is not None:
+            w = logit(self._weights)
+            return nn.Parameter(w.float(), requires_grad=True)
         weights = torch.zeros(len(self.token_mapping))
         weights[self.pad_id] = -10_000
         return nn.Parameter(weights, requires_grad=not self.freeze)

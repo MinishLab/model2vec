@@ -7,6 +7,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
+import torch
 from sklearn.model_selection import train_test_split as sklearn_split
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.pipeline import make_pipeline
@@ -111,3 +112,8 @@ class TipFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         """Filter out tip messages from lightning."""
         return "💡 Tip" not in record.getMessage()
+
+
+def logit(x: torch.Tensor) -> torch.Tensor:
+    """Invert a sigmoid."""
+    return -torch.log((1 / x) - 1)
