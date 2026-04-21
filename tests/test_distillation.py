@@ -90,6 +90,36 @@ def test_distill_from_model(
 
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
 @patch("transformers.AutoModel.from_pretrained")
+def test_distill_quantization(
+    mock_auto_model: MagicMock,
+    mock_model_info: MagicMock,
+    mock_berttokenizer: PreTrainedTokenizerFast,
+    mock_transformer: PreTrainedModel,
+) -> None:
+    """Test distill function with different parameters."""
+    # Mock the return value of model_info to avoid calling the Hugging Face API
+    mock_model_info.return_value = type("ModelInfo", (object,), {"cardData": {"language": "en"}})
+    mock_auto_model.return_value = mock_transformer
+
+    static_model = distill_from_model(
+        model=mock_transformer,
+        tokenizer=mock_berttokenizer,
+        vocabulary=None,
+        device="cpu",
+        pca_dims="auto",
+        sif_coefficient=1e-4,
+        token_remove_pattern=None,
+        vocabulary_quantization=3,
+    )
+
+    assert static_model.embedding.shape == (3, 768)
+    assert static_model.weights is not None
+    assert static_model.token_mapping is not None
+    assert len(static_model.weights) == static_model.tokenizer.get_vocab_size()
+
+
+@patch.object(import_module("model2vec.distill.distillation"), "model_info")
+@patch("transformers.AutoModel.from_pretrained")
 def test_distill_removal_pattern_all_tokens(
     mock_auto_model: MagicMock,
     mock_model_info: MagicMock,
