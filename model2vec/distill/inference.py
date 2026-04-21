@@ -206,10 +206,20 @@ def _encode_pooler_with_model(model: PreTrainedModel, encodings: dict[str, torch
     return pooler.cpu()
 
 
-def post_process_embeddings(
-    embeddings: np.ndarray, pca_dims: PCADimType, sif_coefficient: float | None = 1e-4
-) -> tuple[np.ndarray, np.ndarray]:
-    """Post process embeddings by applying PCA and SIF weighting by estimating the frequencies through Zipf's law."""
+def compute_weights(n_embeddings: int, sif_coefficient: float | None) -> np.ndarray:
+    """Compute the weights based on Zipf's law and a SIF coefficient."""
+    if sif_coefficient is None:
+        return np.ones(n_embeddings)
+    logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
+    inv_rank = 1 / (np.arange(2, n_embeddings + 2))
+    proba = inv_rank / np.sum(inv_rank)
+    weight = sif_coefficient / (sif_coefficient + proba)
+
+    return weight
+
+
+def apply_pca(embeddings: np.ndarray, pca_dims: PCADimType) -> np.ndarray:
+    """Apply PCA to the embeddings."""
     if pca_dims is not None:
         if pca_dims == "auto":
             pca_dims = embeddings.shape[1]
@@ -241,12 +251,4 @@ def post_process_embeddings(
                 logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
                 logger.info(f"Explained variance: {explained_variance:.3f}.")
 
-    if sif_coefficient is not None:
-        logger.info("Estimating word frequencies using Zipf's law, and then applying SIF.")
-        inv_rank = 1 / (np.arange(2, embeddings.shape[0] + 2))
-        proba = inv_rank / np.sum(inv_rank)
-        weight = sif_coefficient / (sif_coefficient + proba)
-    else:
-        weight = np.ones(embeddings.shape[0])
-
-    return embeddings, weight
+    return embeddings
