@@ -5,14 +5,13 @@ import os
 import re
 from typing import cast
 
-import numpy as np
 from huggingface_hub.hf_api import model_info
 from skeletoken import TokenizerModel
 from skeletoken.external.transformers import reshape_embeddings
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizerFast
 from transformers.modeling_utils import PreTrainedModel
 
-from model2vec.distill.inference import PCADimType, PoolingMode, create_embeddings, post_process_embeddings
+from model2vec.distill.inference import PCADimType, PoolingMode, apply_pca, compute_weights, create_embeddings
 from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
@@ -108,16 +107,17 @@ def distill_from_model(
         pooling=pooling,
     )
 
-    # Maybe apply quantization
+    # Apply quantization
     if vocabulary_quantization is not None:
-        _, weights = post_process_embeddings(np.asarray(embeddings), None, sif_coefficient=sif_coefficient)
+        weights = compute_weights(len(embeddings), sif_coefficient=sif_coefficient)
         embeddings, token_mapping, weights = quantize_vocabulary(
-            n_clusters=vocabulary_quantization, weights=weights, embeddings=np.asarray(embeddings)
+            n_clusters=vocabulary_quantization, weights=weights, embeddings=embeddings
         )
-        embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient=sif_coefficient)
+        embeddings = apply_pca(embeddings, pca_dims)
     else:
         # Post-process the embeddings.
-        embeddings, weights = post_process_embeddings(np.asarray(embeddings), pca_dims, sif_coefficient=sif_coefficient)
+        weights = compute_weights(len(embeddings), sif_coefficient=sif_coefficient)
+        embeddings = apply_pca(embeddings, pca_dims)
         embeddings = embeddings * weights[:, None]
         weights = None
         token_mapping = None

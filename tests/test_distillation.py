@@ -14,7 +14,7 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_tokenizers import PreTrainedTokenizerFast
 
 from model2vec.distill.distillation import distill, distill_from_model
-from model2vec.distill.inference import PoolingMode, create_embeddings, post_process_embeddings
+from model2vec.distill.inference import PoolingMode, apply_pca, compute_weights, create_embeddings
 from model2vec.model import StaticModel
 from model2vec.tokenizer import clean_and_create_vocabulary
 
@@ -259,7 +259,9 @@ def test__post_process_embeddings(
         # The implementation logs a warning and skips reduction; no exception expected.
         pass
 
-    processed_embeddings, _ = post_process_embeddings(embeddings, pca_dims, sif_coefficient)
+    processed_embeddings = apply_pca(embeddings, pca_dims)
+    weights = compute_weights(len(processed_embeddings), sif_coefficient=sif_coefficient)
+    processed_embeddings = processed_embeddings * weights[:, None]
 
     # Assert the shape is correct
     assert processed_embeddings.shape == expected_shape
