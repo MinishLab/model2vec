@@ -38,6 +38,7 @@ class StaticModelForClassification(BaseFinetuneable):
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
+        freeze_weights: bool = False,
     ) -> None:
         """Initialize a standard classifier model."""
         # Alias: Follows scikit-learn. Set to dummy classes
@@ -55,6 +56,7 @@ class StaticModelForClassification(BaseFinetuneable):
             hidden_dim=hidden_dim,
             n_layers=n_layers,
             normalize=normalize,
+            freeze_weights=freeze_weights,
         )
 
     @property
@@ -65,8 +67,7 @@ class StaticModelForClassification(BaseFinetuneable):
     def predict(
         self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024, threshold: float = 0.5
     ) -> np.ndarray:
-        """
-        Predict labels for a set of texts.
+        """Predict labels for a set of texts.
 
         In single-label mode, each prediction is a single class.
         In multilabel mode, each prediction is a list of classes.
@@ -93,8 +94,7 @@ class StaticModelForClassification(BaseFinetuneable):
             return np.array(pred)
 
     def predict_proba(self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024) -> np.ndarray:
-        """
-        Predict probabilities for each class.
+        """Predict probabilities for each class.
 
         In single-label mode, returns softmax probabilities.
         In multilabel mode, returns sigmoid probabilities.
@@ -125,8 +125,7 @@ class StaticModelForClassification(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = _DEFAULT_RANDOM_SEED,
     ) -> StaticModelForClassification:
-        """
-        Fit a model.
+        """Fit a model.
 
         This function creates a Lightning Trainer object and fits the model to the data.
         It supports both single-label and multi-label classification.
@@ -222,8 +221,7 @@ class StaticModelForClassification(BaseFinetuneable):
     def evaluate(
         self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
     ) -> str | dict[str, dict[str, float]]:
-        """
-        Evaluate the classifier on a given dataset using scikit-learn's classification report.
+        """Evaluate the classifier on a given dataset using scikit-learn's classification report.
 
         :param X: The texts to predict on.
         :param y: The ground truth labels.
@@ -239,8 +237,7 @@ class StaticModelForClassification(BaseFinetuneable):
         return report
 
     def _initialize_on_labels(self, y: LabelType) -> None:
-        """
-        Sets the output dimensionality, the classes, and initializes the head.
+        """Sets the output dimensionality, the classes, and initializes the head.
 
         :param y: The labels.
         :raises ValueError: If the labels are inconsistent.

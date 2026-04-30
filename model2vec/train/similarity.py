@@ -30,6 +30,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
+        freeze_weights: bool = False,
     ) -> None:
         """Initialize a standard similarity model."""
         super().__init__(
@@ -43,6 +44,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
             hidden_dim=hidden_dim,
             n_layers=n_layers,
             normalize=normalize,
+            freeze_weights=freeze_weights,
         )
 
     def fit(
@@ -61,8 +63,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = _DEFAULT_RANDOM_SEED,
     ) -> StaticModelForSimilarity:
-        """
-        Fit a model.
+        """Fit a model.
 
         This function creates a Lightning Trainer object and fits the model to the data.
         We use early stopping. After training, the weights of the best model are loaded back into the model.

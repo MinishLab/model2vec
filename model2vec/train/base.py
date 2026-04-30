@@ -46,9 +46,9 @@ class BaseFinetuneable(nn.Module):
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
+        freeze_weights: bool = False,
     ) -> None:
-        """
-        Initialize a trainable StaticModel from a StaticModel.
+        """Initialize a trainable StaticModel from a StaticModel.
 
         :param vectors: The embeddings of the staticmodel.
         :param tokenizer: The tokenizer.
@@ -60,6 +60,7 @@ class BaseFinetuneable(nn.Module):
         :param weights: The weights of the model. If None, the weights are initialized to zeros.
         :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
         :param normalize: Whether to normalize the embeddings.
+        :param freeze_weights: Whether to freeze the learned token weights.
         """
         super().__init__()
         self.pad_id = pad_id
@@ -68,6 +69,7 @@ class BaseFinetuneable(nn.Module):
         self.hidden_dim = hidden_dim
         self.n_layers = n_layers
         self.normalize = normalize
+        self.freeze_weights = freeze_weights
 
         self.vectors = vectors
         if self.vectors.dtype != torch.float32:
@@ -93,26 +95,31 @@ class BaseFinetuneable(nn.Module):
         """Construct the weights for the model."""
         if self._weights is not None:
             w = logit(self._weights)
-            return nn.Parameter(w.float(), requires_grad=True)
-        weights = torch.zeros(len(self.token_mapping))
-        weights[self.pad_id] = -10_000
-        return nn.Parameter(weights, requires_grad=not self.freeze)
+        else:
+            w = torch.zeros(len(self.token_mapping)).float()
+            w[self.pad_id] = -10_000
+        return nn.Parameter(w, requires_grad=not self.freeze_weights)
 
     def construct_head(self) -> nn.Sequential:
         """Constructs a simple classifier head."""
+        return self.construct_mlp(self.n_layers, self.embed_dim, self.hidden_dim, self.out_dim)
+
+    @staticmethod
+    def construct_mlp(n_layers: int, embed_dim: int, hidden_dim: int, out_dim: int) -> nn.Sequential:
+        """Constructs a simple classifier head."""
         modules: list[nn.Module] = []
-        if self.n_layers == 0:
-            modules.append(nn.Linear(self.embed_dim, self.out_dim))
+        if n_layers == 0:
+            modules.append(nn.Linear(embed_dim, out_dim))
         else:
             # If we have a hidden layer, we should first project to hidden_dim
             modules = [
-                nn.Linear(self.embed_dim, self.hidden_dim),
+                nn.Linear(embed_dim, hidden_dim),
                 nn.ReLU(),
             ]
-            for _ in range(self.n_layers - 1):
-                modules.extend([nn.Linear(self.hidden_dim, self.hidden_dim), nn.ReLU()])
+            for _ in range(n_layers - 1):
+                modules.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
             # We always have a layer mapping from hidden to out.
-            modules.append(nn.Linear(self.hidden_dim, self.out_dim))
+            modules.append(nn.Linear(hidden_dim, out_dim))
 
         linear_modules = [module for module in modules if isinstance(module, nn.Linear)]
         if linear_modules:
@@ -137,7 +144,11 @@ class BaseFinetuneable(nn.Module):
 
     @classmethod
     def from_pretrained(
-        cls: type[ModelType], path: str = "minishlab/potion-base-32m", *, token: str | None = None, **kwargs: Any
+        cls: type[ModelType],
+        path: str = "minishlab/potion-base-32m",
+        *,
+        token: str | None = None,
+        **kwargs: Any,
     ) -> ModelType:
         """Load the model from a pretrained model2vec model."""
         if model_name := kwargs.pop("model_name", None):
@@ -148,7 +159,11 @@ class BaseFinetuneable(nn.Module):
 
     @classmethod
     def from_static_model(
-        cls: type[ModelType], *, model: StaticModel, pad_token: str | None = None, **kwargs: Any
+        cls: type[ModelType],
+        *,
+        model: StaticModel,
+        pad_token: str | None = None,
+        **kwargs: Any,
     ) -> ModelType:
         """Load the model from a static model."""
         model.embedding = np.nan_to_num(model.embedding)
@@ -172,8 +187,7 @@ class BaseFinetuneable(nn.Module):
         )
 
     def _encode(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """
-        A forward pass and mean pooling.
+        """A forward pass and mean pooling.
 
         This function is analogous to `StaticModel.encode`, but reimplemented to allow gradients
         to pass through.
@@ -181,14 +195,15 @@ class BaseFinetuneable(nn.Module):
         :param input_ids: A 2D tensor of input ids. All input ids are have to be within bounds.
         :return: The mean over the input ids, weighted by token weights.
         """
-        w = self.w[input_ids]
-        w = torch.sigmoid(w)
         zeros = (input_ids != self.pad_id).float()
-        w = w * zeros
         # Add a small epsilon to avoid division by zero
         length = zeros.sum(1) + 1e-16
         input_ids_embeddings = self.token_mapping[input_ids]
         embedded = self.embeddings(input_ids_embeddings)
+
+        w = self.w[input_ids]
+        w = torch.sigmoid(w)
+        w = w * zeros
         # Weigh each token
         embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
         # Mean pooling by dividing by the length
@@ -218,8 +233,7 @@ class BaseFinetuneable(nn.Module):
         return self.head(encoded), encoded
 
     def tokenize(self, texts: list[str], max_length: int | None = 512) -> torch.Tensor:
-        """
-        Tokenize a bunch of strings into a single padded 2D tensor.
+        """Tokenize a bunch of strings into a single padded 2D tensor.
 
         Note that this is not used during training.
 
@@ -238,13 +252,22 @@ class BaseFinetuneable(nn.Module):
 
     def to_static_model(self) -> StaticModel:
         """Convert the model to a static model."""
-        emb = self.embeddings.weight.detach().cpu().numpy()
-        w = torch.sigmoid(self.w).detach().cpu().numpy()
+        with torch.no_grad():
+            emb = self.embeddings.weight
+            emb = emb.detach().cpu().numpy()
+        if self.w is not None:
+            w = torch.sigmoid(self.w).detach().cpu().numpy()
+        else:
+            w = np.ones(len(emb))
         # If the weights and emb are the same length, the model was not quantized before training.
         if len(w) == len(emb):
             emb = emb * w[:, None]
             return StaticModel(
-                vectors=emb, weights=None, tokenizer=self.tokenizer, normalize=self.normalize, token_mapping=None
+                vectors=emb,
+                weights=None,
+                tokenizer=self.tokenizer,
+                normalize=self.normalize,
+                token_mapping=None,
             )
         return StaticModel(
             vectors=emb,
@@ -268,7 +291,12 @@ class BaseFinetuneable(nn.Module):
         return batch_size
 
     def _check_val_split(
-        self, X: list[str], y: list, X_val: list[str] | None, y_val: list | None, test_size: float
+        self,
+        X: list[str],
+        y: list,
+        X_val: list[str] | None,
+        y_val: list | None,
+        test_size: float,
     ) -> tuple[list[str], list[str], Sequence, Sequence]:
         if (X_val is not None) != (y_val is not None):
             raise ValueError("Both X_val and y_val must be provided together, or neither.")
@@ -368,8 +396,7 @@ class BaseFinetuneable(nn.Module):
         return val_check_interval, check_val_every_epoch
 
     def _prepare_dataset(self, X: list[str], y: torch.Tensor, max_length: int = 512) -> TextDataset:
-        """
-        Prepare a dataset.
+        """Prepare a dataset.
 
         :param X: The texts.
         :param y: The labels.
