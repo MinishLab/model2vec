@@ -61,8 +61,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = _DEFAULT_RANDOM_SEED,
     ) -> StaticModelForSimilarity:
-        """
-        Fit a model.
+        """Fit a model.
 
         This function creates a Lightning Trainer object and fits the model to the data.
         We use early stopping. After training, the weights of the best model are loaded back into the model.

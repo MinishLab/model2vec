@@ -18,8 +18,7 @@ class ProgressParallel(Parallel):
     """A drop-in replacement for joblib.Parallel that shows a tqdm progress bar."""
 
     def __init__(self, use_tqdm: bool = True, total: int | None = None, *args: Any, **kwargs: Any) -> None:
-        """
-        Initialize the ProgressParallel object.
+        """Initialize the ProgressParallel object.
 
         :param use_tqdm: Whether to show the progress bar.
         :param total: Total number of tasks (batches) you expect to process. If None,
@@ -86,15 +85,3 @@ def importable(module: str, extra: str) -> None:
         raise ImportError(
             f"`{module}`, is required. Please reinstall model2vec with the `{extra}` extra. `pip install model2vec[{extra}]`"
         )
-
-
-def setup_logging() -> None:
-    """Simple logging setup."""
-    from rich.logging import RichHandler
-
-    logging.basicConfig(
-        level="INFO",
-        format="%(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[RichHandler(rich_tracebacks=True)],
-    )

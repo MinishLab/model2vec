@@ -5,8 +5,7 @@ from torch.utils.data import DataLoader, Dataset
 
 class TextDataset(Dataset):
     def __init__(self, tokenized_texts: list[list[int]], targets: torch.Tensor) -> None:
-        """
-        A dataset of texts.
+        """A dataset of texts.
 
         :param tokenized_texts: The tokenized texts. Each text is a list of token ids.
         :param targets: The targets.

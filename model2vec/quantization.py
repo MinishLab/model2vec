@@ -24,8 +24,7 @@ dtype_map = {
 
 
 def quantize_embeddings(embeddings: np.ndarray, quantize_to: DType) -> np.ndarray:
-    """
-    Quantize embeddings to a specified data type to reduce memory usage.
+    """Quantize embeddings to a specified data type to reduce memory usage.
 
     :param embeddings: The embeddings to quantize, as a numpy array.
     :param quantize_to: The data type to quantize to.
@@ -62,8 +61,7 @@ def quantize_embeddings(embeddings: np.ndarray, quantize_to: DType) -> np.ndarra
 def quantize_and_reduce_dim(
     embeddings: np.ndarray, quantize_to: str | DType | None, dimensionality: int | None
 ) -> np.ndarray:
-    """
-    Quantize embeddings to a datatype and reduce dimensionality.
+    """Quantize embeddings to a datatype and reduce dimensionality.
 
     :param embeddings: The embeddings to quantize and reduce, as a numpy array.
     :param quantize_to: The data type to quantize to. If None, no quantization is performed.

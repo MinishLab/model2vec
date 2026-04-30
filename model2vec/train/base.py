@@ -47,8 +47,7 @@ class BaseFinetuneable(nn.Module):
         freeze: bool = False,
         normalize: bool = True,
     ) -> None:
-        """
-        Initialize a trainable StaticModel from a StaticModel.
+        """Initialize a trainable StaticModel from a StaticModel.
 
         :param vectors: The embeddings of the staticmodel.
         :param tokenizer: The tokenizer.
@@ -172,8 +171,7 @@ class BaseFinetuneable(nn.Module):
         )
 
     def _encode(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """
-        A forward pass and mean pooling.
+        """A forward pass and mean pooling.
 
         This function is analogous to `StaticModel.encode`, but reimplemented to allow gradients
         to pass through.
@@ -218,8 +216,7 @@ class BaseFinetuneable(nn.Module):
         return self.head(encoded), encoded
 
     def tokenize(self, texts: list[str], max_length: int | None = 512) -> torch.Tensor:
-        """
-        Tokenize a bunch of strings into a single padded 2D tensor.
+        """Tokenize a bunch of strings into a single padded 2D tensor.
 
         Note that this is not used during training.
 
@@ -368,8 +365,7 @@ class BaseFinetuneable(nn.Module):
         return val_check_interval, check_val_every_epoch
 
     def _prepare_dataset(self, X: list[str], y: torch.Tensor, max_length: int = 512) -> TextDataset:
-        """
-        Prepare a dataset.
+        """Prepare a dataset.
 
         :param X: The texts.
         :param y: The labels.

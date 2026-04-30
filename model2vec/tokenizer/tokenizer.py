@@ -13,8 +13,7 @@ def clean_and_create_vocabulary(
     vocabulary_to_add: list[str],
     token_remove_regex: re.Pattern[str] | None,
 ) -> TokenizerModel:
-    """
-    Clean a vocabulary by removing duplicates and tokens that were already in the vocabulary.
+    """Clean a vocabulary by removing duplicates and tokens that were already in the vocabulary.
 
     This function removes duplicate tokens and tokens that are already in the model's vocabulary.
     It also removes the tokenizer's post-processor, which we do not use anyway.
@@ -94,8 +93,7 @@ def _report_statistics(n_multiword: int, n_duplicate: int, n_regex_removed: int,
 
 
 def turn_tokens_into_ids(tokens: list[str], model: TokenizerModel) -> list[list[int]]:
-    """
-    Convert a list of Token objects to their corresponding token ID sequences.
+    """Convert a list of Token objects to their corresponding token ID sequences.
 
     :param tokens: List of Token objects to convert
     :param model: The tokenizermodel of the tokenizer.

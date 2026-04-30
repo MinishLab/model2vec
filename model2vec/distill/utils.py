@@ -9,8 +9,7 @@ logger = getLogger(__name__)
 
 
 def select_optimal_device(device: str | None) -> str:
-    """
-    Get the optimal device to use based on backend availability.
+    """Get the optimal device to use based on backend availability.
 
     For Torch versions >= 2.8.0, MPS is disabled due to known performance regressions.
 

@@ -77,8 +77,7 @@ def train_test_split(
     y: list,
     test_size: float,
 ) -> tuple[list[str], list[str], list, list]:
-    """
-    Split the data.
+    """Split the data.
 
     For single-label classification, stratification is attempted (if possible).
     For multilabel classification, a random split is performed.
