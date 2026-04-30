@@ -52,8 +52,7 @@ class StaticModelPipeline:
     def from_pretrained(
         cls: type[StaticModelPipeline], path: PathLike, token: str | None = None, trust_remote_code: bool = False
     ) -> StaticModelPipeline:
-        """
-        Load a StaticModel from a local path or huggingface hub path.
+        """Load a StaticModel from a local path or huggingface hub path.
 
         NOTE: if you load a private model from the huggingface hub, you need to pass a token.
 
@@ -74,8 +73,7 @@ class StaticModelPipeline:
     def push_to_hub(
         self, repo_id: str, subfolder: str | None = None, token: str | None = None, private: bool = False
     ) -> None:
-        """
-        Save a model to a folder, and then push that folder to the hf hub.
+        """Save a model to a folder, and then push that folder to the hf hub.
 
         :param repo_id: The id of the repository to push to.
         :param subfolder: The subfolder to push to.
@@ -122,8 +120,7 @@ class StaticModelPipeline:
         multiprocessing_threshold: int = 10_000,
         threshold: float = 0.5,
     ) -> np.ndarray:
-        """
-        Predict the labels of the input.
+        """Predict the labels of the input.
 
         :param X: The input data to predict. Can be a list of strings or a single string.
         :param show_progress_bar: Whether to display a progress bar during prediction. Defaults to False.
@@ -162,8 +159,7 @@ class StaticModelPipeline:
         use_multiprocessing: bool = True,
         multiprocessing_threshold: int = 10_000,
     ) -> np.ndarray:
-        """
-        Predict the labels of the input.
+        """Predict the labels of the input.
 
         :param X: The input data to predict. Can be a list of strings or a single string.
         :param show_progress_bar: Whether to display a progress bar during prediction. Defaults to False.
@@ -190,8 +186,7 @@ class StaticModelPipeline:
     def evaluate(
         self, X: Sequence[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
     ) -> str | dict[str, dict[str, float]]:
-        """
-        Evaluate the classifier on a given dataset using scikit-learn's classification report.
+        """Evaluate the classifier on a given dataset using scikit-learn's classification report.
 
         :param X: The texts to predict on.
         :param y: The ground truth labels.
@@ -212,8 +207,7 @@ class StaticModelPipeline:
 def _load_pipeline(
     folder_or_repo_path: PathLike, token: str | None = None, trust_remote_code: bool = False
 ) -> tuple[StaticModel, Pipeline]:
-    """
-    Load a model and an sklearn pipeline.
+    """Load a model and an sklearn pipeline.
 
     This assumes the following files are present in the repo:
     - `pipeline.skops`: The head of the pipeline.
@@ -259,8 +253,7 @@ def _load_pipeline(
 
 
 def save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> None:
-    """
-    Save a pipeline to a folder.
+    """Save a pipeline to a folder.
 
     :param pipeline: The pipeline to save.
     :param folder_path: The path to the folder to save the pipeline to.
@@ -296,8 +289,7 @@ def evaluate_single_or_multi_label(
     y: list[int] | list[str] | list[list[int]] | list[list[str]],
     output_dict: bool = False,
 ) -> str | dict[str, dict[str, float]]:
-    """
-    Evaluate the classifier on a given dataset using scikit-learn's classification report.
+    """Evaluate the classifier on a given dataset using scikit-learn's classification report.
 
     :param predictions: The predictions.
     :param y: The ground truth labels.

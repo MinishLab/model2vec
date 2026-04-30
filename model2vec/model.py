@@ -34,8 +34,7 @@ class StaticModel:
         weights: np.ndarray | None = None,
         token_mapping: np.ndarray | None = None,
     ) -> None:
-        """
-        Initialize the StaticModel.
+        """Initialize the StaticModel.
 
         :param vectors: The vectors to use.
         :param tokenizer: The Transformers tokenizer to use.
@@ -49,7 +48,7 @@ class StaticModel:
         :param token_mapping: A mapping from token ids to indices in the vectors.
             If None, we don't remap the tokens during inference.
             This is only used for models that have undergone vocabulary quantization.
-        :raises: ValueError if the number of tokens does not match the number of vectors.
+        :raises ValueError: if the number of tokens does not match the number of vectors.
         """
         super().__init__()
         tokens, _ = zip(*sorted(tokenizer.get_vocab().items(), key=lambda x: x[1]))
@@ -95,8 +94,7 @@ class StaticModel:
 
     @property
     def normalize(self) -> bool:
-        """
-        Get the normalize value.
+        """Get the normalize value.
 
         :return: The normalize value.
         """
@@ -125,8 +123,7 @@ class StaticModel:
         return int(self.embedding.shape[0]) if is_quantized else None
 
     def save_pretrained(self, path: PathLike, model_name: str | None = None, subfolder: str | None = None) -> None:
-        """
-        Save the pretrained model.
+        """Save the pretrained model.
 
         :param path: The path to save to.
         :param model_name: The model name to use in the Model Card.
@@ -148,8 +145,7 @@ class StaticModel:
         )
 
     def tokenize(self, sentences: Sequence[str], max_length: int | None = None) -> list[list[int]]:
-        """
-        Tokenize a list of sentences.
+        """Tokenize a list of sentences.
 
         :param sentences: The sentences to tokenize.
         :param max_length: The maximum length of the sentences in tokens. If this is None, sequences
@@ -189,8 +185,7 @@ class StaticModel:
         vocabulary_quantization: int | None = None,
         force_download: bool = True,
     ) -> StaticModel:
-        """
-        Load a StaticModel from a local path or huggingface hub path.
+        """Load a StaticModel from a local path or huggingface hub path.
 
         NOTE: if you load a private model from the huggingface hub, you need to pass a token.
 
@@ -280,8 +275,7 @@ class StaticModel:
         use_multiprocessing: bool = True,
         multiprocessing_threshold: int = 10_000,
     ) -> list[np.ndarray] | np.ndarray:
-        """
-        Encode a list of sentences as a list of numpy arrays of tokens.
+        """Encode a list of sentences as a list of numpy arrays of tokens.
 
         This is useful if you want to use the tokens for further processing, or if you want to do sequence
         modeling.
@@ -357,8 +351,7 @@ class StaticModel:
         multiprocessing_threshold: int = 10_000,
         **kwargs: Any,
     ) -> np.ndarray:
-        """
-        Encode a list of sentences.
+        """Encode a list of sentences.
 
         This function encodes a list of sentences by averaging the word embeddings of the tokens in the sentence.
         For ease of use, we don't batch sentences together.
@@ -411,8 +404,7 @@ class StaticModel:
         return out_array
 
     def _encode_helper(self, id_list: list[int]) -> np.ndarray:
-        """
-        Helper function to encode a list of ids.
+        """Helper function to encode a list of ids.
 
         This function is used to deduplicate the logic in `encode` and `encode_as_sequence`.
         It retrieves the embeddings for the given list of ids, applying weights if available.
@@ -457,8 +449,7 @@ class StaticModel:
     def push_to_hub(
         self, repo_id: str, private: bool = False, token: str | None = None, subfolder: str | None = None
     ) -> None:
-        """
-        Push the model to the huggingface hub.
+        """Push the model to the huggingface hub.
 
         NOTE: you need to pass a token if you are pushing a private model.
 
@@ -481,8 +472,7 @@ def quantize_model(
     quantize_to: str | DType | None = None,
     dimensionality: int | None = None,
 ) -> StaticModel:
-    """
-    Quantize the model to a lower precision and possibly lower dimensionality.
+    """Quantize the model to a lower precision and possibly lower dimensionality.
 
     :param model: The model to quantize.
     :param vocabulary_quantization: The number of clusters to use for quantization.
@@ -490,7 +480,7 @@ def quantize_model(
     :param dimensionality: The desired dimensionality of the model.
         This needs to be < than the current model dimensionality.
     :return: A new StaticModel with the quantized embeddings.
-    :raises: ValueError if the model is already quantized.
+    :raises ValueError: if the model is already quantized.
     """
     token_mapping: np.ndarray | None
     weights: np.ndarray | None

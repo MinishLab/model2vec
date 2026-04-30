@@ -26,9 +26,7 @@ dependencies = [
     "jinja2",
     "joblib",
     "numpy",
-    "rich",
     "safetensors",
-    "setuptools",
     "tokenizers>=0.20",
     "tqdm",
 ]
@@ -51,13 +49,13 @@ model2vec = [
 
 [project.optional-dependencies]
 dev = [
-    "black",
     "ipython",
     "mypy",
     "pre-commit",
     "pytest",
     "pytest-cov",
     "ruff",
+    "setuptools",
 ]
 
 distill = ["torch", "transformers<5.4.0", "scikit-learn", "skeletoken>=0.3.3"]
@@ -73,7 +71,7 @@ quantization = ["scikit-learn"]
 "Source" = "https://github.com/MinishLab/model2vec"
 
 [tool.ruff]
-exclude = [".venv/"]
+exclude = [".venv/", "*.ipynb"]
 line-length = 120
 target-version = "py310"
 
@@ -99,7 +97,7 @@ ignore = [
     # Allow self and cls to be untyped, and allow Any type
     "ANN001", "ANN002", "ANN401",
     # Pydocstyle ignores
-    "D100", "D101", "D104", "D203", "D212", "D401",
+    "D100", "D101", "D104", "D203", "D213", "D401",
     # Allow use of f-strings in logging
     "G004"
 ]
