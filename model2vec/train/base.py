@@ -102,24 +102,19 @@ class BaseFinetuneable(nn.Module):
 
     def construct_head(self) -> nn.Sequential:
         """Constructs a simple classifier head."""
-        return self.construct_mlp(self.n_layers, self.embed_dim, self.hidden_dim, self.out_dim)
-
-    @staticmethod
-    def construct_mlp(n_layers: int, embed_dim: int, hidden_dim: int, out_dim: int) -> nn.Sequential:
-        """Constructs a simple classifier head."""
         modules: list[nn.Module] = []
-        if n_layers == 0:
-            modules.append(nn.Linear(embed_dim, out_dim))
+        if self.n_layers == 0:
+            modules.append(nn.Linear(self.embed_dim, self.out_dim))
         else:
             # If we have a hidden layer, we should first project to hidden_dim
             modules = [
-                nn.Linear(embed_dim, hidden_dim),
+                nn.Linear(self.embed_dim, self.hidden_dim),
                 nn.ReLU(),
             ]
-            for _ in range(n_layers - 1):
-                modules.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
+            for _ in range(self.n_layers - 1):
+                modules.extend([nn.Linear(self.hidden_dim, self.hidden_dim), nn.ReLU()])
             # We always have a layer mapping from hidden to out.
-            modules.append(nn.Linear(hidden_dim, out_dim))
+            modules.append(nn.Linear(self.hidden_dim, self.out_dim))
 
         linear_modules = [module for module in modules if isinstance(module, nn.Linear)]
         if linear_modules:
@@ -254,11 +249,9 @@ class BaseFinetuneable(nn.Module):
         """Convert the model to a static model."""
         with torch.no_grad():
             emb = self.embeddings.weight
-            emb = emb.detach().cpu().numpy()
-        if self.w is not None:
-            w = torch.sigmoid(self.w).detach().cpu().numpy()
-        else:
-            w = np.ones(len(emb))
+            emb = emb.cpu().numpy()
+            w = torch.sigmoid(self.w).cpu().numpy()
+
         # If the weights and emb are the same length, the model was not quantized before training.
         if len(w) == len(emb):
             emb = emb * w[:, None]
