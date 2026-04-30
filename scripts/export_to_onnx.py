@@ -38,8 +38,7 @@ class TorchStaticModel(torch.nn.Module):
         self.median_token_length = model.median_token_length
 
     def forward(self, input_ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the model.
+        """Forward pass of the model.
 
         :param input_ids: The input token ids.
         :param offsets: The offsets to compute the mean pooling.
@@ -53,8 +52,7 @@ class TorchStaticModel(torch.nn.Module):
         return embeddings
 
     def tokenize(self, sentences: list[str], max_length: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Tokenize the input sentences.
+        """Tokenize the input sentences.
 
         :param sentences: The input sentences.
         :param max_length: The maximum length of the input_ids.
@@ -83,8 +81,7 @@ class TorchStaticModel(torch.nn.Module):
 
 
 def export_model_to_onnx(model_path: str, save_path: Path) -> None:
-    """
-    Export the StaticModel to ONNX format and save tokenizer files.
+    """Export the StaticModel to ONNX format and save tokenizer files.
 
     :param model_path: The path to the pretrained StaticModel.
     :param save_path: The directory to save the model and related files.
@@ -129,13 +126,11 @@ def export_model_to_onnx(model_path: str, save_path: Path) -> None:
 
 
 def save_tokenizer(tokenizer: Tokenizer, save_directory: Path) -> None:
-    """
-    Save tokenizer files in a format compatible with Transformers.
+    """Save tokenizer files in a format compatible with Transformers.
 
     :param tokenizer: The tokenizer from the StaticModel.
     :param save_directory: The directory to save the tokenizer files.
     :raises FileNotFoundError: If config.json is not found in save_directory.
-    :raises FileNotFoundError: If tokenizer_config.json is not found in save_directory.
     :raises ValueError: If tokenizer_name is not found in config.json.
     """
     tokenizer_json_path = save_directory / "tokenizer.json"

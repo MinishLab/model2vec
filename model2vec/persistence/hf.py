@@ -10,8 +10,7 @@ logger = logging.getLogger(__name__)
 def push_folder_to_hub(
     folder_path: Path, subfolder: str | None, repo_id: str, private: bool, token: str | None
 ) -> None:
-    """
-    Push a model folder to the huggingface hub, including model card.
+    """Push a model folder to the huggingface hub, including model card.
 
     :param folder_path: The path to the folder.
     :param subfolder: The subfolder to push to.
@@ -30,8 +29,7 @@ def push_folder_to_hub(
 
 
 def maybe_get_cached_model_path(model_id: str) -> Path | None:
-    """
-    Gets the latest model path for a given identifier from the hugging face hub cache.
+    """Gets the latest model path for a given identifier from the hugging face hub cache.
 
     Returns None if there is no cached model. In this case, the model will be downloaded.
     """

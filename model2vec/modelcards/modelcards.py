@@ -16,8 +16,7 @@ def create_model_card(
     template_path: str = "model_card_template.md",
     **kwargs: Any,
 ) -> None:
-    """
-    Create a model card and store it in the specified path.
+    """Create a model card and store it in the specified path.
 
     :param folder_path: The path where the model card will be stored.
     :param base_model_name: The name of the base model.

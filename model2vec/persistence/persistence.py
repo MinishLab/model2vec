@@ -31,8 +31,7 @@ def save_pretrained(
     mapping: np.ndarray | None = None,
     **kwargs: Any,
 ) -> None:
-    """
-    Save a model to a folder.
+    """Save a model to a folder.
 
     :param folder_path: The path to the folder.
     :param embeddings: The embeddings.
@@ -85,8 +84,7 @@ def load_pretrained(
     token: str | None,
     force_download: bool,
 ) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any], np.ndarray | None, np.ndarray | None]:
-    """
-    Loads a pretrained model from a folder.
+    """Loads a pretrained model from a folder.
 
     :param folder_or_repo_path: The folder or repo path to load from.
         - If this is a local path, we will load from the local path.

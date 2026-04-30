@@ -33,8 +33,7 @@ def distill_from_model(
     vocabulary_quantization: int | None = None,
     pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> StaticModel:
-    """
-    Distill a staticmodel from a sentence transformer.
+    """Distill a staticmodel from a sentence transformer.
 
     This function creates a set of embeddings from a sentence transformer. It does this by doing either
     a forward pass for all subword tokens in the tokenizer, or by doing a forward pass for all tokens in a passed
@@ -65,7 +64,7 @@ def distill_from_model(
         'first': use the first token's hidden state ([CLS] token in BERT-style models).
         'pooler': use the pooler output (if available). This is often a non-linear projection of the [CLS] token.
     :return: A StaticModel.
-    :raises: ValueError if the vocabulary is empty after preprocessing.
+    :raises ValueError: if the vocabulary is empty after preprocessing.
 
     """
     quantize_to = DType(quantize_to)
@@ -168,15 +167,14 @@ def _validate_parameters(
     sif_coefficient: float | None,
     token_remove_pattern: str | None,
 ) -> tuple[float | None, re.Pattern[str] | None]:
-    """
-    Validate the parameters passed to the distillation function.
+    """Validate the parameters passed to the distillation function.
 
     :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
         Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to
         this regex pattern will be removed from the vocabulary.
     :return: The SIF coefficient to use.
-    :raises: ValueError if the regex can't be compiled.
+    :raises ValueError: if the regex can't be compiled.
 
     """
     if sif_coefficient is not None:
@@ -205,8 +203,7 @@ def distill(
     vocabulary_quantization: int | None = None,
     pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> StaticModel:
-    """
-    Distill a staticmodel from a sentence transformer.
+    """Distill a staticmodel from a sentence transformer.
 
     This function creates a set of embeddings from a sentence transformer. It does this by doing either
     a forward pass for all subword tokens in the tokenizer, or by doing a forward pass for all tokens in a passed

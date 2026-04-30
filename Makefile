@@ -1,5 +1,4 @@
-clean:
-
+VERBOSITY=
 
 venv:
 	uv venv
@@ -9,7 +8,7 @@ install:
 	uv run pre-commit install
 
 install-no-pre-commit:
-	uv pip install ".[dev,distill,inference,train]"
+	uv pip install ".[dev,distill,inference,train,onnx,quantization]"
 
 install-base:
 	uv sync --extra dev
@@ -18,4 +17,7 @@ fix:
 	uv run pre-commit run --all-files
 
 test:
-	uv run pytest --cov=model2vec --cov-report=term-missing
+	uv run pytest --cov=model2vec --cov-report=term-missing $(VERBOSITY)
+
+test-verbose:
+	make test VERBOSITY="-vvv"
