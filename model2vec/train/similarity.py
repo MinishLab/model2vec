@@ -30,6 +30,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
+        freeze_weights: bool = False,
     ) -> None:
         """Initialize a standard similarity model."""
         super().__init__(
@@ -43,6 +44,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
             hidden_dim=hidden_dim,
             n_layers=n_layers,
             normalize=normalize,
+            freeze_weights=freeze_weights,
         )
 
     def fit(

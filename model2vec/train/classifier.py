@@ -38,6 +38,7 @@ class StaticModelForClassification(BaseFinetuneable):
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
+        freeze_weights: bool = False,
     ) -> None:
         """Initialize a standard classifier model."""
         # Alias: Follows scikit-learn. Set to dummy classes
@@ -55,6 +56,7 @@ class StaticModelForClassification(BaseFinetuneable):
             hidden_dim=hidden_dim,
             n_layers=n_layers,
             normalize=normalize,
+            freeze_weights=freeze_weights,
         )
 
     @property
