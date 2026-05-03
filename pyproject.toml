@@ -120,3 +120,6 @@ ignore_missing_imports = true
 
 [tool.setuptools.dynamic]
 version = {attr = "model2vec.version.__version__"}
+
+[tool.uv]
+exclude-newer = "1 week"
