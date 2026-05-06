@@ -15,8 +15,8 @@ from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 
-from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
+from model2vec.model import PathLike, StaticModel
 from model2vec.train.dataset import TextDataset
 from model2vec.train.utils import (
     get_probable_pad_token_id,
@@ -140,7 +140,7 @@ class BaseFinetuneable(nn.Module):
     @classmethod
     def from_pretrained(
         cls: type[ModelType],
-        path: str = "minishlab/potion-base-32m",
+        path: PathLike = "minishlab/potion-base-32m",
         *,
         token: str | None = None,
         **kwargs: Any,
