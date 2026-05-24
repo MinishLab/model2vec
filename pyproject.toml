@@ -4,7 +4,7 @@ description = "Fast State-of-the-Art Static Embeddings"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-authors = [{ name = "Stéphan Tulkens", email = "stephantul@gmail.com"}, {name = "Thomas van Dongen", email = "thomas123@live.nl"}]
+authors = [{ name = "Stéphan Tulkens", email = "stephantul@gmail.com"}, {name = "Thomas van Dongen", email = "thomasvdongen@proton.me"}]
 dynamic = ["version"]
 
 classifiers = [
