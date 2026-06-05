@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_RANDOM_SEED = 42
+DEFAULT_RANDOM_SEED = 42
 _KNOWN_PAD_TOKENS = ("[PAD]", "<pad>")
 
 

@@ -12,6 +12,7 @@ from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 from model2vec.train.base import BaseFinetuneable
 from model2vec.train.dataset import TextDataset
+from model2vec.train.regression import StaticModelForRegression
 from model2vec.train.similarity import StaticModelForSimilarity
 from model2vec.train.utils import get_probable_pad_token_id, logit, train_test_split
 
@@ -180,6 +181,22 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
 
 
 def test_convert_to_pipeline_similarity(mock_trained_similarity_pipeline: StaticModelForSimilarity) -> None:
+    """Convert a model to a pipeline."""
+    mock_trained_similarity_pipeline.eval()
+    pipeline = mock_trained_similarity_pipeline.to_pipeline()
+    encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
+    encoded_model = (
+        mock_trained_similarity_pipeline(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))[1]
+        .detach()
+        .numpy()
+    )
+    assert np.allclose(encoded_pipeline, encoded_model)
+    p1 = pipeline.predict(["dog cat", "dog"])
+    p2 = mock_trained_similarity_pipeline.encode(["dog cat", "dog"])
+    assert np.allclose(p1, p2, rtol=1e-5, atol=1e-4)
+
+
+def test_convert_to_pipeline_regression(mock_trained_similarity_pipeline: StaticModelForRegression) -> None:
     """Convert a model to a pipeline."""
     mock_trained_similarity_pipeline.eval()
     pipeline = mock_trained_similarity_pipeline.to_pipeline()
