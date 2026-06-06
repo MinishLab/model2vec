@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import logging
+from typing import TypeVar
 
 import lightning as pl
 import torch
 from tokenizers import Tokenizer
 
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.lightning_modules import StaticLightningModule
-from model2vec.train.utils import _DEFAULT_RANDOM_SEED
+from model2vec.train.lightning_modules import SimilarityLightningModule
+from model2vec.train.utils import DEFAULT_RANDOM_SEED
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 class StaticModelForSimilarity(BaseFinetuneable):
     val_metric = "val_loss"
     early_stopping_direction = "min"
+    _lightning_class = SimilarityLightningModule
 
     def __init__(
         self,
@@ -48,7 +50,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         )
 
     def fit(
-        self,
+        self: _T,
         X: list[str],
         y: torch.Tensor,
         learning_rate: float = 1e-3,
@@ -61,8 +63,8 @@ class StaticModelForSimilarity(BaseFinetuneable):
         X_val: list[str] | None = None,
         y_val: torch.Tensor | None = None,
         validation_steps: int | None = None,
-        random_seed: int = _DEFAULT_RANDOM_SEED,
-    ) -> StaticModelForSimilarity:
+        random_seed: int = DEFAULT_RANDOM_SEED,
+    ) -> _T:
         """Fit a model.
 
         This function creates a Lightning Trainer object and fits the model to the data.
@@ -100,7 +102,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         self.out_dim = train_dataset.targets.shape[1]
         self._initialize()
 
-        c = StaticLightningModule(self, learning_rate=learning_rate)
+        c = self._lightning_class(self, learning_rate=learning_rate)
 
         self._train(
             module=c,
@@ -115,3 +117,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         )
 
         return self
+
+
+_T = TypeVar("_T", bound=StaticModelForSimilarity)

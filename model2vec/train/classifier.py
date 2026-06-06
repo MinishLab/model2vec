@@ -14,7 +14,7 @@ from tqdm import trange
 from model2vec.inference import evaluate_single_or_multi_label
 from model2vec.train.base import BaseFinetuneable
 from model2vec.train.lightning_modules import ClassifierLightningModule, MultiLabelClassifierLightningModule
-from model2vec.train.utils import _DEFAULT_RANDOM_SEED
+from model2vec.train.utils import DEFAULT_RANDOM_SEED
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class StaticModelForClassification(BaseFinetuneable):
         y_val: LabelType | None = None,
         class_weight: Literal["balanced"] | dict[str, float] | torch.Tensor | None = None,
         validation_steps: int | None = None,
-        random_seed: int = _DEFAULT_RANDOM_SEED,
+        random_seed: int = DEFAULT_RANDOM_SEED,
     ) -> StaticModelForClassification:
         """Fit a model.
 

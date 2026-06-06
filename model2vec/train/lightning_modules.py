@@ -7,19 +7,13 @@ from sklearn.metrics import jaccard_score
 from torch import nn
 
 
-class StaticLightningModule(pl.LightningModule):
+class RegressionLightningModule(pl.LightningModule):
     def __init__(self, model: nn.Module, learning_rate: float) -> None:
         """Initialize the LightningModule."""
         super().__init__()
         self.model = model
         self.learning_rate = learning_rate
-        self.loss_function = self.cosine_distance
-
-    def cosine_distance(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        """Returns the cosine distance loss function."""
-        x = torch.nn.functional.normalize(x, dim=1)
-        y = torch.nn.functional.normalize(y, dim=1)
-        return (1 - torch.sum(x * y, dim=1)).mean()
+        self.loss_function = nn.MSELoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Simple forward pass."""
@@ -57,7 +51,24 @@ class StaticLightningModule(pl.LightningModule):
         return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "monitor": "val_loss"}}
 
 
-class ClassifierLightningModule(StaticLightningModule):
+class SimilarityLightningModule(RegressionLightningModule):
+    def __init__(self, model: nn.Module, learning_rate: float) -> None:
+        """Initialize the LightningModule."""
+        super().__init__(model, learning_rate)
+        self.model = model
+        self.learning_rate = learning_rate
+        self.loss_function = CosineLoss()
+
+
+class CosineLoss(nn.Module):
+    def __call__(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Returns the cosine distance loss function."""
+        x = torch.nn.functional.normalize(x, dim=1)
+        y = torch.nn.functional.normalize(y, dim=1)
+        return (1 - torch.sum(x * y, dim=1)).mean()
+
+
+class ClassifierLightningModule(RegressionLightningModule):
     def __init__(self, model: nn.Module, learning_rate: float, class_weight: torch.Tensor | None = None) -> None:
         """Initialize the LightningModule."""
         super().__init__(model, learning_rate)
@@ -77,7 +88,7 @@ class ClassifierLightningModule(StaticLightningModule):
         return loss
 
 
-class MultiLabelClassifierLightningModule(StaticLightningModule):
+class MultiLabelClassifierLightningModule(RegressionLightningModule):
     def __init__(self, model: nn.Module, learning_rate: float, class_weight: torch.Tensor | None = None) -> None:
         """Initialize the LightningModule."""
         super().__init__(model, learning_rate)
