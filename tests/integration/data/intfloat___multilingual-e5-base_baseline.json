@@ -32,13 +32,15 @@
         "\u2581blorptastic",
         "\u2581flimzycrag"
       ],
-      "similarity_scores": {
-        "dog~astronomy": 0.573303,
-        "dog~puppy": 0.880382,
-        "happy~concrete": 0.520932,
-        "happy~joyful": 0.807798,
-        "king~bicycle": 0.660403,
-        "king~queen": 0.535522
+      "mteb_sts_scores": {
+        "BIOSSES": 0.432685,
+        "SICK-R": 0.474725,
+        "STS12": 0.520844,
+        "STS13": 0.623774,
+        "STS14": 0.565683,
+        "STS15": 0.635075,
+        "STS16": 0.58762,
+        "STSBenchmark": 0.492349
       },
       "token_order_hash": "c15b66edc095c19fae1fc0d10462ccd3cdc77e835825639022dac2e8a3f4b5bd"
     },
@@ -73,13 +75,15 @@
         "\u1ea5",
         "\u7a23"
       ],
-      "similarity_scores": {
-        "dog~astronomy": 0.257133,
-        "dog~puppy": 0.777345,
-        "happy~concrete": 0.21136,
-        "happy~joyful": 0.663768,
-        "king~bicycle": 0.367408,
-        "king~queen": 0.285096
+      "mteb_sts_scores": {
+        "BIOSSES": 0.512096,
+        "SICK-R": 0.556843,
+        "STS12": 0.583896,
+        "STS13": 0.706956,
+        "STS14": 0.664318,
+        "STS15": 0.735835,
+        "STS16": 0.682632,
+        "STSBenchmark": 0.625896
       },
       "token_order_hash": "d0534dadde49bec613f7090e0fec5797f10194566612acf36895214252e290e0"
     }

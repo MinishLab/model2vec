@@ -4,7 +4,10 @@ import hashlib
 from pathlib import Path
 from typing import Any, cast
 
+import mteb
 import numpy as np
+from mteb.models.abs_encoder import AbsEncoder
+from mteb.models.model_meta import ModelMeta
 from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
@@ -22,18 +25,23 @@ BASE_MODELS: tuple[str, ...] = (
 
 BASELINE_DIR = Path(__file__).parent / "data"
 
+STS_TASKS: tuple[str, ...] = (
+    "BIOSSES",
+    "SICK-R",
+    "STS12",
+    "STS13",
+    "STS14",
+    "STS15",
+    "STS16",
+    "STSBenchmark",
+)
+
 _NOVEL_VOCABULARY = ["zibblorptron", "quixnorfle", "blorptastic", "flimzycrag"]
 
 CONFIGS: dict[str, dict[str, Any]] = {
     "subword": {"pca_dims": 256, "quantize_to": "float32"},
     "custom_vocab": {"vocabulary": _NOVEL_VOCABULARY, "pca_dims": 32, "quantize_to": "float32"},
 }
-
-SEMANTIC_TRIPLES = [
-    ("king", "queen", "bicycle"),
-    ("dog", "puppy", "astronomy"),
-    ("happy", "joyful", "concrete"),
-]
 
 
 def baseline_path_for(model_name: str) -> Path:
@@ -58,26 +66,44 @@ def distill_all(model: PreTrainedModel, tokenizer: PreTrainedTokenizerFast) -> d
     return {name: distill_from_model(model=model, tokenizer=tokenizer, **kwargs) for name, kwargs in CONFIGS.items()}
 
 
-def _cosine_similarity(u: np.ndarray, v: np.ndarray) -> float:
-    return float(np.dot(u, v) / (np.linalg.norm(u) * np.linalg.norm(v)))
+class _MTEBEncoder(AbsEncoder):
+    """Adapts a `StaticModel` to MTEB's `AbsEncoder` protocol."""
+
+    def __init__(self, model: StaticModel) -> None:
+        self.model = model
+        self.mteb_model_meta = ModelMeta.create_empty(overwrites={"name": "model2vec-distilled", "revision": "local"})
+
+    def encode(
+        self,
+        inputs: Any,
+        *,
+        task_metadata: Any,
+        hf_split: str,
+        hf_subset: str,
+        prompt_type: Any = None,
+        **kwargs: Any,
+    ) -> np.ndarray:
+        texts = [text for batch in inputs for text in batch["text"]]
+        return self.model.encode(texts)
 
 
-def compute_similarity_scores(model: StaticModel) -> dict[str, float]:
-    """Compute cosine similarity scores for the semantic sanity pairs."""
-    scores: dict[str, float] = {}
-    for word_a, word_b, unrelated in SEMANTIC_TRIPLES:
-        vectors = model.encode([word_a, word_b, unrelated])
-        scores[f"{word_a}~{word_b}"] = round(_cosine_similarity(vectors[0], vectors[1]), 6)
-        scores[f"{word_a}~{unrelated}"] = round(_cosine_similarity(vectors[0], vectors[2]), 6)
-    return scores
+def compute_mteb_sts_scores(model: StaticModel) -> dict[str, float]:
+    """Run the STS subset of MTEB against a distilled model.
+
+    :param model: The distilled StaticModel to evaluate.
+    :return: A dict mapping MTEB STS task name to its main score.
+    """
+    tasks = mteb.get_tasks(tasks=list(STS_TASKS))
+    results = mteb.evaluate(_MTEBEncoder(model), tasks, cache=None, show_progress_bar=False)  # type: ignore[arg-type]
+    return {result.task_name: round(float(result.get_score()), 6) for result in results.task_results}
 
 
 def compute_metrics(model: StaticModel) -> dict[str, Any]:
     """Compute a JSON-serializable snapshot of a distilled model's key properties.
 
     :param model: The distilled StaticModel to summarize.
-    :return: A dict with vocab size, embedding shape/rank/distribution, token order, and semantic
-        similarity scores. Used both to write and to check the regression baseline.
+    :return: A dict with vocab size, embedding shape/rank/distribution, token order, and MTEB STS
+        scores. Used both to write and to check the regression baseline.
     """
     embedding = model.embedding.astype(np.float64)
     tokens = list(model.tokens)
@@ -93,5 +119,5 @@ def compute_metrics(model: StaticModel) -> dict[str, Any]:
         "token_order_hash": token_order_hash,
         "first_tokens": tokens[:10],
         "last_tokens": tokens[-10:],
-        "similarity_scores": compute_similarity_scores(model),
+        "mteb_sts_scores": compute_mteb_sts_scores(model),
     }

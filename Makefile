@@ -8,7 +8,7 @@ install:
 	uv run pre-commit install
 
 install-no-pre-commit:
-	uv pip install ".[dev,distill,inference,train,onnx,quantization]"
+	uv pip install ".[dev,distill,inference,train,onnx,quantization,integration]"
 
 install-base:
 	uv sync --extra dev

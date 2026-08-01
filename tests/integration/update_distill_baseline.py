@@ -4,7 +4,7 @@ import json
 import logging
 import sys
 
-from tests.integration._distill_metrics import (
+from tests.integration.distill_metrics import (
     BASE_MODELS,
     baseline_path_for,
     compute_metrics,
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def update_baseline(model_name: str) -> None:
     """Distill every configured variant of one base model and write their metrics to its baseline file.
 
-    :param model_name: A short name, i.e. a key of `BASE_MODELS`.
+    :param model_name: A model identifier on Hugging Face.
     """
     model, tokenizer = load_base_model_and_tokenizer(model_name)
     distilled = distill_all(model, tokenizer)

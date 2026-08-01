@@ -1,20 +1,3 @@
-"""Regression test for the distillation pipeline.
-
-Downloads real sentence-transformers (see `BASE_MODELS`), distills several StaticModel variants
-from each, and compares the result against a stored JSON baseline
-(`tests/integration/data/<model>_baseline.json`): vocabulary size, token order, embedding matrix
-rank/distribution, and semantic similarity scores. This catches regressions that unit tests (which
-run against a mocked transformer) can't, e.g. a tokenizer/embedding misalignment, a degenerate
-(rank-collapsed) embedding matrix, or a silent drop in semantic quality -- and, by covering more
-than one base model, regressions specific to a particular tokenizer family (e.g. BPE vs. wordpiece).
-
-This suite requires network access and real forward passes over a full vocabulary, so it is
-intentionally excluded from `make test` and must be run explicitly with `make test-integration`.
-
-If a change intentionally alters distillation output, regenerate the baselines with
-`make test-integration-update` and review the JSON diff before committing it.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -29,7 +12,7 @@ from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model2vec.distill import distill_from_model
 from model2vec.model import StaticModel
-from tests.integration._distill_metrics import (
+from tests.integration.distill_metrics import (
     BASE_MODELS,
     CONFIGS,
     baseline_path_for,
@@ -123,16 +106,16 @@ def test_embedding_distribution_matches_baseline(
 
 
 @pytest.mark.parametrize("config_name", sorted(CONFIGS))
-def test_semantic_similarity_matches_baseline(
+def test_mteb_sts_scores_match_baseline(
     config_name: str, model_name: str, baseline: dict[str, Any], current_metrics: dict[str, dict[str, Any]]
 ) -> None:
-    """Guard against silently destroyed performance."""
-    expected_scores = baseline["configs"][config_name]["similarity_scores"]
-    actual_scores = current_metrics[config_name]["similarity_scores"]
-    for pair_name, expected_score in expected_scores.items():
-        actual_score = actual_scores[pair_name]
-        assert actual_score == pytest.approx(expected_score, abs=0.05), (
-            f"[{model_name}/{config_name}] similarity for '{pair_name}' drifted from baseline: "
+    """Repeated distillation must score the same on the MTEB STS tasks as the golden baseline."""
+    expected_scores = baseline["configs"][config_name]["mteb_sts_scores"]
+    actual_scores = current_metrics[config_name]["mteb_sts_scores"]
+    for task_name, expected_score in expected_scores.items():
+        actual_score = actual_scores[task_name]
+        assert actual_score == pytest.approx(expected_score, abs=0.01), (
+            f"[{model_name}/{config_name}] MTEB '{task_name}' STS score drifted from baseline: "
             f"{expected_score:.4f} -> {actual_score:.4f}"
         )
 
