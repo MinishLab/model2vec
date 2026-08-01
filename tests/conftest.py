@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Iterator, cast
 
 import numpy as np
 import pytest
@@ -63,6 +62,14 @@ def mock_tokenizermodel() -> TokenizerModel:
     return TokenizerModel.from_pretrained("tests/data/test_tokenizer")
 
 
+# TODO: Temporary fix for skeletoken 0.3.3 compatibility.
+# Once we go to >= 0.4.0 this is no longer needed
+class DumbConfig:
+    def __iter__(self) -> Iterator[tuple[str, object]]:
+        """Yield no config values."""
+        yield from []
+
+
 @pytest.fixture
 def mock_transformer(request: pytest.FixtureRequest) -> PreTrainedModel:
     """Create a mock transformer model."""
@@ -81,7 +88,7 @@ def mock_transformer(request: pytest.FixtureRequest) -> PreTrainedModel:
             self.with_pooler = with_pooler
             self.pooler_value = pooler_value
             self.input_embs = torch.nn.Embedding(vocab_size, dim)
-            self.config = SimpleNamespace()
+            self.config = DumbConfig()
 
         def to(self, device: str) -> MockPreTrainedModel:
             self.device = device
