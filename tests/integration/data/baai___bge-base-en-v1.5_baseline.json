@@ -1,0 +1,87 @@
+{
+  "base_model": "baai/bge-base-en-v1.5",
+  "configs": {
+    "custom_vocab": {
+      "embedding_dim": 32,
+      "embedding_mean": -0.00102,
+      "embedding_rank": 32,
+      "embedding_rows": 29529,
+      "embedding_std": 0.907232,
+      "first_tokens": [
+        "[PAD]",
+        "[UNK]",
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "("
+      ],
+      "full_vocab_size": 29529,
+      "last_tokens": [
+        "##\uff0d",
+        "##\uff0e",
+        "##\uff0f",
+        "##\uff1a",
+        "##\uff1f",
+        "##\uff5e",
+        "zibblorptron",
+        "quixnorfle",
+        "blorptastic",
+        "flimzycrag"
+      ],
+      "similarity_scores": {
+        "dog~astronomy": -0.059722,
+        "dog~puppy": 0.507191,
+        "happy~concrete": -0.047596,
+        "happy~joyful": 0.78852,
+        "king~bicycle": 0.226473,
+        "king~queen": 0.484422
+      },
+      "token_order_hash": "09d9aaaedc7d41b2fd1e3ffa64f16794a2cefe9ffc7faf1055ae5d49350c3060"
+    },
+    "subword": {
+      "embedding_dim": 256,
+      "embedding_mean": -0.000118,
+      "embedding_rank": 256,
+      "embedding_rows": 29525,
+      "embedding_std": 0.562719,
+      "first_tokens": [
+        "[PAD]",
+        "[UNK]",
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "("
+      ],
+      "full_vocab_size": 29525,
+      "last_tokens": [
+        "##\uff01",
+        "##\uff08",
+        "##\uff09",
+        "##\uff0c",
+        "##\uff0d",
+        "##\uff0e",
+        "##\uff0f",
+        "##\uff1a",
+        "##\uff1f",
+        "##\uff5e"
+      ],
+      "similarity_scores": {
+        "dog~astronomy": 0.043488,
+        "dog~puppy": 0.718679,
+        "happy~concrete": -0.00541,
+        "happy~joyful": 0.603683,
+        "king~bicycle": 0.103374,
+        "king~queen": 0.406895
+      },
+      "token_order_hash": "d881fab650dd73240615f87f531ff31a6135f961933ebc32c0dfdd130763e7a8"
+    }
+  }
+}

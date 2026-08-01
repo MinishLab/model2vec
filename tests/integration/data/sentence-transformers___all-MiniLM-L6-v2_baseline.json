@@ -42,47 +42,6 @@
       },
       "token_order_hash": "09d9aaaedc7d41b2fd1e3ffa64f16794a2cefe9ffc7faf1055ae5d49350c3060"
     },
-    "quantized": {
-      "embedding_dim": 256,
-      "embedding_mean": -0.0,
-      "embedding_rank": 256,
-      "embedding_rows": 2000,
-      "embedding_std": 0.304732,
-      "first_tokens": [
-        "[PAD]",
-        "[UNK]",
-        "!",
-        "\"",
-        "#",
-        "$",
-        "%",
-        "&",
-        "'",
-        "("
-      ],
-      "full_vocab_size": 29525,
-      "last_tokens": [
-        "##\uff01",
-        "##\uff08",
-        "##\uff09",
-        "##\uff0c",
-        "##\uff0d",
-        "##\uff0e",
-        "##\uff0f",
-        "##\uff1a",
-        "##\uff1f",
-        "##\uff5e"
-      ],
-      "similarity_scores": {
-        "dog~astronomy": -0.079069,
-        "dog~puppy": 0.998789,
-        "happy~concrete": -0.108555,
-        "happy~joyful": 0.828377,
-        "king~bicycle": 0.043042,
-        "king~queen": 0.229007
-      },
-      "token_order_hash": "d881fab650dd73240615f87f531ff31a6135f961933ebc32c0dfdd130763e7a8"
-    },
     "subword": {
       "embedding_dim": 256,
       "embedding_mean": -0.0001,

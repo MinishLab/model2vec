@@ -1,0 +1,87 @@
+{
+  "base_model": "Alibaba-NLP/gte-modernbert-base",
+  "configs": {
+    "custom_vocab": {
+      "embedding_dim": 32,
+      "embedding_mean": 0.000534,
+      "embedding_rank": 32,
+      "embedding_rows": 50269,
+      "embedding_std": 3.379484,
+      "first_tokens": [
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "(",
+        ")",
+        "*"
+      ],
+      "full_vocab_size": 50269,
+      "last_tokens": [
+        "\u0120quixnorfle",
+        "norfle",
+        "\u0120quix",
+        "\u0120blorptastic",
+        "ptastic",
+        "\u0120blor",
+        "\u0120flimzycrag",
+        "zycr",
+        "\u0120flim",
+        "\u0120flimzycr"
+      ],
+      "similarity_scores": {
+        "dog~astronomy": -0.336587,
+        "dog~puppy": -0.012992,
+        "happy~concrete": 0.197486,
+        "happy~joyful": 0.085868,
+        "king~bicycle": 0.135328,
+        "king~queen": 0.257917
+      },
+      "token_order_hash": "c2f9a27e98ef519d36c74cbde4ccc7ab023a23896aac6351f30c41c900daac78"
+    },
+    "subword": {
+      "embedding_dim": 256,
+      "embedding_mean": 3.1e-05,
+      "embedding_rank": 256,
+      "embedding_rows": 50254,
+      "embedding_std": 1.690459,
+      "first_tokens": [
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "(",
+        ")",
+        "*"
+      ],
+      "full_vocab_size": 50254,
+      "last_tokens": [
+        "767",
+        "itons",
+        "\u0120PIP",
+        "\u0120Tus",
+        "ibrated",
+        "\u0120fortified",
+        "ferenced",
+        "\u0120Outcomes",
+        "[UNK]",
+        "[PAD]"
+      ],
+      "similarity_scores": {
+        "dog~astronomy": -0.19247,
+        "dog~puppy": 0.069406,
+        "happy~concrete": 0.101801,
+        "happy~joyful": 0.106968,
+        "king~bicycle": 0.030125,
+        "king~queen": 0.21826
+      },
+      "token_order_hash": "c3ba2855d4683a2c49936b821bd0d7ad2f137bf090f66ee382bb85c350b4baba"
+    }
+  }
+}

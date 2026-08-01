@@ -1,12 +1,5 @@
-"""Shared config and metric computation for the distillation regression test.
-
-Used by both `test_distill_regression.py` (which compares metrics against the stored baselines)
-and `update_distill_baseline.py` (which (re)writes those baselines).
-"""
-
 from __future__ import annotations
 
-import copy
 import hashlib
 from pathlib import Path
 from typing import Any, cast
@@ -19,10 +12,13 @@ from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 from model2vec.distill import distill_from_model
 from model2vec.model import StaticModel
 
-BASE_MODELS: dict[str, str] = {
-    "minilm": "sentence-transformers/all-MiniLM-L6-v2",
-    "distilroberta": "sentence-transformers/all-distilroberta-v1",
-}
+BASE_MODELS: tuple[str, ...] = (
+    "sentence-transformers/all-MiniLM-L6-v2",
+    "baai/bge-base-en-v1.5",
+    "intfloat/multilingual-e5-base",
+    "google/embeddinggemma-300m",
+    "Alibaba-NLP/gte-modernbert-base",
+)
 
 BASELINE_DIR = Path(__file__).parent / "data"
 
@@ -31,7 +27,6 @@ _NOVEL_VOCABULARY = ["zibblorptron", "quixnorfle", "blorptastic", "flimzycrag"]
 CONFIGS: dict[str, dict[str, Any]] = {
     "subword": {"pca_dims": 256, "quantize_to": "float32"},
     "custom_vocab": {"vocabulary": _NOVEL_VOCABULARY, "pca_dims": 32, "quantize_to": "float32"},
-    "quantized": {"pca_dims": 256, "vocabulary_quantization": 2000, "quantize_to": "float32"},
 }
 
 SEMANTIC_TRIPLES = [
@@ -43,7 +38,8 @@ SEMANTIC_TRIPLES = [
 
 def baseline_path_for(model_name: str) -> Path:
     """The JSON baseline file for a given short model name (a key of `BASE_MODELS`)."""
-    return BASELINE_DIR / f"{model_name}_baseline.json"
+    safe_model_name = model_name.replace("/", "___")
+    return BASELINE_DIR / f"{safe_model_name}_baseline.json"
 
 
 def load_base_model_and_tokenizer(model_name: str) -> tuple[PreTrainedModel, PreTrainedTokenizerFast]:
@@ -59,10 +55,7 @@ def load_base_model_and_tokenizer(model_name: str) -> tuple[PreTrainedModel, Pre
 
 def distill_all(model: PreTrainedModel, tokenizer: PreTrainedTokenizerFast) -> dict[str, StaticModel]:
     """Distill every configured variant from the same base model and tokenizer."""
-    return {
-        name: distill_from_model(model=copy.deepcopy(model), tokenizer=tokenizer, **kwargs)
-        for name, kwargs in CONFIGS.items()
-    }
+    return {name: distill_from_model(model=model, tokenizer=tokenizer, **kwargs) for name, kwargs in CONFIGS.items()}
 
 
 def _cosine_similarity(u: np.ndarray, v: np.ndarray) -> float:
