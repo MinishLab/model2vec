@@ -1,6 +1,6 @@
 # Training
 
-Aside from [distillation](../../README.md#distillation), `model2vec` also supports training simple classifiers on top of static models, using [pytorch](https://pytorch.org/), [lightning](https://lightning.ai/) and [scikit-learn](https://scikit-learn.org/stable/index.html).
+Aside from [distillation](../../README.md#distillation), `model2vec` also supports training simple classifiers on top of static models, using [pytorch](https://pytorch.org/) and [scikit-learn](https://scikit-learn.org/stable/index.html).
 
 We support both single and multi-label classification, which work seamlessly based on the labels you provide.
 
@@ -53,7 +53,7 @@ print(classification_report)
 
 As you can see, we got a pretty nice 91% accuracy, with only 81 seconds of training.
 
-The training loop is handled by [`lightning`](https://pypi.org/project/lightning/). By default the training loop splits the data into a train and validation split, with 90% of the data being used for training and 10% for validation. By default, it runs with early stopping on the validation set accuracy, with a patience of 5.
+The training loop is a plain PyTorch loop (see [`model2vec/train/trainer.py`](trainer.py)). By default the training loop splits the data into a train and validation split, with 90% of the data being used for training and 10% for validation. By default, it runs with early stopping on the validation set accuracy, with a patience of 5.
 
 Note that this model is as fast as you're used to from us:
 
@@ -142,9 +142,9 @@ The core functionality of the `StaticModelForClassification` is contained in a c
 * `train_test_split`: governs the train test split before classification.
 * `prepare_dataset`: Selects the `torch.Dataset` that will be used in the `Dataloader` during training.
 * `_encode`: The encoding function used in the model.
-* `fit`: contains all the lightning-related fitting logic.
+* `fit`: contains all the fitting logic.
 
-The training of the model is done in a `lighting.LightningModule`, which can be modified but is very basic.
+The training loop itself lives in `model2vec.train.trainer.run_training_loop`, a plain torch loop that is fairly basic and easy to modify. Each task passes in its own loss function (and, for classification, a small function that computes extra validation metrics like accuracy).
 
 # Results
 

@@ -170,7 +170,7 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
     mock_trained_pipeline.eval()
     pipeline = mock_trained_pipeline.to_pipeline()
     encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
-    encoded_model = mock_trained_pipeline(mock_trained_pipeline.tokenize(["dog cat", "dog"]))[1].detach().numpy()
+    encoded_model = mock_trained_pipeline._encode(mock_trained_pipeline.tokenize(["dog cat", "dog"])).detach().numpy()
     assert np.allclose(encoded_pipeline, encoded_model)
     a = pipeline.predict(["dog cat", "dog"]).tolist()
     b = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
@@ -186,7 +186,7 @@ def test_convert_to_pipeline_similarity(mock_trained_similarity_pipeline: Static
     pipeline = mock_trained_similarity_pipeline.to_pipeline()
     encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
     encoded_model = (
-        mock_trained_similarity_pipeline(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))[1]
+        mock_trained_similarity_pipeline._encode(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))
         .detach()
         .numpy()
     )
@@ -202,7 +202,7 @@ def test_convert_to_pipeline_regression(mock_trained_similarity_pipeline: Static
     pipeline = mock_trained_similarity_pipeline.to_pipeline()
     encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
     encoded_model = (
-        mock_trained_similarity_pipeline(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))[1]
+        mock_trained_similarity_pipeline._encode(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))
         .detach()
         .numpy()
     )
