@@ -46,6 +46,14 @@ def _resolve_max_epochs(max_epochs: int | None) -> int:
     return max_epochs
 
 
+def _step_plateau_scheduler(
+    scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau, latest_val_loss: float | None
+) -> None:
+    """Step a ReduceLROnPlateau scheduler with the latest val_loss, once per epoch, if one is available yet."""
+    if latest_val_loss is not None:
+        scheduler.step(latest_val_loss)
+
+
 def resolve_device(device: str) -> torch.device:
     """Resolve a device string, with "auto" picking the best available accelerator."""
     if device != "auto":
@@ -137,11 +145,12 @@ def run_training_loop(
     current_epoch = 0
     global_step = 0
     postfix: dict[str, str] = {}
+    latest_val_loss: float | None = None
 
     def validate_and_checkpoint() -> bool:
-        nonlocal last_checkpoint
+        nonlocal last_checkpoint, latest_val_loss
         metrics = _run_validation(model, loss_function, compute_metrics, val_loader, device)
-        scheduler.step(metrics["val_loss"])
+        latest_val_loss = metrics["val_loss"]
         last_checkpoint = copy.deepcopy(model.state_dict())
         postfix.update({key: f"{value:.4f}" for key, value in metrics.items()})
         if early_stopper is None:
@@ -175,6 +184,8 @@ def run_training_loop(
                 pbar.set_postfix(postfix)
                 if should_stop and (min_epochs is None or current_epoch >= min_epochs):
                     return last_checkpoint
+
+            _step_plateau_scheduler(scheduler, latest_val_loss)
 
             if current_epoch >= max_epochs:
                 return last_checkpoint

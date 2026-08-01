@@ -480,3 +480,33 @@ def test_run_training_loop_mid_epoch_early_stop() -> None:
         compute_metrics=lambda head_out, y, loss: {"val_loss": 1.0},
     )
     assert set(state_dict) == set(model.state_dict())
+
+
+def test_run_training_loop_steps_scheduler_once_per_epoch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The LR scheduler steps once per epoch, not once per validation check."""
+    step_calls: list[float] = []
+    original_step = torch.optim.lr_scheduler.ReduceLROnPlateau.step
+
+    def counting_step(self: torch.optim.lr_scheduler.ReduceLROnPlateau, metrics: float) -> None:
+        step_calls.append(metrics)
+        original_step(self, metrics)
+
+    monkeypatch.setattr(torch.optim.lr_scheduler.ReduceLROnPlateau, "step", counting_step)
+
+    model = nn.Linear(3, 2)
+    run_training_loop(
+        model=model,
+        loss_function=nn.MSELoss(),
+        learning_rate=1e-3,
+        val_metric="val_loss",
+        early_stopping_direction="min",
+        train_loader=_make_loader(6),
+        val_loader=_make_loader(2),
+        early_stopping_patience=None,
+        min_epochs=None,
+        max_epochs=3,
+        device=resolve_device("cpu"),
+        val_check_interval=1,
+        check_val_every_epoch=None,
+    )
+    assert len(step_calls) == 3
