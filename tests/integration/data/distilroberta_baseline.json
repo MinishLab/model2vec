@@ -1,0 +1,128 @@
+{
+  "base_model": "sentence-transformers/all-distilroberta-v1",
+  "configs": {
+    "custom_vocab": {
+      "embedding_dim": 32,
+      "embedding_mean": -0.0016,
+      "embedding_rank": 32,
+      "embedding_rows": 50277,
+      "embedding_std": 1.178123,
+      "first_tokens": [
+        "<pad>",
+        "<unk>",
+        ".",
+        "\u0120the",
+        ",",
+        "\u0120to",
+        "\u0120and",
+        "\u0120of",
+        "\u0120a",
+        "\u0120in"
+      ],
+      "full_vocab_size": 50277,
+      "last_tokens": [
+        "\u0120quixnorfle",
+        "norfle",
+        "\u0120quix",
+        "\u0120blorptastic",
+        "ptastic",
+        "\u0120blor",
+        "\u0120flimzycrag",
+        "zycr",
+        "\u0120flim",
+        "\u0120flimzycr"
+      ],
+      "similarity_scores": {
+        "dog~astronomy": -0.007912,
+        "dog~puppy": 0.74848,
+        "happy~concrete": -0.281206,
+        "happy~joyful": 0.400427,
+        "king~bicycle": -0.088169,
+        "king~queen": 0.749298
+      },
+      "token_order_hash": "5d377f1ee7affee5f45e4c3e1c222b5ef8204e80e88d2864e2fa24b134ca1e1e"
+    },
+    "quantized": {
+      "embedding_dim": 256,
+      "embedding_mean": 0.0,
+      "embedding_rank": 256,
+      "embedding_rows": 2000,
+      "embedding_std": 0.516296,
+      "first_tokens": [
+        "<pad>",
+        "<unk>",
+        ".",
+        "\u0120the",
+        ",",
+        "\u0120to",
+        "\u0120and",
+        "\u0120of",
+        "\u0120a",
+        "\u0120in"
+      ],
+      "full_vocab_size": 50262,
+      "last_tokens": [
+        "<?",
+        "*=-",
+        "\u00c3\u013d\u00c3\u013d",
+        "\u0120EntityItem",
+        "EngineDebug",
+        "\u0120strutConnector",
+        "<|endoftext|>",
+        "madeupword0000",
+        "madeupword0001",
+        "madeupword0002"
+      ],
+      "similarity_scores": {
+        "dog~astronomy": 0.004173,
+        "dog~puppy": 0.998192,
+        "happy~concrete": -0.087464,
+        "happy~joyful": 0.996333,
+        "king~bicycle": 0.023292,
+        "king~queen": 0.999984
+      },
+      "token_order_hash": "82f963ecc62f9a8c203ed70e8eadc2323389b82fc70b43a0ac614f5d76b8b479"
+    },
+    "subword": {
+      "embedding_dim": 256,
+      "embedding_mean": -0.000478,
+      "embedding_rank": 256,
+      "embedding_rows": 50262,
+      "embedding_std": 0.649781,
+      "first_tokens": [
+        "<pad>",
+        "<unk>",
+        ".",
+        "\u0120the",
+        ",",
+        "\u0120to",
+        "\u0120and",
+        "\u0120of",
+        "\u0120a",
+        "\u0120in"
+      ],
+      "full_vocab_size": 50262,
+      "last_tokens": [
+        "<?",
+        "*=-",
+        "\u00c3\u013d\u00c3\u013d",
+        "\u0120EntityItem",
+        "EngineDebug",
+        "\u0120strutConnector",
+        "<|endoftext|>",
+        "madeupword0000",
+        "madeupword0001",
+        "madeupword0002"
+      ],
+      "similarity_scores": {
+        "dog~astronomy": -0.064217,
+        "dog~puppy": 0.715823,
+        "happy~concrete": -0.102525,
+        "happy~joyful": 0.505929,
+        "king~bicycle": 0.01079,
+        "king~queen": 0.542192
+      },
+      "token_order_hash": "82f963ecc62f9a8c203ed70e8eadc2323389b82fc70b43a0ac614f5d76b8b479"
+    }
+  }
+}

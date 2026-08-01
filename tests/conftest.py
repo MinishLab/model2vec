@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, cast
 
 import numpy as np
@@ -80,7 +81,7 @@ def mock_transformer(request: pytest.FixtureRequest) -> PreTrainedModel:
             self.with_pooler = with_pooler
             self.pooler_value = pooler_value
             self.input_embs = torch.nn.Embedding(vocab_size, dim)
-            self.config: dict[str, Any] = {}
+            self.config = SimpleNamespace()
 
         def to(self, device: str) -> MockPreTrainedModel:
             self.device = device
