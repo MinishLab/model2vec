@@ -66,7 +66,7 @@ def baseline(model_name: str) -> dict[str, Any]:
 @pytest.fixture(scope="module")
 def base_model_and_tokenizer(model_name: str) -> tuple[PreTrainedModel, PreTrainedTokenizerFast]:
     """Download this module's base sentence-transformer once, for reuse across every test in it."""
-    return load_base_model_and_tokenizer(BASE_MODELS[model_name])
+    return load_base_model_and_tokenizer(model_name)
 
 
 @pytest.fixture(scope="module")
