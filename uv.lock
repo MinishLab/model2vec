@@ -12,6 +12,9 @@ resolution-markers = [
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P3D"
 
+[options.exclude-newer-package]
+skeletoken = false
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -1168,7 +1171,7 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'quantization'" },
     { name = "scikit-learn", marker = "extra == 'train'" },
     { name = "setuptools", marker = "extra == 'dev'" },
-    { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.3.0,<0.5.0" },
+    { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.4.0,<0.5.0" },
     { name = "skops", marker = "extra == 'inference'" },
     { name = "skops", marker = "extra == 'train'" },
     { name = "tokenizers", specifier = ">=0.20" },

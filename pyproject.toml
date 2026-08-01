@@ -123,3 +123,4 @@ version = {attr = "model2vec.version.__version__"}
 
 [tool.uv]
 exclude-newer = "1 week"
+exclude-newer-package = { skeletoken = false }
