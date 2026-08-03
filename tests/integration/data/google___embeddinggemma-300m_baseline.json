@@ -1,0 +1,91 @@
+{
+  "base_model": "google/embeddinggemma-300m",
+  "configs": {
+    "custom_vocab": {
+      "embedding_dim": 32,
+      "embedding_mean": 0.000445,
+      "embedding_rank": 32,
+      "embedding_rows": 255746,
+      "embedding_std": 2.829036,
+      "first_tokens": [
+        "<pad>",
+        "<unk>",
+        "<0x00>",
+        "<0x01>",
+        "<0x02>",
+        "<0x03>",
+        "<0x04>",
+        "<0x05>",
+        "<0x06>",
+        "<0x07>"
+      ],
+      "full_vocab_size": 255746,
+      "last_tokens": [
+        "zibblor",
+        "quixnorfle",
+        "norfle",
+        "quix",
+        "blorptastic",
+        "blorpt",
+        "flimzycrag",
+        "flim",
+        "flimzycr",
+        "zycr"
+      ],
+      "mteb_sts_scores": {
+        "BIOSSES": 0.48233,
+        "SICK-R": 0.570594,
+        "STS12": 0.519418,
+        "STS13": 0.622716,
+        "STS14": 0.537778,
+        "STS15": 0.575234,
+        "STS16": 0.534645,
+        "STSBenchmark": 0.451954
+      },
+      "token_order_hash": "bb8f48741104cf94146b583abb11a896d6005dbf7e04403053821a12ddeecf42"
+    },
+    "subword": {
+      "embedding_dim": 256,
+      "embedding_mean": 1.4e-05,
+      "embedding_rank": 256,
+      "embedding_rows": 255732,
+      "embedding_std": 1.653758,
+      "first_tokens": [
+        "<pad>",
+        "<unk>",
+        "<0x00>",
+        "<0x01>",
+        "<0x02>",
+        "<0x03>",
+        "<0x04>",
+        "<0x05>",
+        "<0x06>",
+        "<0x07>"
+      ],
+      "full_vocab_size": 255732,
+      "last_tokens": [
+        "\ud83e\udd3d",
+        "\u13dc",
+        "\u141b",
+        "\u257e",
+        "\u25a5",
+        "\u7c59",
+        "\u8182",
+        "\u87f3",
+        "\ud44e",
+        "\ud835\udd39"
+      ],
+      "mteb_sts_scores": {
+        "BIOSSES": 0.639707,
+        "SICK-R": 0.633239,
+        "STS12": 0.566534,
+        "STS13": 0.731087,
+        "STS14": 0.647276,
+        "STS15": 0.723692,
+        "STS16": 0.644938,
+        "STSBenchmark": 0.58957
+      },
+      "token_order_hash": "cf0c61603b3c2786463e128bb975616001935355803924492e245746455ed235"
+    }
+  }
+}

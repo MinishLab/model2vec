@@ -1,0 +1,91 @@
+{
+  "base_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "configs": {
+    "custom_vocab": {
+      "embedding_dim": 32,
+      "embedding_mean": -0.000871,
+      "embedding_rank": 32,
+      "embedding_rows": 29529,
+      "embedding_std": 0.63969,
+      "first_tokens": [
+        "[PAD]",
+        "[UNK]",
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "("
+      ],
+      "full_vocab_size": 29529,
+      "last_tokens": [
+        "##\uff0d",
+        "##\uff0e",
+        "##\uff0f",
+        "##\uff1a",
+        "##\uff1f",
+        "##\uff5e",
+        "zibblorptron",
+        "quixnorfle",
+        "blorptastic",
+        "flimzycrag"
+      ],
+      "mteb_sts_scores": {
+        "BIOSSES": 0.500132,
+        "SICK-R": 0.565143,
+        "STS12": 0.594862,
+        "STS13": 0.653794,
+        "STS14": 0.596518,
+        "STS15": 0.611507,
+        "STS16": 0.569707,
+        "STSBenchmark": 0.559639
+      },
+      "token_order_hash": "09d9aaaedc7d41b2fd1e3ffa64f16794a2cefe9ffc7faf1055ae5d49350c3060"
+    },
+    "subword": {
+      "embedding_dim": 256,
+      "embedding_mean": -0.0001,
+      "embedding_rank": 256,
+      "embedding_rows": 29525,
+      "embedding_std": 0.368635,
+      "first_tokens": [
+        "[PAD]",
+        "[UNK]",
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "("
+      ],
+      "full_vocab_size": 29525,
+      "last_tokens": [
+        "##\uff01",
+        "##\uff08",
+        "##\uff09",
+        "##\uff0c",
+        "##\uff0d",
+        "##\uff0e",
+        "##\uff0f",
+        "##\uff1a",
+        "##\uff1f",
+        "##\uff5e"
+      ],
+      "mteb_sts_scores": {
+        "BIOSSES": 0.656286,
+        "SICK-R": 0.611602,
+        "STS12": 0.620365,
+        "STS13": 0.73547,
+        "STS14": 0.670425,
+        "STS15": 0.745883,
+        "STS16": 0.67784,
+        "STSBenchmark": 0.655636
+      },
+      "token_order_hash": "d881fab650dd73240615f87f531ff31a6135f961933ebc32c0dfdd130763e7a8"
+    }
+  }
+}

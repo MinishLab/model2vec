@@ -1,0 +1,91 @@
+{
+  "base_model": "baai/bge-base-en-v1.5",
+  "configs": {
+    "custom_vocab": {
+      "embedding_dim": 32,
+      "embedding_mean": -0.00102,
+      "embedding_rank": 32,
+      "embedding_rows": 29529,
+      "embedding_std": 0.907232,
+      "first_tokens": [
+        "[PAD]",
+        "[UNK]",
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "("
+      ],
+      "full_vocab_size": 29529,
+      "last_tokens": [
+        "##\uff0d",
+        "##\uff0e",
+        "##\uff0f",
+        "##\uff1a",
+        "##\uff1f",
+        "##\uff5e",
+        "zibblorptron",
+        "quixnorfle",
+        "blorptastic",
+        "flimzycrag"
+      ],
+      "mteb_sts_scores": {
+        "BIOSSES": 0.60555,
+        "SICK-R": 0.574381,
+        "STS12": 0.615507,
+        "STS13": 0.715354,
+        "STS14": 0.638972,
+        "STS15": 0.682774,
+        "STS16": 0.623959,
+        "STSBenchmark": 0.611345
+      },
+      "token_order_hash": "09d9aaaedc7d41b2fd1e3ffa64f16794a2cefe9ffc7faf1055ae5d49350c3060"
+    },
+    "subword": {
+      "embedding_dim": 256,
+      "embedding_mean": -0.000118,
+      "embedding_rank": 256,
+      "embedding_rows": 29525,
+      "embedding_std": 0.562719,
+      "first_tokens": [
+        "[PAD]",
+        "[UNK]",
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%",
+        "&",
+        "'",
+        "("
+      ],
+      "full_vocab_size": 29525,
+      "last_tokens": [
+        "##\uff01",
+        "##\uff08",
+        "##\uff09",
+        "##\uff0c",
+        "##\uff0d",
+        "##\uff0e",
+        "##\uff0f",
+        "##\uff1a",
+        "##\uff1f",
+        "##\uff5e"
+      ],
+      "mteb_sts_scores": {
+        "BIOSSES": 0.742493,
+        "SICK-R": 0.633061,
+        "STS12": 0.634404,
+        "STS13": 0.755101,
+        "STS14": 0.697645,
+        "STS15": 0.777181,
+        "STS16": 0.708249,
+        "STSBenchmark": 0.694604
+      },
+      "token_order_hash": "d881fab650dd73240615f87f531ff31a6135f961933ebc32c0dfdd130763e7a8"
+    }
+  }
+}
