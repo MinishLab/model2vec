@@ -41,7 +41,7 @@ def clean_and_create_vocabulary(
     tokens_to_add: list[str] = []
     added_tokens_to_add: list[str] = []
     for token in vocabulary_to_add:
-        preprocessed = preprocessor.preprocess(token)
+        preprocessed = preprocessor.preprocess(token, had_word_prefix=True)
         if len(preprocessed) < 1:
             logger.warning(f"Token '{token}' was empty after preprocessing.")
             n_empty += 1
@@ -69,9 +69,13 @@ def clean_and_create_vocabulary(
         seen_tokens.add(token)
         tokens_to_add.append(token)
 
+    # Remove the post processor.
     model.post_processor = None
+    # Remove all prior added tokens
     model = model.prune_added_tokens()
-    model = model.add_tokens_to_vocabulary(tokens_to_add, preprocess_tokens=True)
+    # Preprocess tokens is False because tokens are already preprocessed.
+    model = model.add_tokens_to_vocabulary(tokens_to_add, preprocess_tokens=False)
+    # The tokens are not special tokens, not single words, and already normalized.
     model = model.add_addedtokens(added_tokens_to_add, is_special=False, single_word=False, normalized=True)
 
     n_multiword = len(added_tokens_to_add)

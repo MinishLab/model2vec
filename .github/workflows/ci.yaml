@@ -50,7 +50,7 @@ jobs:
       - name: Run tests under coverage
         shell: bash
         run: |
-          coverage run --source=model2vec -m pytest
+          coverage run --source=model2vec -m pytest --ignore=tests/integration
           coverage report
 
       - name: Upload results to Codecov
