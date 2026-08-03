@@ -74,15 +74,18 @@ def _run_validation(
     device: torch.device,
 ) -> dict[str, float]:
     model.eval()
-    accumulated: dict[str, list[float]] = defaultdict(list)
+    weighted_sums: dict[str, float] = defaultdict(float)
+    total_samples = 0
     for x, y in val_loader:
         x, y = x.to(device), y.to(device)
+        batch_size = x.shape[0]
         head_out = model(x)
         loss = loss_function(head_out, y)
         for key, value in compute_metrics(head_out, y, loss).items():
-            accumulated[key].append(value)
+            weighted_sums[key] += value * batch_size
+        total_samples += batch_size
     model.train()
-    return {key: sum(values) / len(values) for key, values in accumulated.items()}
+    return {key: total / total_samples for key, total in weighted_sums.items()}
 
 
 def run_training_loop(
