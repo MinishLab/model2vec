@@ -6,6 +6,8 @@ import pytest
 import torch
 from skeletoken import TokenizerModel
 from tokenizers import Tokenizer
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 from transformers import AutoTokenizer
 
 from model2vec.model import StaticModel
@@ -14,7 +16,8 @@ from model2vec.train.base import BaseFinetuneable
 from model2vec.train.dataset import TextDataset
 from model2vec.train.regression import StaticModelForRegression
 from model2vec.train.similarity import StaticModelForSimilarity
-from model2vec.train.utils import get_probable_pad_token_id, logit, train_test_split
+from model2vec.train.trainer import _resolve_max_epochs, resolve_device, run_training_loop
+from model2vec.train.utils import get_probable_pad_token_id, logit, seed_everything, train_test_split
 
 
 @pytest.mark.parametrize("n_layers", [0, 1, 2, 3])
@@ -170,7 +173,7 @@ def test_convert_to_pipeline(mock_trained_pipeline: StaticModelForClassification
     mock_trained_pipeline.eval()
     pipeline = mock_trained_pipeline.to_pipeline()
     encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
-    encoded_model = mock_trained_pipeline(mock_trained_pipeline.tokenize(["dog cat", "dog"]))[1].detach().numpy()
+    encoded_model = mock_trained_pipeline._encode(mock_trained_pipeline.tokenize(["dog cat", "dog"])).detach().numpy()
     assert np.allclose(encoded_pipeline, encoded_model)
     a = pipeline.predict(["dog cat", "dog"]).tolist()
     b = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
@@ -186,7 +189,7 @@ def test_convert_to_pipeline_similarity(mock_trained_similarity_pipeline: Static
     pipeline = mock_trained_similarity_pipeline.to_pipeline()
     encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
     encoded_model = (
-        mock_trained_similarity_pipeline(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))[1]
+        mock_trained_similarity_pipeline._encode(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))
         .detach()
         .numpy()
     )
@@ -196,19 +199,19 @@ def test_convert_to_pipeline_similarity(mock_trained_similarity_pipeline: Static
     assert np.allclose(p1, p2, rtol=1e-5, atol=1e-4)
 
 
-def test_convert_to_pipeline_regression(mock_trained_similarity_pipeline: StaticModelForRegression) -> None:
+def test_convert_to_pipeline_regression(mock_trained_regression_pipeline: StaticModelForRegression) -> None:
     """Convert a model to a pipeline."""
-    mock_trained_similarity_pipeline.eval()
-    pipeline = mock_trained_similarity_pipeline.to_pipeline()
+    mock_trained_regression_pipeline.eval()
+    pipeline = mock_trained_regression_pipeline.to_pipeline()
     encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
     encoded_model = (
-        mock_trained_similarity_pipeline(mock_trained_similarity_pipeline.tokenize(["dog cat", "dog"]))[1]
+        mock_trained_regression_pipeline._encode(mock_trained_regression_pipeline.tokenize(["dog cat", "dog"]))
         .detach()
         .numpy()
     )
     assert np.allclose(encoded_pipeline, encoded_model)
     p1 = pipeline.predict(["dog cat", "dog"])
-    p2 = mock_trained_similarity_pipeline.encode(["dog cat", "dog"])
+    p2 = mock_trained_regression_pipeline.encode(["dog cat", "dog"])
     assert np.allclose(p1, p2, rtol=1e-5, atol=1e-4)
 
 
@@ -394,3 +397,116 @@ def test_logit() -> None:
     """Test on random data."""
     x = torch.arange(10).float() / 10
     assert torch.allclose(logit(torch.sigmoid(x)), x, atol=1e-6)
+
+
+def test_seed_everything_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    """seed_everything also seeds CUDA RNGs when CUDA is available."""
+    seeded_with: list[int] = []
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "manual_seed_all", seeded_with.append)
+    seed_everything(123)
+    assert seeded_with and all(seed == 123 for seed in seeded_with)
+
+
+def test_resolve_max_epochs() -> None:
+    """None and negative max_epochs resolve to a large cap; positive values pass through unchanged."""
+    assert _resolve_max_epochs(None) > 0
+    assert _resolve_max_epochs(-1) > 0
+    assert _resolve_max_epochs(3) == 3
+
+
+def test_resolve_device_explicit() -> None:
+    """An explicit device string is returned unchanged."""
+    assert resolve_device("cpu") == torch.device("cpu")
+
+
+def test_resolve_device_auto_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    """'auto' picks cuda when available."""
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    assert resolve_device("auto") == torch.device("cuda")
+
+
+def test_resolve_device_auto_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """'auto' falls back to cpu when no accelerator is available."""
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    assert resolve_device("auto") == torch.device("cpu")
+
+
+def _make_loader(n: int, in_dim: int = 3, out_dim: int = 2) -> DataLoader:
+    x = torch.randn(n, in_dim)
+    y = torch.randn(n, out_dim)
+    return DataLoader(TensorDataset(x, y), batch_size=1)
+
+
+def test_run_training_loop_without_early_stopping_stops_at_max_epochs() -> None:
+    """With early stopping disabled, training runs until max_epochs and stops there."""
+    model = nn.Linear(3, 2)
+    state_dict = run_training_loop(
+        model=model,
+        loss_function=nn.MSELoss(),
+        learning_rate=1e-3,
+        val_metric="val_loss",
+        early_stopping_direction="min",
+        train_loader=_make_loader(4),
+        val_loader=_make_loader(2),
+        early_stopping_patience=None,
+        min_epochs=None,
+        max_epochs=1,
+        device=resolve_device("cpu"),
+        val_check_interval=None,
+        check_val_every_epoch=1,
+    )
+    assert set(state_dict) == set(model.state_dict())
+
+
+def test_run_training_loop_mid_epoch_early_stop() -> None:
+    """Early stopping can trigger mid-epoch via val_check_interval, not just at epoch boundaries."""
+    model = nn.Linear(3, 2)
+    state_dict = run_training_loop(
+        model=model,
+        loss_function=nn.MSELoss(),
+        learning_rate=1e-3,
+        val_metric="val_loss",
+        early_stopping_direction="min",
+        train_loader=_make_loader(4),
+        val_loader=_make_loader(2),
+        early_stopping_patience=1,
+        min_epochs=None,
+        max_epochs=None,
+        device=resolve_device("cpu"),
+        val_check_interval=1,
+        check_val_every_epoch=None,
+        compute_metrics=lambda head_out, y, loss: {"val_loss": 1.0},
+    )
+    assert set(state_dict) == set(model.state_dict())
+
+
+def test_run_training_loop_steps_scheduler_once_per_epoch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The LR scheduler steps once per epoch, not once per validation check."""
+    step_calls: list[float] = []
+    original_step = torch.optim.lr_scheduler.ReduceLROnPlateau.step
+
+    def counting_step(self: torch.optim.lr_scheduler.ReduceLROnPlateau, metrics: float) -> None:
+        step_calls.append(metrics)
+        original_step(self, metrics)
+
+    monkeypatch.setattr(torch.optim.lr_scheduler.ReduceLROnPlateau, "step", counting_step)
+
+    model = nn.Linear(3, 2)
+    run_training_loop(
+        model=model,
+        loss_function=nn.MSELoss(),
+        learning_rate=1e-3,
+        val_metric="val_loss",
+        early_stopping_direction="min",
+        train_loader=_make_loader(6),
+        val_loader=_make_loader(2),
+        early_stopping_patience=None,
+        min_epochs=None,
+        max_epochs=3,
+        device=resolve_device("cpu"),
+        val_check_interval=1,
+        check_val_every_epoch=None,
+    )
+    assert len(step_calls) == 3

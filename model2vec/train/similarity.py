@@ -3,21 +3,32 @@ from __future__ import annotations
 import logging
 from typing import TypeVar
 
-import lightning as pl
 import torch
 from tokenizers import Tokenizer
+from torch import nn
 
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.lightning_modules import SimilarityLightningModule
-from model2vec.train.utils import DEFAULT_RANDOM_SEED
+from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
 logger = logging.getLogger(__name__)
+
+
+class CosineLoss(nn.Module):
+    def __call__(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Returns the cosine distance loss function."""
+        x = torch.nn.functional.normalize(x, dim=1)
+        y = torch.nn.functional.normalize(y, dim=1)
+        return (1 - torch.sum(x * y, dim=1)).mean()
 
 
 class StaticModelForSimilarity(BaseFinetuneable):
     val_metric = "val_loss"
     early_stopping_direction = "min"
-    _lightning_class = SimilarityLightningModule
+
+    @staticmethod
+    def _build_loss_function() -> nn.Module:
+        """Construct the loss function used to train this model."""
+        return CosineLoss()
 
     def __init__(
         self,
@@ -67,7 +78,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
     ) -> _T:
         """Fit a model.
 
-        This function creates a Lightning Trainer object and fits the model to the data.
+        This function trains the model with a plain torch training loop.
         We use early stopping. After training, the weights of the best model are loaded back into the model.
 
         This function seeds everything with a seed of 42, so the results are reproducible.
@@ -93,7 +104,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param random_seed: The random seed to use. Defaults to 42.
         :return: The fitted model.
         """
-        pl.seed_everything(random_seed)
+        seed_everything(random_seed)
         logger.info("Re-initializing model.")
 
         train_dataset, val_dataset = self._create_datasets(X, y, X_val, y_val, test_size)
@@ -102,10 +113,9 @@ class StaticModelForSimilarity(BaseFinetuneable):
         self.out_dim = train_dataset.targets.shape[1]
         self._initialize()
 
-        c = self._lightning_class(self, learning_rate=learning_rate)
-
         self._train(
-            module=c,
+            loss_function=self._build_loss_function(),
+            learning_rate=learning_rate,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             batch_size=batch_size,

@@ -61,7 +61,7 @@ dev = [
 distill = ["torch", "transformers<5.4.0", "scikit-learn", "skeletoken>=0.4.0,<0.5.0"]
 onnx = ["onnx", "torch"]
 # train also installs inference
-train = ["torch", "lightning", "scikit-learn", "skops"]
+train = ["torch", "scikit-learn", "skops"]
 inference = ["scikit-learn", "skops"]
 quantization = ["scikit-learn"]
 integration = ["mteb"]

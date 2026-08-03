@@ -5,20 +5,33 @@ from collections import Counter
 from itertools import chain
 from typing import Any, Literal, cast
 
-import lightning as pl
 import numpy as np
 import torch
+from sklearn.metrics import jaccard_score
 from tokenizers import Tokenizer
+from torch import nn
 from tqdm import trange
 
 from model2vec.inference import evaluate_single_or_multi_label
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.lightning_modules import ClassifierLightningModule, MultiLabelClassifierLightningModule
-from model2vec.train.utils import DEFAULT_RANDOM_SEED
+from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
 logger = logging.getLogger(__name__)
 
 LabelType = list[str] | list[list[str]]
+
+
+def _classifier_metrics(head_out: torch.Tensor, y: torch.Tensor, loss: torch.Tensor) -> dict[str, float]:
+    """Validation metrics for single-label classification: loss and accuracy."""
+    accuracy = (head_out.argmax(dim=1) == y).float().mean()
+    return {"val_loss": loss.item(), "val_accuracy": accuracy.item()}
+
+
+def _multilabel_classifier_metrics(head_out: torch.Tensor, y: torch.Tensor, loss: torch.Tensor) -> dict[str, float]:
+    """Validation metrics for multi-label classification: loss and Jaccard accuracy."""
+    preds = (torch.sigmoid(head_out) > 0.5).float()
+    accuracy = cast(float, jaccard_score(y.cpu(), preds.cpu(), average="samples"))
+    return {"val_loss": loss.item(), "val_accuracy": accuracy}
 
 
 class StaticModelForClassification(BaseFinetuneable):
@@ -127,7 +140,7 @@ class StaticModelForClassification(BaseFinetuneable):
     ) -> StaticModelForClassification:
         """Fit a model.
 
-        This function creates a Lightning Trainer object and fits the model to the data.
+        This function trains the model with a plain torch training loop.
         It supports both single-label and multi-label classification.
         We use early stopping. After training, the weights of the best model are loaded back into the model.
 
@@ -157,7 +170,7 @@ class StaticModelForClassification(BaseFinetuneable):
         :return: The fitted model.
         :raises ValueError: If either X_val or y_val are provided, but not both.
         """
-        pl.seed_everything(random_seed)
+        seed_everything(random_seed)
         logger.info("Re-initializing model.")
 
         # Determine whether the task is multilabel based on the type of y.
@@ -177,16 +190,16 @@ class StaticModelForClassification(BaseFinetuneable):
         train_dataset, val_dataset = self._create_datasets(X, y, X_val, y_val, test_size)
         batch_size = self._determine_batch_size(batch_size, len(train_dataset))
 
-        c: pl.LightningModule
         if self.multilabel:
-            c = MultiLabelClassifierLightningModule(
-                self, learning_rate=learning_rate, class_weight=resolved_class_weight
-            )
+            loss_function: nn.Module = nn.BCEWithLogitsLoss(pos_weight=resolved_class_weight)
+            compute_metrics = _multilabel_classifier_metrics
         else:
-            c = ClassifierLightningModule(self, learning_rate=learning_rate, class_weight=resolved_class_weight)
+            loss_function = nn.CrossEntropyLoss(weight=resolved_class_weight)
+            compute_metrics = _classifier_metrics
 
         self._train(
-            module=c,
+            loss_function=loss_function,
+            learning_rate=learning_rate,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             batch_size=batch_size,
@@ -195,6 +208,7 @@ class StaticModelForClassification(BaseFinetuneable):
             max_epochs=max_epochs,
             device=device,
             validation_steps=validation_steps,
+            compute_metrics=compute_metrics,
         )
 
         return self

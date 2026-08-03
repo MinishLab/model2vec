@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
-import warnings
+import random
 from collections import Counter
-from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -93,24 +92,13 @@ def train_test_split(
     return sklearn_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=stratify_data)  # type: ignore
 
 
-def suppress_lightning_warnings(func: Callable) -> Callable:
-    """Suppresses annoying lightning warnings."""
-
-    @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Callable:
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", module="lightning")
-            return func(*args, **kwargs)
-
-    return wrapper
-
-
-class TipFilter(logging.Filter):
-    """logging filter to suppress tip messages from lightning."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Filter out tip messages from lightning."""
-        return "💡 Tip" not in record.getMessage()
+def seed_everything(seed: int) -> None:
+    """Seed python, numpy, and torch random number generators."""
+    random.seed(seed)
+    np.random.seed(seed)  # noqa: NPY002
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def logit(x: torch.Tensor) -> torch.Tensor:

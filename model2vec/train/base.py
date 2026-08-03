@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from tempfile import TemporaryDirectory
 from typing import Any, TypeVar
 
-import lightning.pytorch as pl
 import numpy as np
 import torch
-from lightning.pytorch import LightningModule
-from lightning.pytorch.callbacks import Callback, EarlyStopping
 from tokenizers import Encoding, Tokenizer
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
@@ -18,10 +14,10 @@ from tqdm import trange
 from model2vec.inference import StaticModelPipeline
 from model2vec.model import PathLike, StaticModel
 from model2vec.train.dataset import TextDataset
+from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
     get_probable_pad_token_id,
     logit,
-    suppress_lightning_warnings,
     to_pipeline,
     train_test_split,
 )
@@ -222,10 +218,9 @@ class BaseFinetuneable(nn.Module):
 
         return np.concatenate(pred, axis=0)
 
-    def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         """Forward pass through the mean, and a classifier layer after."""
-        encoded = self._encode(input_ids)
-        return self.head(encoded), encoded
+        return self.head(self._encode(input_ids))
 
     def tokenize(self, texts: list[str], max_length: int | None = 512) -> torch.Tensor:
         """Tokenize a bunch of strings into a single padded 2D tensor.
@@ -308,10 +303,10 @@ class BaseFinetuneable(nn.Module):
 
         return train_texts, validation_texts, train_labels, validation_labels
 
-    @suppress_lightning_warnings
     def _train(
         self,
-        module: LightningModule,
+        loss_function: nn.Module,
+        learning_rate: float,
         train_dataset: TextDataset,
         val_dataset: TextDataset,
         batch_size: int,
@@ -320,48 +315,31 @@ class BaseFinetuneable(nn.Module):
         max_epochs: int | None,
         device: str,
         validation_steps: int | None,
+        compute_metrics: MetricsFn = default_metrics,
     ) -> None:
-        callbacks: list[Callback] = []
-        if early_stopping_patience is not None:
-            callback = EarlyStopping(
-                monitor=self.val_metric,
-                mode=self.early_stopping_direction,
-                patience=early_stopping_patience,
-                min_delta=0.001,
-            )
-            callbacks.append(callback)
-
         val_check_interval, check_val_every_epoch = self._determine_val_check_interval(
             validation_steps, len(train_dataset), batch_size
         )
 
-        with TemporaryDirectory() as tempdir:
-            trainer = pl.Trainer(
-                min_epochs=min_epochs,
-                max_epochs=max_epochs,
-                callbacks=callbacks,
-                val_check_interval=val_check_interval,
-                check_val_every_n_epoch=check_val_every_epoch,
-                accelerator=device,
-                default_root_dir=tempdir,
-            )
-
-            trainer.fit(
-                module,
-                train_dataloaders=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size),
-                val_dataloaders=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size),
-            )
-            best_model_path = trainer.checkpoint_callback.best_model_path  # type: ignore
-            best_model_weights = torch.load(best_model_path, weights_only=True)
-
-        state_dict = {}
-        for weight_name, weight in best_model_weights["state_dict"].items():
-            if "loss_function" in weight_name:
-                # Skip the loss function class weight as its not needed for predictions
-                continue
-            state_dict[weight_name.removeprefix("model.")] = weight
+        state_dict = run_training_loop(
+            model=self,
+            loss_function=loss_function,
+            learning_rate=learning_rate,
+            val_metric=self.val_metric,
+            early_stopping_direction=self.early_stopping_direction,
+            train_loader=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size),
+            val_loader=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size),
+            early_stopping_patience=early_stopping_patience,
+            min_epochs=min_epochs,
+            max_epochs=max_epochs,
+            device=resolve_device(device),
+            val_check_interval=val_check_interval,
+            check_val_every_epoch=check_val_every_epoch,
+            compute_metrics=compute_metrics,
+        )
 
         self.load_state_dict(state_dict)
+        self.to("cpu")
         self.eval()
 
     @staticmethod
