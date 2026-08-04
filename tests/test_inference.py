@@ -1,10 +1,14 @@
 import os
+from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
+import numpy as np
 import pytest
 
-from model2vec.inference.mlp import Activation
+from model2vec.inference.mlp import Activation, Layer, MLPHead
 from model2vec.inference.model import StaticModelPipeline
+from model2vec.model import StaticModel
 
 
 def test_init_predict(mock_inference_pipeline: StaticModelPipeline) -> None:
@@ -95,3 +99,51 @@ def test_roundtrip_save_file_gone(mock_inference_pipeline: StaticModelPipeline) 
         os.unlink(os.path.join(temp_dir, "head.safetensors"))
         with pytest.raises(FileNotFoundError):
             StaticModelPipeline.from_pretrained(temp_dir)
+
+
+def test_mlp_head_predict_proba_identity() -> None:
+    """Test that predict_proba returns the raw logits for an identity activation."""
+    layer = Layer(weight=np.eye(3), bias=np.zeros(3))
+    head = MLPHead(layers=[layer], activation=Activation.IDENTITY)
+
+    X = np.array([[1.0, -2.0, 3.0]])
+    proba = head.predict_proba(X)
+
+    assert np.allclose(proba, X)
+
+
+def test_load_pipeline_from_hub(mock_inference_pipeline: StaticModelPipeline) -> None:
+    """Test that a repo id that isn't a local path is downloaded from the hub."""
+    with TemporaryDirectory() as temp_dir:
+        mock_inference_pipeline.save_pretrained(temp_dir)
+        downloaded_model = StaticModel.from_pretrained(temp_dir)
+        head_path = os.path.join(temp_dir, "head.safetensors")
+
+        with (
+            patch("model2vec.inference.model.huggingface_hub.hf_hub_download", return_value=head_path) as mock_download,
+            patch("model2vec.inference.model.StaticModel.from_pretrained", return_value=downloaded_model),
+        ):
+            loaded = StaticModelPipeline.from_pretrained("fake/repo-id")
+
+        mock_download.assert_called_once_with("fake/repo-id", "head.safetensors", token=None)
+        assert loaded.predict(["dog"]).tolist() == mock_inference_pipeline.predict(["dog"]).tolist()
+
+
+def test_push_to_hub(mock_inference_pipeline: StaticModelPipeline) -> None:
+    """Test that push_to_hub saves the pipeline to a temp folder before pushing it to the hub."""
+    captured: dict[str, object] = {}
+
+    def _capture_upload(
+        folder_path: Path, subfolder: str | None, repo_id: str, private: bool, token: str | None
+    ) -> None:
+        captured["files"] = sorted(p.name for p in folder_path.iterdir())
+        captured["repo_id"] = repo_id
+        captured["private"] = private
+
+    with patch("model2vec.persistence.push_folder_to_hub", side_effect=_capture_upload) as mock_push:
+        mock_inference_pipeline.push_to_hub("fake/repo-id", private=True)
+
+    mock_push.assert_called_once()
+    assert captured["repo_id"] == "fake/repo-id"
+    assert captured["private"] is True
+    assert "head.safetensors" in captured["files"]  # type: ignore[operator]
