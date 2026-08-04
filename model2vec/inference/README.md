@@ -1,6 +1,6 @@
 # Inference
 
-This subpackage mainly contains helper functions for inference with trained models that have been exported to `scikit-learn` compatible pipelines.
+This subpackage mainly contains helper functions for inference with trained classifier/projector heads, persisted as a `safetensors` file and `config.json` metadata.
 
 If you're looking for information on how to train a model, see [here](../train/README.md).
 

@@ -1,17 +1,16 @@
 import os
-import re
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
 
 import pytest
 
-from model2vec.inference.model import HeadType, StaticModelPipeline
+from model2vec.inference.mlp import Activation
+from model2vec.inference.model import StaticModelPipeline
 
 
 def test_init_predict(mock_inference_pipeline: StaticModelPipeline) -> None:
     """Test successful init and predict with StaticModelPipeline."""
     target: list[str] | list[list[str]]
-    if mock_inference_pipeline.classifier_type == HeadType.MULTILABEL:
+    if mock_inference_pipeline.head.activation == Activation.SIGMOID:
         assert mock_inference_pipeline.classes_ is not None
         if isinstance(mock_inference_pipeline.classes_[0], str):
             target = [["a", "b"]]
@@ -29,7 +28,7 @@ def test_init_predict(mock_inference_pipeline: StaticModelPipeline) -> None:
 
 def test_init_predict_projector(mock_inference_pipeline_projector: StaticModelPipeline) -> None:
     """Test successful init and predict with StaticModelPipeline."""
-    assert mock_inference_pipeline_projector.classifier_type == HeadType.PROJECTOR
+    assert mock_inference_pipeline_projector.head.activation == Activation.IDENTITY
     assert mock_inference_pipeline_projector.classes_ is None
     with pytest.raises(ValueError):
         mock_inference_pipeline_projector.predict_proba(["dog"])
@@ -49,7 +48,7 @@ def test_init_predict_proba(mock_inference_pipeline: StaticModelPipeline) -> Non
 def test_init_evaluate(mock_inference_pipeline: StaticModelPipeline) -> None:
     """Test successful init and evaluate with StaticModelPipeline."""
     target: list[str] | list[list[str]]
-    if mock_inference_pipeline.classifier_type == HeadType.MULTILABEL:
+    if mock_inference_pipeline.head.activation == Activation.SIGMOID:
         assert mock_inference_pipeline.classes_ is not None
         if isinstance(mock_inference_pipeline.classes_[0], str):
             target = [["a", "b"]]
@@ -70,7 +69,7 @@ def test_roundtrip_save(mock_inference_pipeline: StaticModelPipeline) -> None:
         mock_inference_pipeline.save_pretrained(temp_dir)
         loaded = StaticModelPipeline.from_pretrained(temp_dir)
         target: list[str] | list[list[str]]
-        if mock_inference_pipeline.classifier_type == HeadType.MULTILABEL:
+        if mock_inference_pipeline.head.activation == Activation.SIGMOID:
             assert mock_inference_pipeline.classes_ is not None
             if isinstance(mock_inference_pipeline.classes_[0], str):
                 target = [["a", "b"]]
@@ -88,20 +87,11 @@ def test_roundtrip_save(mock_inference_pipeline: StaticModelPipeline) -> None:
         assert loaded.predict_proba(["dog"]).argmax(1).tolist() == [1]
 
 
-@patch("model2vec.inference.model._DEFAULT_TRUST_PATTERN", re.compile("torch"))
-def test_roundtrip_save_mock_trust_pattern(mock_inference_pipeline: StaticModelPipeline) -> None:
-    """Test saving and loading the pipeline."""
-    with TemporaryDirectory() as temp_dir:
-        mock_inference_pipeline.save_pretrained(temp_dir)
-        with pytest.raises(ValueError):
-            StaticModelPipeline.from_pretrained(temp_dir)
-
-
 def test_roundtrip_save_file_gone(mock_inference_pipeline: StaticModelPipeline) -> None:
     """Test saving and loading the pipeline."""
     with TemporaryDirectory() as temp_dir:
         mock_inference_pipeline.save_pretrained(temp_dir)
-        # Rename the file to abc.pipeline, so that it looks like it was downloaded from the hub
-        os.unlink(os.path.join(temp_dir, "pipeline.skops"))
+        # Remove the head file, so that it looks like it was never saved
+        os.unlink(os.path.join(temp_dir, "head.safetensors"))
         with pytest.raises(FileNotFoundError):
             StaticModelPipeline.from_pretrained(temp_dir)
