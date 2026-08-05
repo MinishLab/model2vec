@@ -16,3 +16,16 @@ label = classifier.predict("Attitudes towards cattle in the Alps: a study in let
 ```
 
 This should just work.
+
+# Migrating a legacy pipeline
+
+Pipelines saved by older versions of model2vec store the head as a `scikit-learn`/`skops` `pipeline.skops` file instead of `head.safetensors`. `from_pretrained` still loads these automatically, falling back to the legacy format and emitting a warning. This requires `scikit-learn` and `skops` to be installed.
+
+To upgrade a pipeline to the current format (and silence the warning), convert it with `convert_legacy_pipeline` and save the result:
+
+```python
+from model2vec.inference import convert_legacy_pipeline
+
+pipeline = convert_legacy_pipeline("path/or/repo-id/of/legacy/pipeline")
+pipeline.save_pretrained("path/to/save")
+```

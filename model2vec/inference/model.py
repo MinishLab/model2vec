@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -7,6 +8,7 @@ from typing import Any, TypeVar, cast
 
 import huggingface_hub
 import numpy as np
+from huggingface_hub.errors import EntryNotFoundError
 from safetensors.numpy import load_file, save_file
 
 from model2vec.inference.evaluation import evaluate_single_or_multi_label
@@ -15,6 +17,7 @@ from model2vec.model import PathLike, StaticModel
 from model2vec.persistence import save_pretrained
 
 _DEFAULT_HEAD_FILENAME = "head.safetensors"
+_LEGACY_HEAD_FILENAME = "pipeline.skops"
 
 LabelType = TypeVar("LabelType", list[str], list[list[str]])
 
@@ -33,6 +36,10 @@ class StaticModelPipeline:
         """Load a StaticModel from a local path or huggingface hub path.
 
         NOTE: if you load a private model from the huggingface hub, you need to pass a token.
+
+        NOTE: if the pipeline was saved by an older version of model2vec (a `pipeline.skops` file instead of
+        `head.safetensors`), this falls back to loading it as a legacy pipeline and emits a warning. This requires
+        `scikit-learn` and `skops` to be installed. See `convert_legacy_pipeline` to upgrade it to the current format.
 
         :param path: The path to the folder containing the pipeline, or a repository on the Hugging Face Hub
         :param token: The token to use to download the pipeline from the hub.
@@ -193,16 +200,23 @@ def _load_pipeline(folder_or_repo_path: PathLike, token: str | None = None) -> t
         be able to load the pipeline from a local folder, public repository, or a repository that you have access to
         because you are logged in.
     :return: The encoder model and the loaded head
-    :raises FileNotFoundError: If the head file does not exist in the folder.
+    :raises FileNotFoundError: If neither the head file nor a legacy pipeline file exist in the folder.
     """
     folder_or_repo_path = Path(folder_or_repo_path)
     head_path: str | Path
     if folder_or_repo_path.exists():
         head_path = folder_or_repo_path / _DEFAULT_HEAD_FILENAME
         if not head_path.exists():
-            raise FileNotFoundError(f"Head file does not exist in {folder_or_repo_path}")
+            if not (folder_or_repo_path / _LEGACY_HEAD_FILENAME).exists():
+                raise FileNotFoundError(f"Head file does not exist in {folder_or_repo_path}")
+            return _load_legacy_pipeline(folder_or_repo_path, token)
     else:
-        head_path = huggingface_hub.hf_hub_download(folder_or_repo_path.as_posix(), _DEFAULT_HEAD_FILENAME, token=token)
+        try:
+            head_path = huggingface_hub.hf_hub_download(
+                folder_or_repo_path.as_posix(), _DEFAULT_HEAD_FILENAME, token=token
+            )
+        except EntryNotFoundError:
+            return _load_legacy_pipeline(folder_or_repo_path, token)
 
     model = StaticModel.from_pretrained(folder_or_repo_path)
 
@@ -223,6 +237,87 @@ def _load_pipeline(folder_or_repo_path: PathLike, token: str | None = None) -> t
     )
 
     return model, head
+
+
+def _load_legacy_pipeline(folder_or_repo_path: PathLike, token: str | None) -> tuple[StaticModel, MLPHead]:
+    """Load a model and its head from a legacy (scikit-learn/skops based) pipeline."""
+    _legacy_warning = (
+        f"No `{_DEFAULT_HEAD_FILENAME}` found for {folder_or_repo_path}; falling back to the legacy "
+        f"`{_LEGACY_HEAD_FILENAME}` format. Save this pipeline with `save_pretrained` to upgrade it."
+    )
+    warnings.warn(_legacy_warning, stacklevel=3)
+    converted = convert_legacy_pipeline(folder_or_repo_path, token=token)
+    return converted.model, converted.head
+
+
+def convert_legacy_pipeline(
+    path: PathLike, token: str | None = None, trust_remote_code: bool = False
+) -> StaticModelPipeline:
+    """Convert an old-style (scikit-learn/skops based) `StaticModelPipeline` to the current, safetensors-based format.
+
+    This requires `scikit-learn` and `skops` to be installed.
+
+    :param path: The path to a local folder, or a repository on the Hugging Face Hub, containing a legacy pipeline
+        saved as a `pipeline.skops` file.
+    :param token: The token to use to download the pipeline from the hub.
+    :param trust_remote_code: Whether to trust the remote code in the skops file. If this is False, we will only
+        load components coming from `sklearn`.
+    :return: A new-style `StaticModelPipeline`, which can be persisted with `save_pretrained` or `push_to_hub`.
+    :raises ImportError: If `scikit-learn` and `skops` are not installed.
+    :raises FileNotFoundError: If the pipeline file does not exist in the folder.
+    :raises ValueError: If an untrusted type is found in the pipeline, or the head is not an MLP with a supported
+        hidden activation.
+    """
+    import re
+
+    try:
+        import skops.io
+        from sklearn.neural_network import MLPClassifier, MLPRegressor
+        from sklearn.pipeline import Pipeline
+    except ImportError as exc:
+        raise ImportError("Converting a legacy pipeline requires `scikit-learn` and `skops`. ") from exc
+
+    folder_or_repo_path = Path(path)
+    legacy_head_path: str | Path
+    if folder_or_repo_path.exists():
+        legacy_head_path = folder_or_repo_path / _LEGACY_HEAD_FILENAME
+        if not legacy_head_path.exists():
+            raise FileNotFoundError(f"Pipeline file does not exist in {folder_or_repo_path}")
+    else:
+        legacy_head_path = huggingface_hub.hf_hub_download(
+            folder_or_repo_path.as_posix(), _LEGACY_HEAD_FILENAME, token=token
+        )
+
+    model = StaticModel.from_pretrained(folder_or_repo_path)
+    model.embedding = np.nan_to_num(model.embedding)
+
+    untrusted_types = skops.io.get_untrusted_types(file=legacy_head_path)
+    if not trust_remote_code:
+        trusted_pattern = re.compile(r"sklearn\..+")
+        for untrusted_type in untrusted_types:
+            if not trusted_pattern.match(untrusted_type):
+                raise ValueError(f"Untrusted type {untrusted_type}.")
+    legacy_pipeline = cast(Pipeline, skops.io.load(legacy_head_path, trusted=untrusted_types))
+    legacy_head = legacy_pipeline[-1]
+
+    if isinstance(legacy_head, MLPRegressor):
+        activation = Activation.IDENTITY
+        classes = None
+    elif isinstance(legacy_head, MLPClassifier):
+        activation = Activation.SIGMOID if legacy_head.out_activation_ == "logistic" else Activation.SOFTMAX
+        classes = np.asarray(legacy_head.classes_)
+    else:
+        raise ValueError(f"Unsupported legacy head type: {type(legacy_head)}. Expected MLPClassifier or MLPRegressor.")
+
+    if legacy_head.activation != "relu":
+        raise ValueError(f"Unsupported hidden activation: {legacy_head.activation}. Only `relu` is supported.")
+
+    layers = [
+        Layer(weight=coef.T, bias=intercept) for coef, intercept in zip(legacy_head.coefs_, legacy_head.intercepts_)
+    ]
+    head = MLPHead(layers=layers, activation=activation, classes=classes)
+
+    return StaticModelPipeline(model, head)
 
 
 def _save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> None:
