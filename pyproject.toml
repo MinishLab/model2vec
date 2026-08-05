@@ -63,6 +63,7 @@ onnx = ["onnx", "torch"]
 train = ["torch"]
 quantization = ["scikit-learn"]
 integration = ["mteb"]
+tests = ["scikit-learn", "skops"]
 
 [project.urls]
 "Homepage" = "https://github.com/MinishLab"
