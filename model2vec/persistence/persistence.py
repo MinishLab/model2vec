@@ -46,11 +46,11 @@ def save_pretrained(
     folder_path = folder_path / subfolder if subfolder else folder_path
     folder_path.mkdir(exist_ok=True, parents=True)
 
-    model_weights = {"embeddings": embeddings}
+    model_weights = {"embeddings": np.ascontiguousarray(embeddings)}
     if weights is not None:
-        model_weights["weights"] = weights
+        model_weights["weights"] = np.ascontiguousarray(weights)
     if mapping is not None:
-        model_weights["mapping"] = mapping
+        model_weights["mapping"] = np.ascontiguousarray(mapping)
 
     save_file(model_weights, folder_path / "model.safetensors")
     tokenizer.save(str(folder_path / "tokenizer.json"), pretty=False)

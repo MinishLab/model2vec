@@ -266,7 +266,7 @@ class BaseFinetuneable(nn.Module):
         )
 
     def to_pipeline(self) -> StaticModelPipeline:
-        """Convert the model to an sklearn pipeline."""
+        """Convert the model to an inference pipeline."""
         return to_pipeline(self)
 
     def _determine_batch_size(self, batch_size: int | None, train_length: int) -> int:

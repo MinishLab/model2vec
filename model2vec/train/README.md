@@ -1,6 +1,6 @@
 # Training
 
-Aside from [distillation](../../README.md#distillation), `model2vec` also supports training simple classifiers on top of static models, using [pytorch](https://pytorch.org/) and [scikit-learn](https://scikit-learn.org/stable/index.html).
+Aside from [distillation](../../README.md#distillation), `model2vec` also supports training simple classifiers on top of static models, using [pytorch](https://pytorch.org/).
 
 We support both single and multi-label classification, which work seamlessly based on the labels you provide.
 
@@ -91,28 +91,22 @@ classifier.fit(ds["train"]["text"], ds["train"]["labels"])
 Then, we can evaluate the classifier:
 
 ```python
-from sklearn import metrics
-from sklearn.preprocessing import MultiLabelBinarizer
-
 classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["labels"], threshold=0.3)
 print(classification_report)
-# Accuracy: 0.410
-# Precision: 0.527
-# Recall: 0.410
-# F1: 0.439
+# {'accuracy': 0.41, 'macro avg': {'precision': 0.527, 'recall': 0.41, 'f1-score': 0.439, ...}, ...}
 ```
 
 The scores are competitive with the popular [roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions) model, while our model is orders of magnitude faster.
 
 # Persistence
 
-You can turn a classifier into a scikit-learn compatible pipeline, as follows:
+You can turn a classifier into a lightweight inference pipeline, as follows:
 
 ```python
 pipeline = classifier.to_pipeline()
 ```
 
-This pipeline object can be persisted using standard pickle-based methods, such as [joblib](https://joblib.readthedocs.io/en/stable/). This makes it easy to use your model in inferene pipelines (no installing torch!), although `joblib` and `pickle` should not be used to share models outside of your organization.
+This strips away `torch`: the head's weights are plain `numpy` arrays, so the resulting `StaticModelPipeline` can be used for inference without installing `torch`.
 
 If you want to persist your pipeline to the Hugging Face hub, you can use our built-in functions:
 

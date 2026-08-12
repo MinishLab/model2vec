@@ -2,18 +2,16 @@ from __future__ import annotations
 
 import logging
 import random
-from collections import Counter
-from typing import TYPE_CHECKING
+from collections import Counter, defaultdict
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
-from sklearn.model_selection import train_test_split as sklearn_split
-from sklearn.neural_network import MLPClassifier, MLPRegressor
-from sklearn.pipeline import make_pipeline
 from tokenizers import Tokenizer
 from torch import nn
 
 from model2vec.inference import StaticModelPipeline
+from model2vec.inference.mlp import Activation, Layer, MLPHead
 
 if TYPE_CHECKING:
     from model2vec.train.base import BaseFinetuneable
@@ -41,34 +39,34 @@ def get_probable_pad_token_id(tokenizer: Tokenizer) -> int:
 
 
 def to_pipeline(model: "BaseFinetuneable | StaticModelForClassification") -> StaticModelPipeline:
-    """Convert the model to an sklearn pipeline."""
+    """Convert the model to an inference pipeline."""
     from model2vec.train.classifier import StaticModelForClassification
 
     static_model = model.to_static_model()
 
-    random_state = np.random.RandomState(42)
-    n_items = model.out_dim
-    X = random_state.randn(n_items, static_model.dim)
-    y: np.ndarray | list[str]
+    layers = [
+        Layer(weight=module.weight.detach().cpu().numpy(), bias=module.bias.detach().cpu().numpy())
+        for module in model.head
+        if isinstance(module, nn.Linear)
+    ]
+
+    classes: np.ndarray | None = None
     if isinstance(model, StaticModelForClassification):
-        y = model.classes_
-        mlp_head = MLPClassifier(hidden_layer_sizes=(model.hidden_dim,) * model.n_layers)
-        activation = "logistic" if model.multilabel else "softmax"
+        classes = np.asarray(model.classes_)
+        activation = Activation.SIGMOID if model.multilabel else Activation.SOFTMAX
     else:
-        y = random_state.randn(n_items, n_items)
-        mlp_head = MLPRegressor(hidden_layer_sizes=(model.hidden_dim,) * model.n_layers)
-        activation = "identity"
-    mlp_head.fit(X, y)
+        activation = Activation.IDENTITY
 
-    for index, layer in enumerate([module for module in model.head if isinstance(module, nn.Linear)]):
-        mlp_head.coefs_[index] = layer.weight.detach().cpu().numpy().T
-        mlp_head.intercepts_[index] = layer.bias.detach().cpu().numpy()
+    head = MLPHead(layers=layers, activation=activation, classes=classes)
 
-    mlp_head.n_outputs_ = model.out_dim
-    mlp_head.out_activation_ = activation
-    pipeline = make_pipeline(mlp_head)
+    return StaticModelPipeline(static_model, head)
 
-    return StaticModelPipeline(static_model, pipeline)
+
+def _index(sequence: Any, indices: list[int]) -> Any:
+    """Index a sequence with a list of indices, preserving the container type."""
+    if isinstance(sequence, list):
+        return [sequence[index] for index in indices]
+    return sequence[indices]
 
 
 def train_test_split(
@@ -81,15 +79,46 @@ def train_test_split(
     For single-label classification, stratification is attempted (if possible).
     For multilabel classification, a random split is performed.
     """
-    stratify_data = None
-    if isinstance(y, list) and isinstance(y[0], (str, int)):
+    rng = random.Random(DEFAULT_RANDOM_SEED)
+    n = len(X)
+
+    stratify = isinstance(y, list) and len(y) > 0 and isinstance(y[0], (str, int))
+    if stratify:
         label_counts = Counter(y)
         if min(label_counts.values()) < 2:
             logger.info("Some classes have fewer than 2 samples. Stratification is disabled.")
-            stratify_data = None
-        else:
-            stratify_data = y
-    return sklearn_split(X, y, test_size=test_size, random_state=42, shuffle=True, stratify=stratify_data)  # type: ignore
+            stratify = False
+
+    train_indices: list[int]
+    test_indices: list[int]
+    if stratify:
+        indices_by_label: dict[Any, list[int]] = defaultdict(list)
+        for index, label in enumerate(y):
+            indices_by_label[label].append(index)
+
+        train_indices = []
+        test_indices = []
+        for indices in indices_by_label.values():
+            indices = indices[:]
+            rng.shuffle(indices)
+            n_test = min(max(1, round(len(indices) * test_size)), len(indices) - 1)
+            test_indices.extend(indices[:n_test])
+            train_indices.extend(indices[n_test:])
+        rng.shuffle(train_indices)
+        rng.shuffle(test_indices)
+    else:
+        indices = list(range(n))
+        rng.shuffle(indices)
+        n_test = min(max(1, round(n * test_size)), max(n - 1, 0))
+        test_indices = indices[:n_test]
+        train_indices = indices[n_test:]
+
+    X_train = _index(X, train_indices)
+    X_test = _index(X, test_indices)
+    y_train = _index(y, train_indices)
+    y_test = _index(y, test_indices)
+
+    return X_train, X_test, y_train, y_test
 
 
 def seed_everything(seed: int) -> None:

@@ -1,74 +1,58 @@
 from __future__ import annotations
 
-import re
+import warnings
 from collections.abc import Sequence
-from enum import Enum
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import huggingface_hub
 import numpy as np
-import skops.io
-from sklearn.metrics import classification_report
-from sklearn.neural_network import MLPClassifier, MLPRegressor
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MultiLabelBinarizer
+from huggingface_hub.errors import EntryNotFoundError
+from safetensors.numpy import load_file, save_file
 
+from model2vec.inference.evaluation import evaluate_single_or_multi_label
+from model2vec.inference.mlp import Activation, Layer, MLPHead
 from model2vec.model import PathLike, StaticModel
-from model2vec.modelcards import create_model_card
+from model2vec.persistence import save_pretrained
 
-_DEFAULT_TRUST_PATTERN = re.compile(r"sklearn\..+")
-_DEFAULT_MODEL_FILENAME = "pipeline.skops"
+_DEFAULT_HEAD_FILENAME = "head.safetensors"
+_LEGACY_HEAD_FILENAME = "pipeline.skops"
 
 LabelType = TypeVar("LabelType", list[str], list[list[str]])
 
 
-class HeadType(str, Enum):
-    CLASSIFIER = "classifier"
-    PROJECTOR = "projector"
-    MULTILABEL = "multilabel"
-
-
 class StaticModelPipeline:
-    def __init__(self, model: StaticModel, head: Pipeline) -> None:
+    def __init__(self, model: StaticModel, head: MLPHead) -> None:
         """Create a pipeline with a StaticModel encoder."""
         self.model = model
         self.head = head
-
-        last_head = self.head[-1]
-        self.classes_: None | np.ndarray = None
-        if isinstance(last_head, MLPRegressor):
-            self.classifier_type = HeadType.PROJECTOR
-        elif isinstance(last_head, MLPClassifier):
-            activation = last_head.out_activation_
-            self.classifier_type = HeadType.MULTILABEL if activation == "logistic" else HeadType.CLASSIFIER
-            self.classes_ = self.head.classes_
-        else:
-            # Default to classifier: the assumption is the user is unlikely to use multilabel here.
-            self.classifier_type = HeadType.CLASSIFIER
+        self.classes_ = head.classes_
 
     @classmethod
     def from_pretrained(
-        cls: type[StaticModelPipeline], path: PathLike, token: str | None = None, trust_remote_code: bool = False
+        cls: type[StaticModelPipeline], path: PathLike, token: str | None = None
     ) -> StaticModelPipeline:
         """Load a StaticModel from a local path or huggingface hub path.
 
         NOTE: if you load a private model from the huggingface hub, you need to pass a token.
 
+        NOTE: if the pipeline was saved by an older version of model2vec (a `pipeline.skops` file instead of
+        `head.safetensors`), this falls back to loading it as a legacy pipeline and emits a warning. This requires
+        `scikit-learn` and `skops` to be installed. See `convert_legacy_pipeline` to upgrade it to the current format.
+
         :param path: The path to the folder containing the pipeline, or a repository on the Hugging Face Hub
         :param token: The token to use to download the pipeline from the hub.
-        :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming from `sklearn`.
         :return: The loaded pipeline.
         """
-        model, head = _load_pipeline(path, token, trust_remote_code)
+        model, head = _load_pipeline(path, token)
         model.embedding = np.nan_to_num(model.embedding)
 
         return cls(model, head)
 
     def save_pretrained(self, path: str) -> None:
         """Save the model to a folder."""
-        save_pipeline(self, path)
+        _save_pipeline(self, path)
 
     def push_to_hub(
         self, repo_id: str, subfolder: str | None = None, token: str | None = None, private: bool = False
@@ -83,8 +67,7 @@ class StaticModelPipeline:
         from model2vec.persistence import push_folder_to_hub
 
         with TemporaryDirectory() as temp_dir:
-            save_pipeline(self, temp_dir)
-            self.model.save_pretrained(temp_dir)
+            _save_pipeline(self, temp_dir)
             push_folder_to_hub(Path(temp_dir), subfolder, repo_id, private, token)
 
     def _encode_and_coerce_to_2d(
@@ -140,15 +123,17 @@ class StaticModelPipeline:
             multiprocessing_threshold=multiprocessing_threshold,
         )
 
-        if self.classifier_type == HeadType.MULTILABEL:
+        if self.head.activation == Activation.IDENTITY:
+            return self.head.predict_regression(encoded)
+
+        if self.head.activation == Activation.SIGMOID:
             assert self.classes_ is not None
-            out_labels = []
             proba = self.head.predict_proba(encoded)
-            for vector in proba:
-                out_labels.append(self.classes_[vector > threshold])
+            out_labels = [self.classes_[vector > threshold] for vector in proba]
             return np.asarray(out_labels, dtype=object)
 
-        return self.head.predict(encoded)
+        assert self.classes_ is not None
+        return self.classes_[self.head.predict_index(encoded)]
 
     def predict_proba(
         self,
@@ -170,7 +155,7 @@ class StaticModelPipeline:
         :return: The predicted labels or probabilities.
         :raises ValueError: If the classifier type is projector.
         """
-        if self.classifier_type == HeadType.PROJECTOR:
+        if self.head.activation == Activation.IDENTITY:
             raise ValueError("You are using evaluate on a projector model. This is not supported.")
         encoded = self._encode_and_coerce_to_2d(
             X,
@@ -184,34 +169,29 @@ class StaticModelPipeline:
         return self.head.predict_proba(encoded)
 
     def evaluate(
-        self, X: Sequence[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
-    ) -> str | dict[str, dict[str, float]]:
-        """Evaluate the classifier on a given dataset using scikit-learn's classification report.
+        self, X: Sequence[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5
+    ) -> dict[str, dict[str, float]]:
+        """Evaluate the classifier on a given dataset using a classification report.
 
         :param X: The texts to predict on.
         :param y: The ground truth labels.
         :param batch_size: The batch size.
         :param threshold: The threshold for multilabel classification.
-        :param output_dict: Whether to output the classification report as a dictionary.
-        :return: A classification report.
+        :return: A classification report, as a dictionary.
         :raises ValueError: If the classifier type is projector.
         """
-        if self.classifier_type == HeadType.PROJECTOR:
+        if self.head.activation == Activation.IDENTITY:
             raise ValueError("You are using evaluate on a projector model. This is not supported.")
         predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
-        report = evaluate_single_or_multi_label(predictions=predictions, y=y, output_dict=output_dict)
-
-        return report
+        return evaluate_single_or_multi_label(predictions=predictions, y=y)
 
 
-def _load_pipeline(
-    folder_or_repo_path: PathLike, token: str | None = None, trust_remote_code: bool = False
-) -> tuple[StaticModel, Pipeline]:
-    """Load a model and an sklearn pipeline.
+def _load_pipeline(folder_or_repo_path: PathLike, token: str | None = None) -> tuple[StaticModel, MLPHead]:
+    """Load a model and its head.
 
     This assumes the following files are present in the repo:
-    - `pipeline.skops`: The head of the pipeline.
-    - `config.json`: The configuration of the model.
+    - `head.safetensors`: The weights of the head.
+    - `config.json`: The configuration of the model, including the head's metadata.
     - `model.safetensors`: The weights of the model.
     - `tokenizer.json`: The tokenizer of the model.
 
@@ -219,40 +199,128 @@ def _load_pipeline(
     :param token: The token to use to download the pipeline from the hub. If this is None, you will only
         be able to load the pipeline from a local folder, public repository, or a repository that you have access to
         because you are logged in.
-    :param trust_remote_code: Whether to trust the remote code. If this is False,
-        we will only load components coming from `sklearn`. If this is True, we will load all components.
-        If you set this to True, you are responsible for whatever happens.
     :return: The encoder model and the loaded head
-    :raises FileNotFoundError: If the pipeline file does not exist in the folder.
-    :raises ValueError: If an untrusted type is found in the pipeline, and `trust_remote_code` is False.
+    :raises FileNotFoundError: If neither the head file nor a legacy pipeline file exist in the folder.
     """
     folder_or_repo_path = Path(folder_or_repo_path)
-    model_filename = _DEFAULT_MODEL_FILENAME
-    head_pipeline_path: str | Path
+    head_path: str | Path
     if folder_or_repo_path.exists():
-        head_pipeline_path = folder_or_repo_path / model_filename
-        if not head_pipeline_path.exists():
-            raise FileNotFoundError(f"Pipeline file does not exist in {folder_or_repo_path}")
+        head_path = folder_or_repo_path / _DEFAULT_HEAD_FILENAME
+        if not head_path.exists():
+            if not (folder_or_repo_path / _LEGACY_HEAD_FILENAME).exists():
+                raise FileNotFoundError(f"Head file does not exist in {folder_or_repo_path}")
+            return _load_legacy_pipeline(folder_or_repo_path, token)
     else:
-        head_pipeline_path = huggingface_hub.hf_hub_download(
-            folder_or_repo_path.as_posix(), model_filename, token=token
-        )
+        try:
+            head_path = huggingface_hub.hf_hub_download(
+                folder_or_repo_path.as_posix(), _DEFAULT_HEAD_FILENAME, token=token
+            )
+        except EntryNotFoundError:
+            return _load_legacy_pipeline(folder_or_repo_path, token)
 
     model = StaticModel.from_pretrained(folder_or_repo_path)
 
-    unknown_types = skops.io.get_untrusted_types(file=head_pipeline_path)
-    # If the user does not trust remote code, we should check that the unknown types are trusted.
-    # By default, we trust everything coming from scikit-learn.
-    if not trust_remote_code:
-        for t in unknown_types:
-            if not _DEFAULT_TRUST_PATTERN.match(t):
-                raise ValueError(f"Untrusted type {t}.")
-    head = skops.io.load(head_pipeline_path, trusted=unknown_types)
+    head_config = cast(dict[str, Any], model.config.get("head_config", {}))
+    activation = Activation(head_config.get("activation", Activation.IDENTITY.value))
+    n_layers = head_config.get("n_layers", 0)
+    classes = head_config.get("classes")
+
+    tensors = load_file(head_path)
+    layers = [
+        Layer(weight=tensors[f"head.{index}.weight"], bias=tensors[f"head.{index}.bias"]) for index in range(n_layers)
+    ]
+
+    head = MLPHead(
+        layers=layers,
+        activation=activation,
+        classes=np.asarray(classes) if classes is not None else None,
+    )
 
     return model, head
 
 
-def save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> None:
+def _load_legacy_pipeline(folder_or_repo_path: PathLike, token: str | None) -> tuple[StaticModel, MLPHead]:
+    """Load a model and its head from a legacy (scikit-learn/skops based) pipeline."""
+    _legacy_warning = (
+        f"No `{_DEFAULT_HEAD_FILENAME}` found for {folder_or_repo_path}; falling back to the legacy "
+        f"`{_LEGACY_HEAD_FILENAME}` format. Save this pipeline with `save_pretrained` to upgrade it."
+    )
+    warnings.warn(_legacy_warning, stacklevel=3)
+    converted = convert_legacy_pipeline(folder_or_repo_path, token=token)
+    return converted.model, converted.head
+
+
+def convert_legacy_pipeline(
+    path: PathLike, token: str | None = None, trust_remote_code: bool = False
+) -> StaticModelPipeline:
+    """Convert an old-style (scikit-learn/skops based) `StaticModelPipeline` to the current, safetensors-based format.
+
+    This requires `scikit-learn` and `skops` to be installed.
+
+    :param path: The path to a local folder, or a repository on the Hugging Face Hub, containing a legacy pipeline
+        saved as a `pipeline.skops` file.
+    :param token: The token to use to download the pipeline from the hub.
+    :param trust_remote_code: Whether to trust the remote code in the skops file. If this is False, we will only
+        load components coming from `sklearn`.
+    :return: A new-style `StaticModelPipeline`, which can be persisted with `save_pretrained` or `push_to_hub`.
+    :raises ImportError: If `scikit-learn` and `skops` are not installed.
+    :raises FileNotFoundError: If the pipeline file does not exist in the folder.
+    :raises ValueError: If an untrusted type is found in the pipeline, or the head is not an MLP with a supported
+        hidden activation.
+    """
+    import re
+
+    try:
+        import skops.io
+        from sklearn.neural_network import MLPClassifier, MLPRegressor
+        from sklearn.pipeline import Pipeline
+    except ImportError as exc:
+        raise ImportError("Converting a legacy pipeline requires `scikit-learn` and `skops`. ") from exc
+
+    folder_or_repo_path = Path(path)
+    legacy_head_path: str | Path
+    if folder_or_repo_path.exists():
+        legacy_head_path = folder_or_repo_path / _LEGACY_HEAD_FILENAME
+        if not legacy_head_path.exists():
+            raise FileNotFoundError(f"Pipeline file does not exist in {folder_or_repo_path}")
+    else:
+        legacy_head_path = huggingface_hub.hf_hub_download(
+            folder_or_repo_path.as_posix(), _LEGACY_HEAD_FILENAME, token=token
+        )
+
+    model = StaticModel.from_pretrained(folder_or_repo_path)
+    model.embedding = np.nan_to_num(model.embedding)
+
+    untrusted_types = skops.io.get_untrusted_types(file=legacy_head_path)
+    if not trust_remote_code:
+        trusted_pattern = re.compile(r"sklearn\..+")
+        for untrusted_type in untrusted_types:
+            if not trusted_pattern.match(untrusted_type):
+                raise ValueError(f"Untrusted type {untrusted_type}.")
+    legacy_pipeline = cast(Pipeline, skops.io.load(legacy_head_path, trusted=untrusted_types))
+    legacy_head = legacy_pipeline[-1]
+
+    if isinstance(legacy_head, MLPRegressor):
+        activation = Activation.IDENTITY
+        classes = None
+    elif isinstance(legacy_head, MLPClassifier):
+        activation = Activation.SIGMOID if legacy_head.out_activation_ == "logistic" else Activation.SOFTMAX
+        classes = np.asarray(legacy_head.classes_)
+    else:
+        raise ValueError(f"Unsupported legacy head type: {type(legacy_head)}. Expected MLPClassifier or MLPRegressor.")
+
+    if legacy_head.activation != "relu":
+        raise ValueError(f"Unsupported hidden activation: {legacy_head.activation}. Only `relu` is supported.")
+
+    layers = [
+        Layer(weight=coef.T, bias=intercept) for coef, intercept in zip(legacy_head.coefs_, legacy_head.intercepts_)
+    ]
+    head = MLPHead(layers=layers, activation=activation, classes=classes)
+
+    return StaticModelPipeline(model, head)
+
+
+def _save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> None:
     """Save a pipeline to a folder.
 
     :param pipeline: The pipeline to save.
@@ -260,61 +328,38 @@ def save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> Non
     """
     folder_path = Path(folder_path)
     folder_path.mkdir(parents=True, exist_ok=True)
-    model_filename = _DEFAULT_MODEL_FILENAME
-    head_pipeline_path = folder_path / model_filename
-    skops.io.dump(pipeline.head, head_pipeline_path)
-    pipeline.model.save_pretrained(folder_path)
-    base_model_name = pipeline.model.base_model_name
+
+    head = pipeline.head
+    tensors: dict[str, np.ndarray] = {}
+    for index, layer in enumerate(head.layers):
+        tensors[f"head.{index}.weight"] = layer.weight
+        tensors[f"head.{index}.bias"] = layer.bias
+    save_file(tensors, folder_path / _DEFAULT_HEAD_FILENAME)
+
+    model = pipeline.model
+    config = dict(model.config)
+    config["head_config"] = {
+        "n_layers": len(head.layers),
+        "activation": head.activation.value,
+        "classes": np.asarray(pipeline.classes_).tolist() if pipeline.classes_ is not None else None,
+    }
+
+    base_model_name = model.base_model_name
     if isinstance(base_model_name, list) and base_model_name:
         name = base_model_name[0]
     elif isinstance(base_model_name, str):
         name = base_model_name
     else:
         name = "unknown"
-    create_model_card(
-        folder_path,
+
+    save_pretrained(
+        folder_path=folder_path,
+        embeddings=model.embedding,
+        tokenizer=model.tokenizer,
+        config=config,
         base_model_name=name,
-        language=pipeline.model.language,
+        language=model.language,
+        weights=model.weights,
+        mapping=model.token_mapping,
         template_path="classifier_template.md",
     )
-
-
-def _is_multi_label_shaped(y: list[int] | list[str] | list[list[int]] | list[list[str]]) -> bool:
-    """Check if the labels are in a multi-label shape."""
-    return isinstance(y, (list, tuple)) and len(y) > 0 and isinstance(y[0], (list, tuple, set))
-
-
-def evaluate_single_or_multi_label(
-    predictions: np.ndarray,
-    y: list[int] | list[str] | list[list[int]] | list[list[str]],
-    output_dict: bool = False,
-) -> str | dict[str, dict[str, float]]:
-    """Evaluate the classifier on a given dataset using scikit-learn's classification report.
-
-    :param predictions: The predictions.
-    :param y: The ground truth labels.
-    :param output_dict: Whether to output the classification report as a dictionary.
-    :return: A classification report.
-    """
-    if _is_multi_label_shaped(y):
-        # Cast because the type checker doesn't understand that y is a list of lists.
-        y = cast(list[list[str]] | list[list[int]], y)
-        classes = sorted(set([label for labels in y for label in labels]))
-        mlb = MultiLabelBinarizer(classes=classes)
-        y_transformed = mlb.fit_transform(y)
-        predictions_transformed = mlb.transform(predictions)
-    else:
-        if all(isinstance(label, (str, int)) for label in y):
-            y = cast(list[str] | list[int], y)
-            classes = sorted(set(y))
-        y_transformed = np.array(y)
-        predictions_transformed = np.array(predictions)
-
-    report = classification_report(
-        y_transformed,
-        predictions_transformed,
-        output_dict=output_dict,
-        zero_division=0,  # type: ignore  # incorrect type in sklearn.
-    )
-
-    return report

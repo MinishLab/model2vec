@@ -7,7 +7,6 @@ from typing import Any, Literal, cast
 
 import numpy as np
 import torch
-from sklearn.metrics import jaccard_score
 from tokenizers import Tokenizer
 from torch import nn
 from tqdm import trange
@@ -27,10 +26,18 @@ def _classifier_metrics(head_out: torch.Tensor, y: torch.Tensor, loss: torch.Ten
     return {"val_loss": loss.item(), "val_accuracy": accuracy.item()}
 
 
+def _compute_accuracy(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
+    """Compute the multilabel accuracy score, averaged over samples."""
+    intersection = (y_true * y_pred).sum(dim=1)
+    union = ((y_true + y_pred) > 0).float().sum(dim=1)
+    scores = torch.where(union > 0, intersection / union, torch.zeros_like(union))
+    return scores.mean().item()
+
+
 def _multilabel_classifier_metrics(head_out: torch.Tensor, y: torch.Tensor, loss: torch.Tensor) -> dict[str, float]:
     """Validation metrics for multi-label classification: loss and Jaccard accuracy."""
     preds = (torch.sigmoid(head_out) > 0.5).float()
-    accuracy = cast(float, jaccard_score(y.cpu(), preds.cpu(), average="samples"))
+    accuracy = _compute_accuracy(y, preds)
     return {"val_loss": loss.item(), "val_accuracy": accuracy}
 
 
@@ -233,22 +240,19 @@ class StaticModelForClassification(BaseFinetuneable):
         return torch.tensor(weights, dtype=torch.float32)
 
     def evaluate(
-        self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5, output_dict: bool = False
-    ) -> str | dict[str, dict[str, float]]:
-        """Evaluate the classifier on a given dataset using scikit-learn's classification report.
+        self, X: list[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5
+    ) -> dict[str, dict[str, float]]:
+        """Evaluate the classifier on a given dataset.
 
         :param X: The texts to predict on.
         :param y: The ground truth labels.
         :param batch_size: The batch size.
         :param threshold: The threshold for multilabel classification.
-        :param output_dict: Whether to output the classification report as a dictionary.
-        :return: A classification report.
+        :return: A classification report, as a dictionary.
         """
         self.eval()
         predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
-        report = evaluate_single_or_multi_label(predictions=predictions, y=y, output_dict=output_dict)
-
-        return report
+        return evaluate_single_or_multi_label(predictions=predictions, y=y)
 
     def _initialize_on_labels(self, y: LabelType) -> None:
         """Sets the output dimensionality, the classes, and initializes the head.

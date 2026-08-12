@@ -3,7 +3,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+import numpy as np
 import pytest
+from tokenizers import Tokenizer
 
 from model2vec.model import StaticModel
 from model2vec.persistence.hf import maybe_get_cached_model_path
@@ -62,6 +64,36 @@ def test_subfolder_loading(mock_static_model: StaticModel) -> None:
             StaticModel.from_pretrained(dir_name)
         model = StaticModel.from_pretrained(dir_name, subfolder="subfolder")
         assert isinstance(model, StaticModel)
+
+
+def test_save_pretrained_non_contiguous_embeddings(tmp_path: Path, mock_tokenizer: Tokenizer) -> None:
+    """Non-contiguous embeddings (e.g. Fortran-ordered) must round-trip exactly through safetensors."""
+    vectors = np.asfortranarray(np.random.RandomState(0).randn(len(mock_tokenizer.get_vocab()), 8))
+    assert not vectors.flags["C_CONTIGUOUS"]
+
+    model = StaticModel(vectors=vectors, tokenizer=mock_tokenizer)
+    save_path = tmp_path / "saved_model"
+    model.save_pretrained(save_path)
+
+    loaded_model = StaticModel.from_pretrained(save_path)
+    np.testing.assert_array_equal(loaded_model.embedding, vectors)
+
+
+def test_save_pretrained_with_weights_and_mapping(tmp_path: Path, mock_tokenizer: Tokenizer) -> None:
+    """save_pretrained must persist weights and a token mapping when present."""
+    n_tokens = len(mock_tokenizer.get_vocab())
+    vectors = np.random.RandomState(0).randn(3, 4)
+    weights = np.random.RandomState(1).randn(n_tokens)
+    mapping = np.array([0, 1, 2, 0, 1][:n_tokens])
+
+    model = StaticModel(vectors=vectors, tokenizer=mock_tokenizer, weights=weights, token_mapping=mapping)
+    save_path = tmp_path / "saved_model"
+    model.save_pretrained(save_path)
+
+    loaded_model = StaticModel.from_pretrained(save_path)
+    np.testing.assert_array_equal(loaded_model.embedding, vectors)
+    np.testing.assert_array_equal(loaded_model.weights, weights)
+    np.testing.assert_array_equal(loaded_model.token_mapping, mapping)
 
 
 def test_maybe_get_cached_model_path() -> None:
