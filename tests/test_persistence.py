@@ -79,6 +79,23 @@ def test_save_pretrained_non_contiguous_embeddings(tmp_path: Path, mock_tokenize
     np.testing.assert_array_equal(loaded_model.embedding, vectors)
 
 
+def test_save_pretrained_with_weights_and_mapping(tmp_path: Path, mock_tokenizer: Tokenizer) -> None:
+    """save_pretrained must persist weights and a token mapping when present."""
+    n_tokens = len(mock_tokenizer.get_vocab())
+    vectors = np.random.RandomState(0).randn(3, 4)
+    weights = np.random.RandomState(1).randn(n_tokens)
+    mapping = np.array([0, 1, 2, 0, 1][:n_tokens])
+
+    model = StaticModel(vectors=vectors, tokenizer=mock_tokenizer, weights=weights, token_mapping=mapping)
+    save_path = tmp_path / "saved_model"
+    model.save_pretrained(save_path)
+
+    loaded_model = StaticModel.from_pretrained(save_path)
+    np.testing.assert_array_equal(loaded_model.embedding, vectors)
+    np.testing.assert_array_equal(loaded_model.weights, weights)
+    np.testing.assert_array_equal(loaded_model.token_mapping, mapping)
+
+
 def test_maybe_get_cached_model_path() -> None:
     """Test cached model path."""
     model_id = "t/t"
