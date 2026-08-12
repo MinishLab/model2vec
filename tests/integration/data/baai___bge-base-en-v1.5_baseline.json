@@ -3,10 +3,10 @@
   "configs": {
     "custom_vocab": {
       "embedding_dim": 32,
-      "embedding_mean": -0.00102,
+      "embedding_mean": 0.001558,
       "embedding_rank": 32,
       "embedding_rows": 29529,
-      "embedding_std": 0.907232,
+      "embedding_std": 0.907231,
       "first_tokens": [
         "[PAD]",
         "[UNK]",
@@ -36,9 +36,9 @@
         "BIOSSES": 0.60555,
         "SICK-R": 0.574381,
         "STS12": 0.615507,
-        "STS13": 0.715354,
+        "STS13": 0.715355,
         "STS14": 0.638972,
-        "STS15": 0.682774,
+        "STS15": 0.682773,
         "STS16": 0.623959,
         "STSBenchmark": 0.611345
       },
@@ -46,7 +46,7 @@
     },
     "subword": {
       "embedding_dim": 256,
-      "embedding_mean": -0.000118,
+      "embedding_mean": 0.000471,
       "embedding_rank": 256,
       "embedding_rows": 29525,
       "embedding_std": 0.562719,
@@ -78,8 +78,8 @@
       "mteb_sts_scores": {
         "BIOSSES": 0.742493,
         "SICK-R": 0.633061,
-        "STS12": 0.634404,
-        "STS13": 0.755101,
+        "STS12": 0.634405,
+        "STS13": 0.7551,
         "STS14": 0.697645,
         "STS15": 0.777181,
         "STS16": 0.708249,
