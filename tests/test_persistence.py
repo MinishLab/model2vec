@@ -9,6 +9,7 @@ from tokenizers import Tokenizer
 
 from model2vec.model import StaticModel
 from model2vec.persistence.hf import maybe_get_cached_model_path
+from model2vec.persistence.utils import SilentTqdm
 
 
 def test_local_loading(mock_static_model: StaticModel) -> None:
@@ -94,6 +95,12 @@ def test_save_pretrained_with_weights_and_mapping(tmp_path: Path, mock_tokenizer
     np.testing.assert_array_equal(loaded_model.embedding, vectors)
     np.testing.assert_array_equal(loaded_model.weights, weights)
     np.testing.assert_array_equal(loaded_model.token_mapping, mapping)
+
+
+def test_silent_tqdm() -> None:
+    """Test that SilentTqdm is disabled by default."""
+    bar = SilentTqdm(range(3))
+    assert bar.disable is True
 
 
 def test_maybe_get_cached_model_path() -> None:

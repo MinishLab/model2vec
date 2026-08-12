@@ -1228,6 +1228,7 @@ wheels = [
 name = "model2vec"
 source = { editable = "." }
 dependencies = [
+    { name = "huggingface-hub" },
     { name = "jinja2" },
     { name = "joblib" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -1278,6 +1279,7 @@ train = [
 
 [package.metadata]
 requires-dist = [
+    { name = "huggingface-hub", specifier = ">=1.0.0" },
     { name = "ipython", marker = "extra == 'dev'" },
     { name = "jinja2" },
     { name = "joblib" },
