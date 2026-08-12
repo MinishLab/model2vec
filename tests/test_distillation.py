@@ -251,6 +251,7 @@ def test_distill(
         )
         assert isinstance(static_model, StaticModel)
         assert static_model.embedding.shape == expected_shape
+        assert static_model.embedding.flags["C_CONTIGUOUS"]
         assert "mock-model" in static_model.config["tokenizer_name"]
         assert static_model.tokenizer is not None
 

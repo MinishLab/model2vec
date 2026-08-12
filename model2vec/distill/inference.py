@@ -235,7 +235,7 @@ def apply_pca(embeddings: np.ndarray, pca_dims: PCADimType) -> np.ndarray:
 
             orig_dims = embeddings.shape[1]
             p = PCA(n_components=pca_dims, svd_solver="full")
-            embeddings = p.fit_transform(embeddings)
+            embeddings = np.ascontiguousarray(p.fit_transform(embeddings))
 
             if embeddings.shape[1] < orig_dims:
                 explained_variance_ratio = np.sum(p.explained_variance_ratio_)
