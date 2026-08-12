@@ -1294,7 +1294,7 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'quantization'" },
     { name = "scikit-learn", marker = "extra == 'tests'" },
     { name = "setuptools", marker = "extra == 'dev'" },
-    { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.4.0,<0.5.0" },
+    { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.4.1,<0.5.0" },
     { name = "skops", marker = "extra == 'tests'" },
     { name = "tokenizers", specifier = ">=0.20" },
     { name = "torch", marker = "extra == 'distill'" },
@@ -3213,7 +3213,7 @@ wheels = [
 
 [[package]]
 name = "skeletoken"
-version = "0.4.0"
+version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
@@ -3222,9 +3222,9 @@ dependencies = [
     { name = "tokenizers" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/17/c1a8e1200a4a4cb23213f27a384a175a386cd037dee0d957b67ef238c233/skeletoken-0.4.0.tar.gz", hash = "sha256:a7b737c3658765260d55befaebc8f38d3d59b31c800632e9c2bc6f92fc305398", size = 6483408, upload-time = "2026-08-01T09:32:01.702Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/77/c3/d66e69b068750e328a656b5113e14b6cb1a017d4e1562cd1e96a37a9ce59/skeletoken-0.4.1.tar.gz", hash = "sha256:7951da60de3fb065b9a26ad596664403b092416f10cb0b4ac8badf0440abaf2f", size = 6485740, upload-time = "2026-08-07T17:49:43.694Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/18/3c/08bb7b1d451b3aac43b9f78f6162997066f761f74c8f0544a7d43171e33b/skeletoken-0.4.0-py3-none-any.whl", hash = "sha256:e564c3cd22e3790dd11195f2a89d345696aecbdf878208d3ca2187354b918671", size = 45863, upload-time = "2026-08-01T09:31:59.51Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/d3/8e22598c2866eb7761d33757a5f1cb61bab6c18626882bf1c93ca2ac246a/skeletoken-0.4.1-py3-none-any.whl", hash = "sha256:55cf30aae0c3557e1af9b98d125cc0373793747279694ccda4d5a73a85907726", size = 46957, upload-time = "2026-08-07T17:49:42.438Z" },
 ]
 
 [[package]]
