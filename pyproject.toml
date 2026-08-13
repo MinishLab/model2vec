@@ -29,6 +29,7 @@ dependencies = [
     "safetensors",
     "tokenizers>=0.20",
     "tqdm",
+    "huggingface-hub>=1.0.0",
 ]
 
 [build-system]
