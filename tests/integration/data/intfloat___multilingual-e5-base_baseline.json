@@ -3,7 +3,7 @@
   "configs": {
     "custom_vocab": {
       "embedding_dim": 32,
-      "embedding_mean": -0.00019,
+      "embedding_mean": -0.000137,
       "embedding_rank": 32,
       "embedding_rows": 250003,
       "embedding_std": 0.764859,
@@ -34,19 +34,19 @@
       ],
       "mteb_sts_scores": {
         "BIOSSES": 0.432685,
-        "SICK-R": 0.474725,
+        "SICK-R": 0.474724,
         "STS12": 0.520844,
-        "STS13": 0.623774,
-        "STS14": 0.565683,
-        "STS15": 0.635075,
+        "STS13": 0.623772,
+        "STS14": 0.565684,
+        "STS15": 0.635076,
         "STS16": 0.58762,
-        "STSBenchmark": 0.492349
+        "STSBenchmark": 0.49235
       },
       "token_order_hash": "c15b66edc095c19fae1fc0d10462ccd3cdc77e835825639022dac2e8a3f4b5bd"
     },
     "subword": {
       "embedding_dim": 256,
-      "embedding_mean": 1.1e-05,
+      "embedding_mean": 3.9e-05,
       "embedding_rank": 256,
       "embedding_rows": 249999,
       "embedding_std": 0.417482,
@@ -80,10 +80,10 @@
         "SICK-R": 0.556843,
         "STS12": 0.583896,
         "STS13": 0.706956,
-        "STS14": 0.664318,
-        "STS15": 0.735835,
-        "STS16": 0.682632,
-        "STSBenchmark": 0.625896
+        "STS14": 0.664319,
+        "STS15": 0.735838,
+        "STS16": 0.682633,
+        "STSBenchmark": 0.6259
       },
       "token_order_hash": "d0534dadde49bec613f7090e0fec5797f10194566612acf36895214252e290e0"
     }

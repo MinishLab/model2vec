@@ -3,10 +3,10 @@
   "configs": {
     "custom_vocab": {
       "embedding_dim": 32,
-      "embedding_mean": -0.000871,
+      "embedding_mean": 5.4e-05,
       "embedding_rank": 32,
       "embedding_rows": 29529,
-      "embedding_std": 0.63969,
+      "embedding_std": 0.639691,
       "first_tokens": [
         "[PAD]",
         "[UNK]",
@@ -34,19 +34,19 @@
       ],
       "mteb_sts_scores": {
         "BIOSSES": 0.500132,
-        "SICK-R": 0.565143,
-        "STS12": 0.594862,
+        "SICK-R": 0.565144,
+        "STS12": 0.594863,
         "STS13": 0.653794,
-        "STS14": 0.596518,
-        "STS15": 0.611507,
-        "STS16": 0.569707,
-        "STSBenchmark": 0.559639
+        "STS14": 0.596517,
+        "STS15": 0.611504,
+        "STS16": 0.569703,
+        "STSBenchmark": 0.559642
       },
       "token_order_hash": "09d9aaaedc7d41b2fd1e3ffa64f16794a2cefe9ffc7faf1055ae5d49350c3060"
     },
     "subword": {
       "embedding_dim": 256,
-      "embedding_mean": -0.0001,
+      "embedding_mean": 4.9e-05,
       "embedding_rank": 256,
       "embedding_rows": 29525,
       "embedding_std": 0.368635,
@@ -78,8 +78,8 @@
       "mteb_sts_scores": {
         "BIOSSES": 0.656286,
         "SICK-R": 0.611602,
-        "STS12": 0.620365,
-        "STS13": 0.73547,
+        "STS12": 0.620366,
+        "STS13": 0.735474,
         "STS14": 0.670425,
         "STS15": 0.745883,
         "STS16": 0.67784,

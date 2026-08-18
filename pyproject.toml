@@ -29,6 +29,7 @@ dependencies = [
     "safetensors",
     "tokenizers>=0.20",
     "tqdm",
+    "huggingface-hub>=1.0.0",
 ]
 
 [build-system]
@@ -58,7 +59,7 @@ dev = [
     "setuptools",
 ]
 
-distill = ["torch", "transformers<5.4.0", "scikit-learn", "skeletoken>=0.4.1,<0.5.0"]
+distill = ["torch", "transformers<5.4.0", "skeletoken>=0.4.1,<0.5.0"]
 onnx = ["onnx", "torch"]
 train = ["torch"]
 quantization = ["usearch"]

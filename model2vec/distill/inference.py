@@ -4,11 +4,10 @@ import inspect
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import numpy as np
 import torch
-from sklearn.decomposition import PCA
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
@@ -211,18 +210,59 @@ def compute_weights(n_embeddings: int, sif_coefficient: float | None) -> np.ndar
     return weight
 
 
+def _pca_fit_transform(X: np.ndarray, n_components: int | float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Fit a PCA via eigendecomposition of the covariance matrix, and transform X.
+
+    :param X: The data matrix of shape (n_samples, n_features).
+    :param n_components: The number of components to keep, or, if a float between 0 and 1, the minimum
+        amount of variance that should be explained by the kept components.
+    :return: A tuple of (transformed X, explained_variance, explained_variance_ratio).
+    """
+    n_samples = X.shape[0]
+    mean = X.mean(axis=0)
+    Xc = X - mean
+
+    cov = (Xc.T @ Xc) / (n_samples - 1)
+
+    eigvals, eigvecs = np.linalg.eigh(cov)
+    eigvals = eigvals[::-1]
+    eigvecs = eigvecs[:, ::-1]
+    eigvals = np.clip(eigvals, a_min=0, a_max=None)
+
+    total_variance = eigvals.sum()
+    if isinstance(n_components, float):
+        explained_variance_ratio_cumsum = np.cumsum(eigvals) / total_variance
+        k = int(np.searchsorted(explained_variance_ratio_cumsum, n_components)) + 1
+        k = min(k, eigvecs.shape[1])
+    else:
+        k = n_components
+
+    components = eigvecs[:, :k].T
+    explained_variance = eigvals[:k]
+    explained_variance_ratio = explained_variance / total_variance
+
+    scores = Xc @ components.T
+
+    max_abs_idx = np.argmax(np.abs(scores), axis=0)
+    signs = np.sign(scores[max_abs_idx, range(scores.shape[1])])
+    scores = scores * signs
+
+    return scores, explained_variance, explained_variance_ratio
+
+
 def apply_pca(embeddings: np.ndarray, pca_dims: PCADimType) -> np.ndarray:
     """Apply PCA to the embeddings."""
     if pca_dims is not None:
-        if pca_dims == "auto":
-            pca_dims = embeddings.shape[1]
+        n_features: int = embeddings.shape[1]
+        pca_dims = n_features if pca_dims == "auto" else pca_dims
+        pca_dims = cast(int | float, pca_dims)
         if pca_dims > embeddings.shape[1]:
             logger.warning(
                 f"PCA dimension ({pca_dims}) is larger than the number of dimensions in the embeddings ({embeddings.shape[1]}). "
                 "Applying PCA, but not reducing dimensionality. Is this is not desired, please set `pca_dims` to None. "
                 "Applying PCA will probably improve performance, so consider just leaving it."
             )
-            pca_dims = embeddings.shape[1]
+            pca_dims = n_features
         if pca_dims >= embeddings.shape[0]:
             logger.warning(
                 f"PCA dimension ({pca_dims}) is larger than the number of tokens in the vocabulary ({embeddings.shape[0]}). Not applying PCA."
@@ -234,14 +274,11 @@ def apply_pca(embeddings: np.ndarray, pca_dims: PCADimType) -> np.ndarray:
                 logger.info(f"Applying PCA with n_components {pca_dims}")
 
             orig_dims = embeddings.shape[1]
-            p = PCA(n_components=pca_dims, svd_solver="full")
-            embeddings = np.ascontiguousarray(p.fit_transform(embeddings))
+            embeddings, explained_variance, explained_variance_ratio = _pca_fit_transform(embeddings, pca_dims)
 
             if embeddings.shape[1] < orig_dims:
-                explained_variance_ratio = np.sum(p.explained_variance_ratio_)
-                explained_variance = np.sum(p.explained_variance_)
                 logger.info(f"Reduced dimensionality from {orig_dims} to {embeddings.shape[1]}.")
-                logger.info(f"Explained variance ratio: {explained_variance_ratio:.3f}.")
-                logger.info(f"Explained variance: {explained_variance:.3f}.")
+                logger.info(f"Explained variance ratio: {np.sum(explained_variance_ratio):.3f}.")
+                logger.info(f"Explained variance: {np.sum(explained_variance):.3f}.")
 
     return embeddings
