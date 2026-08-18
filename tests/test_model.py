@@ -266,15 +266,16 @@ def test_load_pretrained_vocabulary_quantized(
     model.save_pretrained(save_path)
 
     # Load the model back from the same path
-    loaded_model = StaticModel.from_pretrained(save_path, vocabulary_quantization=3)
+    loaded_model = StaticModel.from_pretrained(save_path, sim_threshold=0.55, drop_fraction=0.0)
 
     # Assert that the loaded model has the same properties as the original one
     assert loaded_model.embedding.dtype == np.float64
-    assert loaded_model.embedding.shape == (3, 2)  # Assuming 3 clusters after quantization
+    assert loaded_model.embedding.shape[1] == 2
+    assert loaded_model.embedding.shape[0] < 5  # The three near-duplicate vectors should merge into one.
     assert loaded_model.weights is not None
     assert loaded_model.weights.shape == (5,)
     assert loaded_model.token_mapping is not None
-    assert loaded_model.vocabulary_quantization == 3
+    assert loaded_model.vocabulary_quantization == loaded_model.embedding.shape[0]
     assert len(loaded_model.token_mapping) == mock_tokenizer.get_vocab_size()
     assert len(loaded_model.token_mapping) == len(loaded_model.weights)
     assert loaded_model.encode("word1 word2").shape == (2,)

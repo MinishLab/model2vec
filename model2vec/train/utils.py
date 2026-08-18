@@ -130,6 +130,7 @@ def seed_everything(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def logit(x: torch.Tensor) -> torch.Tensor:
+def logit(x: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     """Invert a sigmoid."""
+    x = x.clamp(eps, 1 - eps)
     return -torch.log((1 / x) - 1)

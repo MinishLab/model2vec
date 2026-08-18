@@ -182,7 +182,8 @@ class StaticModel:
         subfolder: str | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
-        vocabulary_quantization: int | None = None,
+        sim_threshold: float | None = None,
+        drop_fraction: float = 0.2,
         force_download: bool = True,
     ) -> StaticModel:
         """Load a StaticModel from a local path or huggingface hub path.
@@ -198,7 +199,10 @@ class StaticModel:
         :param dimensionality: The dimensionality of the model. If this is None, use the dimensionality of the model.
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
-        :param vocabulary_quantization: The number of clusters to use for vocabulary quantization.
+        :param sim_threshold: If set, enables vocabulary quantization: tokens with cosine similarity above this
+            value are merged together.
+        :param drop_fraction: Fraction of the resulting clusters (by total weight) to fold into their nearest
+            surviving neighbor. Only used if `sim_threshold` is set.
         :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
             already present in the cache.
         :return: A StaticModel.
@@ -207,7 +211,8 @@ class StaticModel:
             cls=cls,
             path=path,
             token=token,
-            vocabulary_quantization=vocabulary_quantization,
+            sim_threshold=sim_threshold,
+            drop_fraction=drop_fraction,
             quantize_to=quantize_to,
             dimensionality=dimensionality,
             normalize=normalize,
@@ -223,7 +228,8 @@ class StaticModel:
         normalize: bool | None = None,
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
-        vocabulary_quantization: int | None = None,
+        sim_threshold: float | None = None,
+        drop_fraction: float = 0.2,
         force_download: bool = True,
     ) -> StaticModel:
         """Deprecated: use from_pretrained."""
@@ -236,7 +242,8 @@ class StaticModel:
             cls=cls,
             path=path,
             token=token,
-            vocabulary_quantization=vocabulary_quantization,
+            sim_threshold=sim_threshold,
+            drop_fraction=drop_fraction,
             quantize_to=quantize_to,
             dimensionality=dimensionality,
             normalize=normalize,
@@ -468,14 +475,18 @@ class StaticModel:
 
 def quantize_model(
     model: StaticModel,
-    vocabulary_quantization: int | None = None,
+    sim_threshold: float | None = None,
+    drop_fraction: float = 0.2,
     quantize_to: str | DType | None = None,
     dimensionality: int | None = None,
 ) -> StaticModel:
     """Quantize the model to a lower precision and possibly lower dimensionality.
 
     :param model: The model to quantize.
-    :param vocabulary_quantization: The number of clusters to use for quantization.
+    :param sim_threshold: If set, enables vocabulary quantization: tokens with cosine similarity above this
+        value are merged together.
+    :param drop_fraction: Fraction of the resulting clusters (by total weight) to fold into their nearest
+        surviving neighbor. Only used if `sim_threshold` is set.
     :param quantize_to: The dtype to quantize the model to.
     :param dimensionality: The desired dimensionality of the model.
         This needs to be < than the current model dimensionality.
@@ -484,14 +495,17 @@ def quantize_model(
     """
     token_mapping: np.ndarray | None
     weights: np.ndarray | None
-    if vocabulary_quantization is not None:
+    if sim_threshold is not None:
         from model2vec.vocabulary_quantization import quantize_vocabulary
 
         if len(model.tokens) != len(model.embedding):
             raise ValueError("Model already has been vocabulary quantized, cannot quantize again.")
 
         embeddings, token_mapping, weights = quantize_vocabulary(
-            n_clusters=vocabulary_quantization, weights=model.weights, embeddings=model.embedding
+            weights=model.weights,
+            embeddings=model.embedding,
+            sim_threshold=sim_threshold,
+            drop_fraction=drop_fraction,
         )
     else:
         embeddings = model.embedding
@@ -520,7 +534,8 @@ def _loading_helper(
     cls: type[StaticModel],
     path: PathLike,
     token: str | None,
-    vocabulary_quantization: int | None,
+    sim_threshold: float | None,
+    drop_fraction: float,
     quantize_to: str | DType | None,
     dimensionality: int | None,
     normalize: bool | None,
@@ -550,12 +565,13 @@ def _loading_helper(
 
     # If no quantization or dimensionality reduction is requested,
     # return the model as is.
-    if not any([vocabulary_quantization, quantize_to, dimensionality]):
+    if sim_threshold is None and quantize_to is None and dimensionality is None:
         return model
 
     return quantize_model(
         model=model,
-        vocabulary_quantization=vocabulary_quantization,
+        sim_threshold=sim_threshold,
+        drop_fraction=drop_fraction,
         quantize_to=quantize_to,
         dimensionality=dimensionality,
     )

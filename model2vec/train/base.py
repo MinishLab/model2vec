@@ -83,7 +83,7 @@ class BaseFinetuneable(nn.Module):
         self.freeze = freeze
         self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=self.freeze, padding_idx=pad_id)
         self.head = self.construct_head()
-        self._weights = weights
+        self._weights = weights.float() if weights is not None else None
         self.w = self.construct_weights()
         self.tokenizer = tokenizer
 

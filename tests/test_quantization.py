@@ -55,22 +55,25 @@ def test_quantize_vocabulary() -> None:
     embeddings = rand.normal(size=(1024, 4)).astype(np.float32)
     norm = np.linalg.norm(embeddings, axis=1)
 
-    # Test without quantization
-    quantized_embeddings, _, quantized_weights = quantize_vocabulary(8, None, embeddings)
+    # Test with default thresholds
+    quantized_embeddings, mapping, quantized_weights = quantize_vocabulary(embeddings, None)
     assert quantized_embeddings.dtype == np.float32
-    assert quantized_embeddings.shape == (8, 4)
-    # assert np.array_equal(quantized_token_mapping, token_mapping)
+    assert quantized_embeddings.shape[1] == 4
+    assert quantized_embeddings.shape[0] < len(embeddings)
+    assert mapping.shape == (1024,)
     assert np.array_equal(norm, quantized_weights)
 
     rand_weights = rand.uniform(size=(1024,))
-    # Test without quantization
-    quantized_embeddings, _, quantized_weights = quantize_vocabulary(8, rand_weights, embeddings)
+    quantized_embeddings, _, quantized_weights = quantize_vocabulary(embeddings, rand_weights)
     assert quantized_embeddings.dtype == np.float32
-    assert quantized_embeddings.shape == (8, 4)
     # Weights should be the same as the in weights
     assert np.array_equal(rand_weights, quantized_weights)
 
+    # A very high similarity threshold and no dropping should barely merge anything.
+    quantized_embeddings, _, _ = quantize_vocabulary(embeddings, None, sim_threshold=0.999, drop_fraction=0.0)
+    assert quantized_embeddings.shape[0] > 0.98 * len(embeddings)
+
     embeddings = embeddings.astype(np.float16)
     # Test with float16 quantization
-    quantized_embeddings, _, quantized_weights = quantize_vocabulary(8, None, embeddings)
+    quantized_embeddings, _, quantized_weights = quantize_vocabulary(embeddings, None)
     assert quantized_embeddings.dtype == np.float16
