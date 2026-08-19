@@ -17,6 +17,8 @@ from tokenizers import Tokenizer
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 from model2vec import StaticModel
+from model2vec.inference import StaticModelPipeline
+from model2vec.inference.mlp import Activation
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -80,8 +82,63 @@ class TorchStaticModel(torch.nn.Module):
         return input_ids, offsets
 
 
+class TorchStaticModelPipeline(torch.nn.Module):
+    def __init__(self, pipeline: StaticModelPipeline) -> None:
+        """Wrap a StaticModelPipeline (encoder + MLP head) as a single torch module."""
+        super().__init__()
+        self.encoder = TorchStaticModel(pipeline.model)
+        self.activation = pipeline.head.activation
+        # Rebuild the head Layers as nn.Linear. Layer stores weight as [out, in] and computes
+        # x @ weight.T + bias, which matches nn.Linear(in, out) exactly.
+        self.layers = torch.nn.ModuleList()
+        for layer in pipeline.head.layers:
+            weight = torch.from_numpy(layer.weight)
+            linear = torch.nn.Linear(weight.shape[1], weight.shape[0])
+            linear.weight = torch.nn.Parameter(weight, requires_grad=False)
+            linear.bias = torch.nn.Parameter(torch.from_numpy(layer.bias), requires_grad=False)
+            self.layers.append(linear)
+
+    def forward(self, input_ids: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
+        """Encode the inputs and run them through the head, applying the output activation."""
+        out = self.encoder(input_ids, offsets)
+        *hidden_layers, last_layer = self.layers
+        for layer in hidden_layers:
+            out = torch.relu(layer(out))
+        logits = last_layer(out)
+        if self.activation == Activation.SOFTMAX:
+            return torch.softmax(logits, dim=-1)
+        if self.activation == Activation.SIGMOID:
+            return torch.sigmoid(logits)
+        return logits
+
+    def tokenize(self, sentences: list[str], max_length: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+        """Tokenize the input sentences using the underlying encoder."""
+        return self.encoder.tokenize(sentences, max_length)
+
+
 def export_model_to_onnx(model_path: str, save_path: Path) -> None:
-    """Export the StaticModel to ONNX format and save tokenizer files.
+    """Export a StaticModel or a StaticModelPipeline to ONNX format and save tokenizer files.
+
+    A classifier/regressor pipeline (one with a trained head) is detected automatically and
+    exported with its head included; a plain encoder is exported as embeddings.
+
+    :param model_path: The path to the pretrained StaticModel or StaticModelPipeline.
+    :param save_path: The directory to save the model and related files.
+    """
+    try:
+        pipeline = StaticModelPipeline.from_pretrained(model_path)
+    except FileNotFoundError:
+        pipeline = None
+
+    if pipeline is not None:
+        export_pipeline_to_onnx(pipeline, save_path)
+        return
+
+    _export_encoder_to_onnx(model_path, save_path)
+
+
+def _export_encoder_to_onnx(model_path: str, save_path: Path) -> None:
+    """Export a plain StaticModel encoder to ONNX format and save tokenizer files.
 
     :param model_path: The path to the pretrained StaticModel.
     :param save_path: The directory to save the model and related files.
@@ -122,6 +179,55 @@ def export_model_to_onnx(model_path: str, save_path: Path) -> None:
 
     # Save the tokenizer files required for transformers.js
     save_tokenizer(model.tokenizer, save_path)
+    logger.info(f"Tokenizer files have been saved to {save_path}")
+
+
+def export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path) -> None:
+    """Export a StaticModelPipeline (encoder + classifier/regressor head) to ONNX format.
+
+    The exported graph outputs class probabilities for classifiers (softmax/sigmoid heads) or
+    raw predictions for regression/projector heads (identity activation).
+
+    :param pipeline: The pretrained StaticModelPipeline.
+    :param save_path: The directory to save the model and related files.
+    """
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    torch_model = TorchStaticModelPipeline(pipeline)
+    torch_model.eval()
+
+    # Persist the pipeline (encoder weights, head and config) alongside the ONNX graph
+    pipeline.save_pretrained(str(save_path))
+
+    # Prepare dummy input data
+    texts = ["hello", "hello world"]
+    input_ids, offsets = torch_model.tokenize(texts)
+
+    # An identity head is a regressor/projector, so its output is a raw value rather than a probability
+    output_name = "predictions" if pipeline.head.activation == Activation.IDENTITY else "probabilities"
+
+    onnx_model_path = save_path / "onnx/model.onnx"
+    onnx_model_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.onnx.export(
+        torch_model,
+        (input_ids, offsets),
+        str(onnx_model_path),
+        export_params=True,
+        opset_version=14,
+        do_constant_folding=True,
+        input_names=["input_ids", "offsets"],
+        output_names=[output_name],
+        dynamic_axes={
+            "input_ids": {0: "num_tokens"},
+            "offsets": {0: "batch_size"},
+            output_name: {0: "batch_size"},
+        },
+    )
+
+    logger.info(f"Pipeline has been successfully exported to {onnx_model_path}")
+
+    # Save the tokenizer files required for transformers.js
+    save_tokenizer(pipeline.model.tokenizer, save_path)
     logger.info(f"Tokenizer files have been saved to {save_path}")
 
 
@@ -187,12 +293,12 @@ def save_tokenizer(tokenizer: Tokenizer, save_directory: Path) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Export StaticModel to ONNX format")
+    parser = argparse.ArgumentParser(description="Export a StaticModel or StaticModelPipeline to ONNX format")
     parser.add_argument(
         "--model_path",
         type=str,
         required=True,
-        help="Path to the pretrained StaticModel",
+        help="Path to the pretrained StaticModel or StaticModelPipeline (classifier/regressor)",
     )
     parser.add_argument(
         "--save_path",
