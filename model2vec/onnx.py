@@ -164,6 +164,7 @@ def _export_encoder_to_onnx(model: StaticModel, save_path: Path) -> None:
         input_names=["input_ids", "attention_mask"],
         output_names=["embeddings"],
         dynamic_shapes=_dynamic_shapes(),
+        external_data=False,
     )
 
     logger.info(f"Model has been successfully exported to {onnx_model_path}")
@@ -205,6 +206,7 @@ def _export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path) -> 
         input_names=["input_ids", "attention_mask"],
         output_names=[output_name],
         dynamic_shapes=_dynamic_shapes(),
+        external_data=False,
     )
 
     logger.info(f"Pipeline has been successfully exported to {onnx_model_path}")
@@ -240,11 +242,18 @@ def _save_tokenizer_and_config(tokenizer: Tokenizer, save_directory: Path) -> No
     :param tokenizer: The tokenizer from the StaticModel.
     :param save_directory: The directory to save the tokenizer and config files.
     """
+    """with TemporaryDirectory() as tmp:
+        tokenizer.save(str(Path(tmp) / "tokenizer.json"))
+        tokenizer_model = TokenizerModel.from_pretrained(Path(tmp) / "tokenizer.json")"""
     tokenizer_model = TokenizerModel.from_tokenizer(tokenizer)
-    tokenizer_model.to_transformers().save_pretrained(save_directory)
-
     pad_token_id = _resolve_pad_token_id(tokenizer, tokenizer_model)
     pad_token = tokenizer.id_to_token(pad_token_id) or ""
+    if pad_token:
+        tokenizer_model.pad_token = pad_token
+    hf = tokenizer_model.to_transformers()
+    # Hardcoded max length of 32768
+    hf.model_max_length = 32768
+    hf.save_pretrained(save_directory)
 
     config = {"pad_token_id": pad_token_id}
     (save_directory / "config.json").write_text(json.dumps(config, indent=2))
