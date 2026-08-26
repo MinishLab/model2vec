@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Iterator, cast
 
 import numpy as np
@@ -62,14 +63,19 @@ def mock_tokenizermodel() -> TokenizerModel:
     return TokenizerModel.from_pretrained("tests/data/test_tokenizer")
 
 
+@dataclass
+class DumbSubConfig:
+    vocab_size: int
+
+
 class DumbConfig:
     def __iter__(self) -> Iterator[tuple[str, object]]:
         """Yield no config values."""
         yield from []
 
-    def get_text_config(self) -> None:
+    def get_text_config(self) -> DumbSubConfig:
         """Gets text config."""
-        return None
+        return DumbSubConfig(30522)
 
 
 @pytest.fixture
