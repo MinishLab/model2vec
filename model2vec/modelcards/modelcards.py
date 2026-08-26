@@ -14,6 +14,7 @@ def create_model_card(
     language: list[str] | None = None,
     model_name: str | None = None,
     template_path: str = "model_card_template.md",
+    tags: list[str] | None = None,
     **kwargs: Any,
 ) -> None:
     """Create a model card and store it in the specified path.
@@ -24,6 +25,7 @@ def create_model_card(
     :param language: The language of the model.
     :param model_name: The name of the model to use in the Model Card.
     :param template_path: The path to the template.
+    :param tags: The tags to add to the model card. Defaults to the standard Model2Vec tags.
     :param **kwargs: Additional metadata for the model card (e.g., model_name, base_model, etc.).
     """
     folder_path = Path(folder_path)
@@ -35,7 +37,7 @@ def create_model_card(
         base_model=base_model_name,
         license=license,
         language=language,
-        tags=["embeddings", "static-embeddings", "sentence-transformers"],
+        tags=tags or ["embeddings", "static-embeddings", "sentence-transformers"],
         library_name="model2vec",
         **kwargs,
     )
