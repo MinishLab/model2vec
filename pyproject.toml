@@ -59,8 +59,8 @@ dev = [
     "setuptools",
 ]
 
-distill = ["torch", "transformers<5.4.0", "skeletoken>=0.4.1,<0.5.0"]
-onnx = ["onnx", "torch"]
+distill = ["torch", "transformers<5.4.0", "skeletoken>=0.6.0,<0.7.0"]
+onnx = ["onnx", "torch", "onnxruntime", "onnxscript", "skeletoken>=0.6.0,<0.7.0"]
 train = ["torch"]
 quantization = ["scikit-learn"]
 integration = ["mteb"]
