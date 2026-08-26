@@ -62,12 +62,14 @@ def mock_tokenizermodel() -> TokenizerModel:
     return TokenizerModel.from_pretrained("tests/data/test_tokenizer")
 
 
-# TODO: Temporary fix for skeletoken 0.3.3 compatibility.
-# Once we go to >= 0.4.0 this is no longer needed
 class DumbConfig:
     def __iter__(self) -> Iterator[tuple[str, object]]:
         """Yield no config values."""
         yield from []
+
+    def get_text_config(self) -> None:
+        """Gets text config."""
+        return None
 
 
 @pytest.fixture
