@@ -30,6 +30,9 @@ def clean_and_create_vocabulary(
     n_empty = 0
     n_regex_removed = 0
 
+    # Remove the post processor.
+    model.post_processor = None
+
     internal_tokens: list[str] = model.sorted_vocabulary
     if token_remove_regex:
         tokens_to_remove = [token for token in internal_tokens if token_remove_regex.match(token)]
@@ -41,7 +44,7 @@ def clean_and_create_vocabulary(
     tokens_to_add: list[str] = []
     added_tokens_to_add: list[str] = []
     for token in vocabulary_to_add:
-        preprocessed = preprocessor.preprocess(token, had_word_prefix=True)
+        preprocessed = preprocessor.preprocess(token)
         if len(preprocessed) < 1:
             logger.warning(f"Token '{token}' was empty after preprocessing.")
             n_empty += 1
@@ -69,8 +72,6 @@ def clean_and_create_vocabulary(
         seen_tokens.add(token)
         tokens_to_add.append(token)
 
-    # Remove the post processor.
-    model.post_processor = None
     # Remove all prior added tokens
     model = model.prune_added_tokens()
     # Preprocess tokens is False because tokens are already preprocessed.

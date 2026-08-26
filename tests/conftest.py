@@ -71,7 +71,7 @@ class DumbConfig:
 
 
 @pytest.fixture
-def mock_transformer(request: pytest.FixtureRequest) -> PreTrainedModel:
+def mock_transformer(request: pytest.FixtureRequest) -> PreTrainedModel:  # noqa: C901
     """Create a mock transformer model."""
     params = getattr(request, "param", {}) or {}
     # Default vocab size
@@ -109,6 +109,9 @@ def mock_transformer(request: pytest.FixtureRequest) -> PreTrainedModel:
         __call__ = forward
 
         def get_input_embeddings(self) -> torch.nn.Embedding:
+            return self.input_embs
+
+        def get_output_embeddings(self) -> torch.nn.Embedding:
             return self.input_embs
 
         def resize_token_embeddings(self, vocab_size: int) -> None:

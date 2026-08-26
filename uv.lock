@@ -1271,6 +1271,7 @@ onnx = [
     { name = "onnxruntime", version = "1.24.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "onnxruntime", version = "1.28.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "onnxscript" },
+    { name = "skeletoken" },
     { name = "torch" },
 ]
 quantization = [
@@ -1306,7 +1307,8 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'quantization'" },
     { name = "scikit-learn", marker = "extra == 'tests'" },
     { name = "setuptools", marker = "extra == 'dev'" },
-    { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.4.1,<0.5.0" },
+    { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.6.0,<0.7.0" },
+    { name = "skeletoken", marker = "extra == 'onnx'", specifier = ">=0.6.0,<0.7.0" },
     { name = "skops", marker = "extra == 'tests'" },
     { name = "tokenizers", specifier = ">=0.20" },
     { name = "torch", marker = "extra == 'distill'" },
@@ -3352,7 +3354,7 @@ wheels = [
 
 [[package]]
 name = "skeletoken"
-version = "0.4.1"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
@@ -3361,9 +3363,9 @@ dependencies = [
     { name = "tokenizers" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/77/c3/d66e69b068750e328a656b5113e14b6cb1a017d4e1562cd1e96a37a9ce59/skeletoken-0.4.1.tar.gz", hash = "sha256:7951da60de3fb065b9a26ad596664403b092416f10cb0b4ac8badf0440abaf2f", size = 6485740, upload-time = "2026-08-07T17:49:43.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f0/26/1fac478648793dc80692d8c719dcb8446ef9ccafec57da276a13fe351fad/skeletoken-0.6.0.tar.gz", hash = "sha256:b1ed48de2abc9e077cb244384aa34523491d73fcc78c63ec4e59562dc858149f", size = 6659476, upload-time = "2026-08-21T17:45:49.382Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a7/d3/8e22598c2866eb7761d33757a5f1cb61bab6c18626882bf1c93ca2ac246a/skeletoken-0.4.1-py3-none-any.whl", hash = "sha256:55cf30aae0c3557e1af9b98d125cc0373793747279694ccda4d5a73a85907726", size = 46957, upload-time = "2026-08-07T17:49:42.438Z" },
+    { url = "https://files.pythonhosted.org/packages/70/52/629abb2340d0e1ba3285c90ed5c1f141c324ed6519f5b4bcc1ce781b880e/skeletoken-0.6.0-py3-none-any.whl", hash = "sha256:d403369306dde2ff687b092f6eefd9ca43ecf7cb5dfacf143452715ae53d6c5c", size = 52375, upload-time = "2026-08-21T17:45:47.63Z" },
 ]
 
 [[package]]
