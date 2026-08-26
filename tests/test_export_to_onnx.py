@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
 import onnxruntime as ort
+import pytest
 import torch
 from skeletoken import TokenizerModel
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import Whitespace
+from transformers import AutoTokenizer
 
 from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
@@ -19,6 +22,7 @@ from model2vec.onnx import (
     _dynamic_shapes,
     _export_onnx,
     _resolve_pad_token_id,
+    _save_tokenizer_and_config,
     export_model_to_onnx,
 )
 
@@ -125,3 +129,70 @@ def test_pipeline_onnx_matches_projector(
 
     assert onnx_output.shape == expected.shape
     np.testing.assert_allclose(onnx_output, expected, atol=1e-4)
+
+
+def test_save_tokenizer_and_config_removes_post_processor_by_default(
+    mock_static_model: StaticModel, tmp_path: Path
+) -> None:
+    """`remove_post_processor=True` (the default) strips special-token insertion from the saved tokenizer."""
+    tokenizer_model = TokenizerModel.from_tokenizer(mock_static_model.tokenizer)
+    assert tokenizer_model.post_processor is not None
+
+    _save_tokenizer_and_config(mock_static_model.tokenizer, tmp_path, remove_post_processor=True)
+
+    saved_tokenizer = AutoTokenizer.from_pretrained(tmp_path)
+    with_special = saved_tokenizer("hello", add_special_tokens=True)["input_ids"]
+    without_special = saved_tokenizer("hello", add_special_tokens=False)["input_ids"]
+    assert with_special == without_special
+
+
+def test_save_tokenizer_and_config_keeps_post_processor_when_disabled(
+    mock_static_model: StaticModel, tmp_path: Path
+) -> None:
+    """`remove_post_processor=False` preserves special-token insertion in the saved tokenizer."""
+    tokenizer_model = TokenizerModel.from_tokenizer(mock_static_model.tokenizer)
+    assert tokenizer_model.post_processor is not None
+
+    _save_tokenizer_and_config(mock_static_model.tokenizer, tmp_path, remove_post_processor=False)
+
+    saved_tokenizer = AutoTokenizer.from_pretrained(tmp_path)
+    with_special = saved_tokenizer("hello", add_special_tokens=True)["input_ids"]
+    without_special = saved_tokenizer("hello", add_special_tokens=False)["input_ids"]
+    assert with_special != without_special
+
+
+def test_save_tokenizer_and_config_warns_when_removing_post_processor(
+    mock_static_model: StaticModel, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A warning is logged when a post processor is actually present and removed."""
+    with caplog.at_level(logging.WARNING, logger="model2vec.onnx"):
+        _save_tokenizer_and_config(mock_static_model.tokenizer, tmp_path, remove_post_processor=True)
+
+    assert "removing a post processor" in caplog.text
+
+
+def test_save_tokenizer_and_config_no_warning_without_post_processor(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """No warning is logged when the tokenizer has no post processor to begin with."""
+    vocab = ["!", "hello", "world", "[UNK]"]
+    tokenizer = Tokenizer(BPE(vocab={t: i for i, t in enumerate(vocab)}, merges=[], unk_token="[UNK]"))
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore[assignment]
+    assert TokenizerModel.from_tokenizer(tokenizer).post_processor is None
+
+    with caplog.at_level(logging.WARNING, logger="model2vec.onnx"):
+        _save_tokenizer_and_config(tokenizer, tmp_path, remove_post_processor=True)
+
+    assert "removing a post processor" not in caplog.text
+
+
+def test_export_model_to_onnx_remove_post_processor_default_true(
+    mock_static_model: StaticModel, tmp_path: Path
+) -> None:
+    """`export_model_to_onnx` defaults to removing the post processor, matching the documented default."""
+    export_model_to_onnx(mock_static_model, tmp_path)
+
+    saved_tokenizer = AutoTokenizer.from_pretrained(tmp_path)
+    with_special = saved_tokenizer("hello", add_special_tokens=True)["input_ids"]
+    without_special = saved_tokenizer("hello", add_special_tokens=False)["input_ids"]
+    assert with_special == without_special

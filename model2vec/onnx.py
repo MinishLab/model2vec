@@ -120,7 +120,9 @@ class TorchStaticModelPipeline(torch.nn.Module):
         return logits
 
 
-def export_model_to_onnx(model: StaticModel | StaticModelPipeline, save_path: str | Path) -> None:
+def export_model_to_onnx(
+    model: StaticModel | StaticModelPipeline, save_path: str | Path, remove_post_processor: bool = True
+) -> None:
     """Export a StaticModel or a StaticModelPipeline to ONNX format and save tokenizer files.
 
     A classifier/regressor pipeline (one with a trained head) is exported with its head
@@ -128,20 +130,22 @@ def export_model_to_onnx(model: StaticModel | StaticModelPipeline, save_path: st
 
     :param model: The StaticModel or StaticModelPipeline instance to export.
     :param save_path: The directory to save the model and related files.
+    :param remove_post_processor: Whether to remove the post processor.
     """
     save_path = Path(save_path)
     if isinstance(model, StaticModelPipeline):
-        _export_pipeline_to_onnx(model, save_path)
+        _export_pipeline_to_onnx(model, save_path, remove_post_processor)
         return
 
-    _export_encoder_to_onnx(model, save_path)
+    _export_encoder_to_onnx(model, save_path, remove_post_processor)
 
 
-def _export_encoder_to_onnx(model: StaticModel, save_path: Path) -> None:
+def _export_encoder_to_onnx(model: StaticModel, save_path: Path, remove_post_processor: bool) -> None:
     """Export a plain StaticModel encoder to ONNX format and save tokenizer files.
 
     :param model: The StaticModel instance to export.
     :param save_path: The directory to save the model and related files.
+    :param remove_post_processor: Whether to remove the post processor.
     """
     save_path.mkdir(parents=True, exist_ok=True)
 
@@ -170,11 +174,11 @@ def _export_encoder_to_onnx(model: StaticModel, save_path: Path) -> None:
     logger.info(f"Model has been successfully exported to {onnx_model_path}")
 
     # Save the tokenizer files required for transformers.js, and a config.json for ONNX runtime providers
-    _save_tokenizer_and_config(model.tokenizer, save_path)
+    _save_tokenizer_and_config(model.tokenizer, save_path, remove_post_processor)
     logger.info(f"Tokenizer files have been saved to {save_path}")
 
 
-def _export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path) -> None:
+def _export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path, remove_post_processor: bool) -> None:
     """Export a StaticModelPipeline (encoder + classifier/regressor head) to ONNX format.
 
     The exported graph outputs class probabilities for classifiers (softmax/sigmoid heads) or
@@ -182,6 +186,7 @@ def _export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path) -> 
 
     :param pipeline: The pretrained StaticModelPipeline.
     :param save_path: The directory to save the model and related files.
+    :param remove_post_processor: Whether to remove the post processor.
     """
     save_path.mkdir(parents=True, exist_ok=True)
 
@@ -212,7 +217,7 @@ def _export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path) -> 
     logger.info(f"Pipeline has been successfully exported to {onnx_model_path}")
 
     # Save the tokenizer files required for transformers.js, and a config.json for ONNX runtime providers
-    _save_tokenizer_and_config(pipeline.model.tokenizer, save_path)
+    _save_tokenizer_and_config(pipeline.model.tokenizer, save_path, remove_post_processor)
     logger.info(f"Tokenizer files have been saved to {save_path}")
 
 
@@ -236,16 +241,19 @@ def _resolve_pad_token_id(tokenizer: Tokenizer, tokenizer_model: TokenizerModel)
     return 0
 
 
-def _save_tokenizer_and_config(tokenizer: Tokenizer, save_directory: Path) -> None:
+def _save_tokenizer_and_config(tokenizer: Tokenizer, save_directory: Path, remove_post_processor: bool) -> None:
     """Save tokenizer files in a format compatible with Transformers, plus config.json and special_tokens_map.json.
 
     :param tokenizer: The tokenizer from the StaticModel.
     :param save_directory: The directory to save the tokenizer and config files.
+    :param remove_post_processor: Whether to remove the post processor.
     """
-    """with TemporaryDirectory() as tmp:
-        tokenizer.save(str(Path(tmp) / "tokenizer.json"))
-        tokenizer_model = TokenizerModel.from_pretrained(Path(tmp) / "tokenizer.json")"""
     tokenizer_model = TokenizerModel.from_tokenizer(tokenizer)
+    if tokenizer_model.post_processor is not None and remove_post_processor:
+        logger.warning(
+            "You are removing a post processor during export. If this is not desired, set `remove_post_processor` to False"
+        )
+        tokenizer_model.post_processor = None
     pad_token_id = _resolve_pad_token_id(tokenizer, tokenizer_model)
     pad_token = tokenizer.id_to_token(pad_token_id) or ""
     if pad_token:
