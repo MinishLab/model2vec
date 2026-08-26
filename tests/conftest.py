@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Iterator, cast
 
 import numpy as np
@@ -62,12 +63,19 @@ def mock_tokenizermodel() -> TokenizerModel:
     return TokenizerModel.from_pretrained("tests/data/test_tokenizer")
 
 
-# TODO: Temporary fix for skeletoken 0.3.3 compatibility.
-# Once we go to >= 0.4.0 this is no longer needed
+@dataclass
+class DumbSubConfig:
+    vocab_size: int
+
+
 class DumbConfig:
     def __iter__(self) -> Iterator[tuple[str, object]]:
         """Yield no config values."""
         yield from []
+
+    def get_text_config(self) -> DumbSubConfig:
+        """Gets text config."""
+        return DumbSubConfig(30522)
 
 
 @pytest.fixture

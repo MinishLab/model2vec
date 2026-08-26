@@ -21,6 +21,7 @@ from torch.export import Dim
 from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
 from model2vec.inference.mlp import Activation
+from model2vec.modelcards import create_model_card
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,10 @@ class TorchStaticModelPipeline(torch.nn.Module):
 
 
 def export_model_to_onnx(
-    model: StaticModel | StaticModelPipeline, save_path: str | Path, remove_post_processor: bool = True
+    model: StaticModel | StaticModelPipeline,
+    save_path: str | Path,
+    remove_post_processor: bool = True,
+    source_model_name: str | None = None,
 ) -> None:
     """Export a StaticModel or a StaticModelPipeline to ONNX format and save tokenizer files.
 
@@ -131,21 +135,27 @@ def export_model_to_onnx(
     :param model: The StaticModel or StaticModelPipeline instance to export.
     :param save_path: The directory to save the model and related files.
     :param remove_post_processor: Whether to remove the post processor.
+    :param source_model_name: The name or Hugging Face Hub repo id of the model2vec model being exported
+        (e.g. "minishlab/potion-base-8M"). Recorded in the generated README to note that this is an ONNX
+        export of that model. If not given, the README notes the source model as unknown.
     """
     save_path = Path(save_path)
     if isinstance(model, StaticModelPipeline):
-        _export_pipeline_to_onnx(model, save_path, remove_post_processor)
+        _export_pipeline_to_onnx(model, save_path, remove_post_processor, source_model_name)
         return
 
-    _export_encoder_to_onnx(model, save_path, remove_post_processor)
+    _export_encoder_to_onnx(model, save_path, remove_post_processor, source_model_name)
 
 
-def _export_encoder_to_onnx(model: StaticModel, save_path: Path, remove_post_processor: bool) -> None:
+def _export_encoder_to_onnx(
+    model: StaticModel, save_path: Path, remove_post_processor: bool, source_model_name: str | None
+) -> None:
     """Export a plain StaticModel encoder to ONNX format and save tokenizer files.
 
     :param model: The StaticModel instance to export.
     :param save_path: The directory to save the model and related files.
     :param remove_post_processor: Whether to remove the post processor.
+    :param source_model_name: The name of the model2vec model being exported, for the README.
     """
     save_path.mkdir(parents=True, exist_ok=True)
 
@@ -177,8 +187,18 @@ def _export_encoder_to_onnx(model: StaticModel, save_path: Path, remove_post_pro
     _save_tokenizer_and_config(model.tokenizer, save_path, remove_post_processor)
     logger.info(f"Tokenizer files have been saved to {save_path}")
 
+    _save_model_card(
+        save_path,
+        source_model_name=source_model_name,
+        language=model.language,
+        template_path="onnx_model_card_template.md",
+    )
+    logger.info(f"Model card has been saved to {save_path}")
 
-def _export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path, remove_post_processor: bool) -> None:
+
+def _export_pipeline_to_onnx(
+    pipeline: StaticModelPipeline, save_path: Path, remove_post_processor: bool, source_model_name: str | None
+) -> None:
     """Export a StaticModelPipeline (encoder + classifier/regressor head) to ONNX format.
 
     The exported graph outputs class probabilities for classifiers (softmax/sigmoid heads) or
@@ -187,6 +207,7 @@ def _export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path, rem
     :param pipeline: The pretrained StaticModelPipeline.
     :param save_path: The directory to save the model and related files.
     :param remove_post_processor: Whether to remove the post processor.
+    :param source_model_name: The name of the model2vec pipeline being exported, for the README.
     """
     save_path.mkdir(parents=True, exist_ok=True)
 
@@ -219,6 +240,36 @@ def _export_pipeline_to_onnx(pipeline: StaticModelPipeline, save_path: Path, rem
     # Save the tokenizer files required for transformers.js, and a config.json for ONNX runtime providers
     _save_tokenizer_and_config(pipeline.model.tokenizer, save_path, remove_post_processor)
     logger.info(f"Tokenizer files have been saved to {save_path}")
+
+    _save_model_card(
+        save_path,
+        source_model_name=source_model_name,
+        language=pipeline.model.language,
+        template_path="onnx_classifier_template.md",
+    )
+    logger.info(f"Model card has been saved to {save_path}")
+
+
+def _save_model_card(
+    save_path: Path,
+    source_model_name: str | None,
+    language: list[str] | None,
+    template_path: str,
+) -> None:
+    """Write a README.md model card noting that this is an ONNX export of `source_model_name`.
+
+    :param save_path: The directory to save the model card to.
+    :param source_model_name: The name of the model2vec model this export was produced from, if known.
+    :param language: The `language` of the exported model.
+    :param template_path: The onnx model card template to use.
+    """
+    create_model_card(
+        save_path,
+        base_model_name=source_model_name or "unknown",
+        language=language,
+        template_path=template_path,
+        tags=["embeddings", "static-embeddings", "sentence-transformers", "onnx"],
+    )
 
 
 def _resolve_pad_token_id(tokenizer: Tokenizer, tokenizer_model: TokenizerModel) -> int:
