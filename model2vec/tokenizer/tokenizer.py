@@ -60,8 +60,12 @@ def clean_and_create_vocabulary(
             if token in model.vocabulary:
                 # If the unprocessed token (incorrectly) is in the vocabulary, we should remove it.
                 model = model.remove_token_from_vocabulary(token)
+            if preprocessor.normalizer:
+                token = preprocessor.normalizer.normalize_str(token)
+            # We need to strip because our AddedTokens also get stripped
+            token = token.strip()
             if token in seen_added:
-                logger.warning(f"Added token '{token}' was in the added vocabulary twice.")
+                logger.warning(f"Normalized added token '{token}' was in the added vocabulary twice.")
                 continue
             added_tokens_to_add.append(token)
             seen_added.add(token)

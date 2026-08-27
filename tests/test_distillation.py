@@ -321,6 +321,8 @@ def test__post_process_embeddings(
         (["multi word token"], ["multi word token"], []),
         # Case: duplicate multi-word token, should only be added once
         (["multi word token", "multi word token"], ["multi word token"], ["twice"]),
+        # Case: multi-word tokens that normalize to the same string, should only be added once
+        (["Multi Word Token", "multi word token"], ["multi word token"], ["twice"]),
     ],
 )
 def test_clean_and_create_vocabulary(
