@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import cast
+from typing import Sequence, cast
 
 from huggingface_hub.hf_api import model_info
 from skeletoken import TokenizerModel
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def distill_from_model(
     model: PreTrainedModel,
     tokenizer: PreTrainedTokenizerFast,
-    vocabulary: list[str] | None = None,
+    vocabulary: Sequence[str] | None = None,
     device: str | None = None,
     pca_dims: PCADimType = 256,
     sif_coefficient: float | None = 1e-4,
