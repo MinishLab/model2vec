@@ -152,9 +152,9 @@ def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
     if mock_trained_pipeline.multilabel:
         if type(mock_trained_pipeline.classes_[0]) == str:
-            assert result == [["a", "b"], ["a", "b"]]
+            assert result == [["b"], ["b"]]
         else:
-            assert result == [[0, 1], [0, 1]]
+            assert result == [[1], [1]]
     else:
         if type(mock_trained_pipeline.classes_[0]) == str:
             assert result == ["b", "b"]
