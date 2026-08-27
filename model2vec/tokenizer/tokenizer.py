@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Sequence
 
 from skeletoken import TokenizerModel
 
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def clean_and_create_vocabulary(
     model: TokenizerModel,
-    vocabulary_to_add: list[str],
+    vocabulary_to_add: Sequence[str],
     token_remove_regex: re.Pattern[str] | None,
 ) -> TokenizerModel:
     """Clean a vocabulary by removing duplicates and tokens that were already in the vocabulary.
@@ -43,6 +44,7 @@ def clean_and_create_vocabulary(
     seen_tokens = set(internal_tokens)
     tokens_to_add: list[str] = []
     added_tokens_to_add: list[str] = []
+    seen_added = set()
     for token in vocabulary_to_add:
         preprocessed = preprocessor.preprocess(token)
         if len(preprocessed) < 1:
@@ -58,7 +60,11 @@ def clean_and_create_vocabulary(
             if token in model.vocabulary:
                 # If the unprocessed token (incorrectly) is in the vocabulary, we should remove it.
                 model = model.remove_token_from_vocabulary(token)
+            if token in seen_added:
+                logger.warning(f"Added token '{token}' was in the added vocabulary twice.")
+                continue
             added_tokens_to_add.append(token)
+            seen_added.add(token)
             continue
         token = preprocessed[0]
         if token in seen_tokens:

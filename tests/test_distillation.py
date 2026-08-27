@@ -319,6 +319,8 @@ def test__post_process_embeddings(
         # Case: Only empty token (""), should return an empty list
         ([""], [], ["empty"]),
         (["multi word token"], ["multi word token"], []),
+        # Case: duplicate multi-word token, should only be added once
+        (["multi word token", "multi word token"], ["multi word token"], ["twice"]),
     ],
 )
 def test_clean_and_create_vocabulary(
