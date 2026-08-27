@@ -46,7 +46,7 @@ def clean_and_create_vocabulary(
     added_tokens_to_add: list[str] = []
     seen_added = set()
     for token in vocabulary_to_add:
-        preprocessed = preprocessor.preprocess(token)
+        preprocessed = preprocessor.preprocess(token, had_initial_subword_prefix=True)
         if len(preprocessed) < 1:
             logger.warning(f"Token '{token}' was empty after preprocessing.")
             n_empty += 1
