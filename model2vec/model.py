@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import os
 import warnings
@@ -67,11 +68,7 @@ class StaticModel:
         self.token_mapping: np.ndarray | None = token_mapping
 
         self.tokenizer = tokenizer
-        self.unk_token_id: int | None
-        if hasattr(self.tokenizer.model, "unk_token") and self.tokenizer.model.unk_token is not None:
-            self.unk_token_id = tokenizer.get_vocab()[self.tokenizer.model.unk_token]
-        else:
-            self.unk_token_id = None  # pragma: no cover  # Doesn't actually happen, but can happen.
+        self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
         self.config = config or {}
@@ -559,3 +556,16 @@ def _loading_helper(
         quantize_to=quantize_to,
         dimensionality=dimensionality,
     )
+
+
+def _get_unk_token_id(tokenizer: Tokenizer) -> int | None:
+    """Get the unk token id."""
+    model = tokenizer.model
+    # Wordpiece + BPE + Word level
+    if hasattr(model, "unk_token"):
+        token = model.unk_token
+        if token is None:
+            return None
+        return tokenizer.token_to_id(token)
+    # Unigram
+    return json.loads(tokenizer.to_str())["model"].get("unk_id")
