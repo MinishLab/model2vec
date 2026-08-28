@@ -88,7 +88,7 @@ def _run_validation(
     return {key: total / total_samples for key, total in weighted_sums.items()}
 
 
-def run_training_loop(
+def run_training_loop(  # noqa: C901
     model: nn.Module,
     loss_function: nn.Module,
     learning_rate: float,
@@ -121,7 +121,7 @@ def run_training_loop(
     :param val_check_interval: If set, validate every this many training steps.
     :param check_val_every_epoch: If set, validate every this many epochs.
     :param compute_metrics: Computes validation metrics from `(head_out, y, loss)`. Defaults to just `val_loss`.
-    :return: The model's state dict as of the last validation check before training stopped.
+    :return: The model's state dict from the validation check with the best `val_metric`.
     """
     model.to(device)
     loss_function.to(device)
@@ -144,17 +144,22 @@ def run_training_loop(
 
     max_epochs = _resolve_max_epochs(max_epochs)
 
-    last_checkpoint = copy.deepcopy(model.state_dict())
+    best_checkpoint = copy.deepcopy(model.state_dict())
+    best_val_metric = float("inf") if early_stopping_direction == "min" else float("-inf")
     current_epoch = 0
     global_step = 0
     postfix: dict[str, str] = {}
     latest_val_loss: float | None = None
 
     def validate_and_checkpoint() -> bool:
-        nonlocal last_checkpoint, latest_val_loss
+        nonlocal best_checkpoint, best_val_metric, latest_val_loss
         metrics = _run_validation(model, loss_function, compute_metrics, val_loader, device)
         latest_val_loss = metrics["val_loss"]
-        last_checkpoint = copy.deepcopy(model.state_dict())
+        current = metrics[val_metric]
+        improved = current < best_val_metric if early_stopping_direction == "min" else current > best_val_metric
+        if improved:
+            best_val_metric = current
+            best_checkpoint = copy.deepcopy(model.state_dict())
         postfix.update({key: f"{value:.4f}" for key, value in metrics.items()})
         if early_stopper is None:
             return False
@@ -178,7 +183,7 @@ def run_training_loop(
                     should_stop = validate_and_checkpoint()
                     pbar.set_postfix(postfix)
                     if should_stop and (min_epochs is None or current_epoch >= min_epochs):
-                        return last_checkpoint
+                        return best_checkpoint
 
             current_epoch += 1
 
@@ -186,9 +191,9 @@ def run_training_loop(
                 should_stop = validate_and_checkpoint()
                 pbar.set_postfix(postfix)
                 if should_stop and (min_epochs is None or current_epoch >= min_epochs):
-                    return last_checkpoint
+                    return best_checkpoint
 
             _step_plateau_scheduler(scheduler, latest_val_loss)
 
             if current_epoch >= max_epochs:
-                return last_checkpoint
+                return best_checkpoint
