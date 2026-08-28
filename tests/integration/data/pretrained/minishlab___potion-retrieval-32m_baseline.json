@@ -1,0 +1,73 @@
+{
+  "metrics": {
+    "base_model_name": "minishlab/potion-base-32M",
+    "config": {
+      "apply_pca": 512,
+      "apply_zipf": true,
+      "architectures": [
+        "StaticModel"
+      ],
+      "hidden_dim": 512,
+      "model_type": "model2vec",
+      "normalize": true,
+      "seq_length": 1000000,
+      "tokenizer_name": "baai/bge-base-en-v1.5"
+    },
+    "embedding_dim": 512,
+    "embedding_dtype": "float32",
+    "embedding_mean": 0.005292,
+    "embedding_rank": 512,
+    "embedding_row_norm_mean": 130.27364,
+    "embedding_rows": 63091,
+    "embedding_std": 5.912311,
+    "encoding_speed": {
+      "sentences_per_second": 120182.5,
+      "tokens_per_second": 1352053.17
+    },
+    "first_tokens": [
+      "[PAD]",
+      "[UNK]",
+      "[CLS]",
+      "[SEP]",
+      "[MASK]",
+      "!",
+      "\"",
+      "#",
+      "$",
+      "%"
+    ],
+    "full_vocab_size": 63091,
+    "has_token_mapping": false,
+    "has_weights": false,
+    "language": null,
+    "last_tokens": [
+      "nti",
+      "corporeal",
+      "downgrading",
+      "symbolise",
+      "emptive",
+      "daters",
+      "cousteau",
+      "crichton",
+      "60k",
+      "longines"
+    ],
+    "median_token_length": 7,
+    "mteb_sts_scores": {
+      "BIOSSES": 0.787801,
+      "SICK-R": 0.66508,
+      "STS12": 0.613768,
+      "STS13": 0.73606,
+      "STS14": 0.704635,
+      "STS15": 0.811203,
+      "STS16": 0.725174,
+      "STSBenchmark": 0.740959
+    },
+    "normalize": true,
+    "token_order_hash": "ba90854d713d66960327011c1d592b5f16c6dd7fe26676b103490b62753dc7c9",
+    "tokenizer_type": "WordPiece",
+    "unk_token_id": 1,
+    "vocabulary_quantization": null
+  },
+  "model": "minishlab/potion-retrieval-32m"
+}
