@@ -73,6 +73,7 @@ class TorchStaticModel(torch.nn.Module):
             embeddings = embeddings.to(torch.float16)
         self.embeddings = torch.nn.Embedding.from_pretrained(embeddings, freeze=True)
         self.normalize = model.normalize
+        self.unk_token_id = model.unk_token_id
 
     def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """Forward pass of the model, following the standard transformers `input_ids`/`attention_mask` signature.
@@ -82,6 +83,8 @@ class TorchStaticModel(torch.nn.Module):
         :return: The embeddings, of shape (batch_size, embedding_dim).
         """
         mask = attention_mask.unsqueeze(-1).to(self.embeddings.weight.dtype)
+        if self.unk_token_id is not None:
+            mask[input_ids == self.unk_token_id] = 0
         # Zero out padding
         embeddings = self.embeddings(input_ids) * mask
         embeddings = embeddings.sum(dim=1) / mask.sum(dim=1).clamp(min=1)
@@ -310,8 +313,8 @@ def _save_tokenizer_and_config(tokenizer: Tokenizer, save_directory: Path, remov
     if pad_token:
         tokenizer_model.pad_token = pad_token
     hf = tokenizer_model.to_transformers()
-    # Hardcoded max length of 32768
-    hf.model_max_length = 32768
+    # Hardcoded max length of 512
+    hf.model_max_length = 512
     hf.save_pretrained(save_directory)
 
     config = {"pad_token_id": pad_token_id}

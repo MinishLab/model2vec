@@ -18,6 +18,7 @@ from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
 from model2vec.inference.mlp import Activation
 from model2vec.onnx import (
+    TorchStaticModel,
     TorchStaticModelPipeline,
     _dynamic_shapes,
     _export_onnx,
@@ -196,3 +197,63 @@ def test_export_model_to_onnx_remove_post_processor_default_true(
     with_special = saved_tokenizer("hello", add_special_tokens=True)["input_ids"]
     without_special = saved_tokenizer("hello", add_special_tokens=False)["input_ids"]
     assert with_special == without_special
+
+
+def _encoder_onnx_output(model: StaticModel, texts: list[str], path: Path) -> np.ndarray:
+    """Export a plain encoder to ONNX and run it on pad-tokenized `texts`."""
+    tokenizer = model.tokenizer
+    tokenizer.enable_padding(pad_id=0, pad_token=tokenizer.id_to_token(0))
+    encodings = tokenizer.encode_batch(texts, add_special_tokens=False)
+    tokenizer.no_padding()
+    input_ids = torch.tensor([e.ids for e in encodings], dtype=torch.long)
+    attention_mask = torch.tensor([e.attention_mask for e in encodings], dtype=torch.long)
+
+    torch_model = TorchStaticModel(model)
+    torch_model.eval()
+    _export_onnx(
+        torch_model,
+        (input_ids, attention_mask),
+        str(path),
+        opset_version=18,
+        input_names=["input_ids", "attention_mask"],
+        output_names=["embeddings"],
+        dynamic_shapes=_dynamic_shapes(),
+    )
+    session = ort.InferenceSession(str(path))
+    output = session.run(None, {"input_ids": input_ids.numpy(), "attention_mask": attention_mask.numpy()})[0]
+    assert isinstance(output, np.ndarray)
+    return output
+
+
+def test_encoder_onnx_zeroes_unk_tokens(tmp_path: Path) -> None:
+    """The exported encoder drops `[UNK]` token contributions, matching `StaticModel.encode`."""
+    vocab = ["[PAD]", "dog", "cat", "fish", "[UNK]"]
+    tokenizer = Tokenizer(
+        BPE(vocab={t: i for i, t in enumerate(vocab)}, merges=[], unk_token="[UNK]", ignore_merges=True)
+    )
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore[assignment]
+    vectors = np.random.RandomState(0).randn(len(vocab), 8).astype(np.float32)
+    model = StaticModel(vectors=vectors, tokenizer=tokenizer, normalize=False)
+    assert model.unk_token_id == vocab.index("[UNK]")
+
+    texts = ["dog cat", "dog zzz cat", "fish zzz"]
+    onnx_output = _encoder_onnx_output(model, texts, tmp_path / "model.onnx")
+    expected = model.encode(texts)
+
+    np.testing.assert_allclose(onnx_output, expected, atol=1e-5)
+
+
+def test_encoder_onnx_without_unk_token(tmp_path: Path) -> None:
+    """A tokenizer with no unk token (`unk_token_id is None`) exports and runs without masking."""
+    vocab = ["[PAD]", "dog", "cat", "fish"]
+    tokenizer = Tokenizer(BPE(vocab={t: i for i, t in enumerate(vocab)}, merges=[], ignore_merges=True))
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore[assignment]
+    vectors = np.random.RandomState(0).randn(len(vocab), 8).astype(np.float32)
+    model = StaticModel(vectors=vectors, tokenizer=tokenizer, normalize=False)
+    assert model.unk_token_id is None
+
+    texts = ["dog cat", "fish dog", "cat"]
+    onnx_output = _encoder_onnx_output(model, texts, tmp_path / "model.onnx")
+    expected = model.encode(texts)
+
+    np.testing.assert_allclose(onnx_output, expected, atol=1e-5)
