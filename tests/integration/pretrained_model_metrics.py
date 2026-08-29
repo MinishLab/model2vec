@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from model2vec.model import StaticModel
-from tests.integration.distill_metrics import STS_TASKS, compute_mteb_sts_scores
+from tests.integration.distill_metrics import compute_mteb_sts_scores
 
 PRETRAINED_MODELS: tuple[str, ...] = (
     "minishlab/potion-base-8m",
@@ -100,14 +100,3 @@ def compute_metrics(model: StaticModel) -> dict[str, Any]:
         "mteb_sts_scores": compute_mteb_sts_scores(model),
         "encoding_speed": measure_encoding_speed(model),
     }
-
-
-__all__ = [
-    "BASELINE_DIR",
-    "PRETRAINED_MODELS",
-    "STS_TASKS",
-    "baseline_path_for",
-    "compute_metrics",
-    "load_static_model",
-    "measure_encoding_speed",
-]
