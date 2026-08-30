@@ -187,7 +187,7 @@ def _export_encoder_to_onnx(
     logger.info(f"Model has been successfully exported to {onnx_model_path}")
 
     # Save the tokenizer files required for transformers.js, and a config.json for ONNX runtime providers
-    _save_tokenizer_and_config(model.tokenizer, save_path, remove_post_processor)
+    _save_tokenizer_and_config(model.tokenizer, save_path, remove_post_processor, model.max_length)
     logger.info(f"Tokenizer files have been saved to {save_path}")
 
     _save_model_card(
@@ -241,7 +241,7 @@ def _export_pipeline_to_onnx(
     logger.info(f"Pipeline has been successfully exported to {onnx_model_path}")
 
     # Save the tokenizer files required for transformers.js, and a config.json for ONNX runtime providers
-    _save_tokenizer_and_config(pipeline.model.tokenizer, save_path, remove_post_processor)
+    _save_tokenizer_and_config(pipeline.model.tokenizer, save_path, remove_post_processor, pipeline.model.max_length)
     logger.info(f"Tokenizer files have been saved to {save_path}")
 
     _save_model_card(
@@ -295,12 +295,15 @@ def _resolve_pad_token_id(tokenizer: Tokenizer, tokenizer_model: TokenizerModel)
     return 0
 
 
-def _save_tokenizer_and_config(tokenizer: Tokenizer, save_directory: Path, remove_post_processor: bool) -> None:
+def _save_tokenizer_and_config(
+    tokenizer: Tokenizer, save_directory: Path, remove_post_processor: bool, max_length: int
+) -> None:
     """Save tokenizer files in a format compatible with Transformers, plus config.json and special_tokens_map.json.
 
     :param tokenizer: The tokenizer from the StaticModel.
     :param save_directory: The directory to save the tokenizer and config files.
     :param remove_post_processor: Whether to remove the post processor.
+    :param max_length: The max length of the model.
     """
     tokenizer_model = TokenizerModel.from_tokenizer(tokenizer)
     if tokenizer_model.post_processor is not None and remove_post_processor:
@@ -313,8 +316,7 @@ def _save_tokenizer_and_config(tokenizer: Tokenizer, save_directory: Path, remov
     if pad_token:
         tokenizer_model.pad_token = pad_token
     hf = tokenizer_model.to_transformers()
-    # Hardcoded max length of 512
-    hf.model_max_length = 512
+    hf.model_max_length = max_length
     hf.save_pretrained(save_directory)
 
     config = {"pad_token_id": pad_token_id}
