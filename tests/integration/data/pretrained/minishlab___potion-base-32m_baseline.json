@@ -8,6 +8,7 @@
         "StaticModel"
       ],
       "hidden_dim": 512,
+      "max_length": 512,
       "model_type": "model2vec",
       "normalize": true,
       "seq_length": 1000000,
@@ -21,8 +22,8 @@
     "embedding_rows": 63091,
     "embedding_std": 4.876269,
     "encoding_speed": {
-      "sentences_per_second": 119227.47,
-      "tokens_per_second": 1341309.0
+      "sentences_per_second": 96840.92,
+      "tokens_per_second": 1089460.4
     },
     "first_tokens": [
       "[PAD]",

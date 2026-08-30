@@ -4,11 +4,11 @@ import json
 import math
 import os
 import warnings
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, overload
+from typing import Any, cast, overload
 
 import numpy as np
 from joblib import delayed
@@ -16,11 +16,15 @@ from tokenizers import Encoding, Tokenizer
 from tqdm import tqdm
 
 from model2vec.quantization import DType, quantize_and_reduce_dim
+from model2vec.types import _UNSET, StaticModelConfig, _UnsetType
 from model2vec.utils import ProgressParallel
 
 PathLike = Path | str
 
 logger = getLogger(__name__)
+
+_DEFAULT_MAX_LENGTH = 512
+_DEFAULT_NORMALIZE = False
 
 
 class StaticModel:
@@ -28,19 +32,22 @@ class StaticModel:
         self,
         vectors: np.ndarray,
         tokenizer: Tokenizer,
-        config: dict[str, Any] | None = None,
+        config: Mapping[str, Any] | None = None,
         normalize: bool | None = None,
         base_model_name: str | None = None,
         language: list[str] | None = None,
         weights: np.ndarray | None = None,
         token_mapping: np.ndarray | None = None,
+        max_length: int | None = None,
     ) -> None:
         """Initialize the StaticModel.
 
         :param vectors: The vectors to use.
         :param tokenizer: The Transformers tokenizer to use.
-        :param config: Any metadata config.
-        :param normalize: Whether to normalize the embeddings.
+        :param config: Any metadata config. Stored as a copy, so mutating it afterwards does not affect
+            the model, and vice versa.
+        :param normalize: Whether to normalize the embeddings. If None, the value from `config["normalize"]`
+            is used, falling back to False if `config` does not specify one.
         :param base_model_name: The used base model name. Used for creating a model card.
         :param language: The language of the model. Used for creating a model card.
         :param weights: The weights to use for the embeddings. If None, no weights are used.
@@ -49,6 +56,9 @@ class StaticModel:
         :param token_mapping: A mapping from token ids to indices in the vectors.
             If None, we don't remap the tokens during inference.
             This is only used for models that have undergone vocabulary quantization.
+        :param max_length: The default maximum sequence length (in tokens) used by `encode` when its own
+            `max_length` argument is not passed. If None, the value from `config["max_length"]` is used,
+            falling back to 512 if `config` does not specify one.
         :raises ValueError: if the number of tokens does not match the number of vectors.
         """
         super().__init__()
@@ -71,18 +81,11 @@ class StaticModel:
         self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
-        self.config = config or {}
+        self.config: StaticModelConfig = cast(StaticModelConfig, {**config}) if config is not None else {}
         self.base_model_name = base_model_name
         self.language = language
-        if hasattr(self.tokenizer, "encode_batch_fast"):
-            self._can_encode_fast = True
-        else:
-            self._can_encode_fast = False
-
-        if normalize is not None:
-            self.normalize = normalize
-        else:
-            self.normalize = self.config.get("normalize", False)
+        self.max_length = max_length if max_length is not None else self.config.get("max_length", _DEFAULT_MAX_LENGTH)
+        self.normalize = normalize if normalize is not None else self.config.get("normalize", _DEFAULT_NORMALIZE)
 
     @property
     def dim(self) -> int:
@@ -107,6 +110,25 @@ class StaticModel:
                 f"Set normalization to `{value}`, which does not match config value `{config_normalize}`. Updating config."
             )
         self.config["normalize"] = value
+
+    @property
+    def max_length(self) -> int:
+        """Get the max_length value.
+
+        :return: The max_length value.
+        """
+        return self._max_length
+
+    @max_length.setter
+    def max_length(self, value: int) -> None:
+        """Update the config if the value of max_length changes."""
+        config_max_length = self.config.get("max_length")
+        self._max_length = value
+        if config_max_length is not None and value != config_max_length:
+            logger.warning(
+                f"Set max_length to `{value}`, which does not match config value `{config_max_length}`. Updating config."
+            )
+        self.config["max_length"] = value
 
     @property
     def embedding_dtype(self) -> str:
@@ -153,10 +175,7 @@ class StaticModel:
             m = max_length * self.median_token_length
             sentences = [sentence[:m] for sentence in sentences]
 
-        if self._can_encode_fast:
-            encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
-        else:
-            encodings = self.tokenizer.encode_batch(sentences, add_special_tokens=False)
+        encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
 
         encodings_ids = [encoding.ids for encoding in encodings]
 
@@ -188,7 +207,8 @@ class StaticModel:
 
         :param path: The path to load your static model from.
         :param token: The huggingface token to use.
-        :param normalize: Whether to normalize the embeddings.
+        :param normalize: Whether to normalize the embeddings. If not passed, the value from the model's config
+            is used, falling back to False if the config does not specify one.
         :param subfolder: The subfolder to load from.
         :param quantize_to: The dtype to quantize the model to. If None, no quantization is done.
             If a string is passed, it is converted to a DType.
@@ -198,7 +218,8 @@ class StaticModel:
         :param vocabulary_quantization: The number of clusters to use for vocabulary quantization.
         :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
             already present in the cache.
-        :return: A StaticModel.
+        :return: A StaticModel. Its `max_length` is taken from the model's config, falling back to 512 if the
+            config does not specify one.
         """
         return _loading_helper(
             cls=cls,
@@ -341,8 +362,10 @@ class StaticModel:
     def encode(
         self,
         sentences: Sequence[str],
+        *,
         show_progress_bar: bool = False,
-        max_length: int | None = 512,
+        max_length: int | None | _UnsetType = _UNSET,
+        normalize: bool | None = None,
         batch_size: int = 1024,
         use_multiprocessing: bool = True,
         multiprocessing_threshold: int = 10_000,
@@ -359,7 +382,9 @@ class StaticModel:
         :param sentences: The list of sentences to encode. You can also pass a single sentence.
         :param show_progress_bar: Whether to show the progress bar.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
-            If this is None, no truncation is done.
+            If this is None, no truncation is done. If not passed, the model's `max_length` is used.
+        :param normalize: Whether to normalize the resulting embeddings. If not passed, the model's `normalize`
+            setting is used.
         :param batch_size: The batch size to use.
         :param use_multiprocessing: Whether to use multiprocessing.
             By default, this is enabled for inputs > multiprocessing_threshold sentences and disabled otherwise.
@@ -371,6 +396,10 @@ class StaticModel:
         if isinstance(sentences, str):
             sentences = [sentences]
             was_single = True
+        if isinstance(max_length, _UnsetType):
+            max_length = self.max_length
+        if normalize is None:
+            normalize = self.normalize
 
         # Prepare all batches
         sentence_batches = list(self._batch(sentences, batch_size))
@@ -382,7 +411,7 @@ class StaticModel:
             os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
             results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
-                delayed(self._encode_batch)(batch, max_length) for batch in sentence_batches
+                delayed(self._encode_batch)(batch, max_length, normalize) for batch in sentence_batches
             )
             out_array = np.concatenate(results, axis=0)
         else:
@@ -393,7 +422,7 @@ class StaticModel:
                 total=total_batches,
                 disable=not show_progress_bar,
             ):
-                out_arrays.append(self._encode_batch(batch, max_length))
+                out_arrays.append(self._encode_batch(batch, max_length, normalize))
             out_array = np.concatenate(out_arrays, axis=0)
 
         if was_single:
@@ -420,7 +449,7 @@ class StaticModel:
 
         return emb
 
-    def _encode_batch(self, sentences: Sequence[str], max_length: int | None) -> np.ndarray:
+    def _encode_batch(self, sentences: Sequence[str], max_length: int | None, normalize: bool) -> np.ndarray:
         """Encode a batch of sentences."""
         ids = self.tokenize(sentences=sentences, max_length=max_length)
         out: list[np.ndarray] = []
@@ -432,7 +461,7 @@ class StaticModel:
                 out.append(np.zeros(self.dim))
 
         out_array = np.stack(out)
-        if self.normalize:
+        if normalize:
             norm = np.linalg.norm(out_array, axis=1, keepdims=True) + 1e-32
             out_array = out_array / norm
 
@@ -504,12 +533,13 @@ def quantize_model(
     return StaticModel(
         vectors=embeddings,
         tokenizer=model.tokenizer,
-        config=dict(model.config),
+        config=model.config,
         weights=weights,
         token_mapping=token_mapping,
         normalize=model.normalize,
         base_model_name=model.base_model_name,
         language=model.language,
+        max_length=model.max_length,
     )
 
 

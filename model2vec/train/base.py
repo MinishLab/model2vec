@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
-from model2vec.model import PathLike, StaticModel
+from model2vec.model import _DEFAULT_MAX_LENGTH, PathLike, StaticModel
 from model2vec.train.dataset import TextDataset
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
@@ -43,6 +43,7 @@ class BaseFinetuneable(nn.Module):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        max_length: int = _DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a trainable StaticModel from a StaticModel.
 
@@ -57,6 +58,8 @@ class BaseFinetuneable(nn.Module):
         :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param max_length: The default maximum sequence length (in tokens) used to tokenize inputs.
+            Matches `StaticModel.max_length`, defaulting to 512.
         """
         super().__init__()
         self.pad_id = pad_id
@@ -66,6 +69,7 @@ class BaseFinetuneable(nn.Module):
         self.n_layers = n_layers
         self.normalize = normalize
         self.freeze_weights = freeze_weights
+        self.max_length = max_length
 
         self.vectors = vectors
         if self.vectors.dtype != torch.float32:
@@ -154,9 +158,18 @@ class BaseFinetuneable(nn.Module):
         *,
         model: StaticModel,
         pad_token: str | None = None,
+        max_length: int | None = None,
         **kwargs: Any,
     ) -> ModelType:
-        """Load the model from a static model."""
+        """Load the model from a static model.
+
+        :param model: The static model to load from.
+        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
+        :param max_length: The default maximum sequence length to use for tokenization. If None, the
+            static model's `max_length` is used.
+        :param **kwargs: Any additional keyword arguments to pass to the constructor.
+        :return: The initialized model.
+        """
         model.embedding = np.nan_to_num(model.embedding)
         weights = torch.from_numpy(model.weights) if model.weights is not None else None
         embeddings_converted = torch.from_numpy(model.embedding)
@@ -168,12 +181,15 @@ class BaseFinetuneable(nn.Module):
             pad_id = model.tokenizer.get_vocab()[pad_token]
         else:
             pad_id = get_probable_pad_token_id(model.tokenizer)
+        if max_length is None:
+            max_length = model.max_length
         return cls(
             vectors=embeddings_converted,
             pad_id=pad_id,
             tokenizer=model.tokenizer,
             token_mapping=token_mapping,
             weights=weights,
+            max_length=max_length,
             **kwargs,
         )
 
@@ -222,15 +238,15 @@ class BaseFinetuneable(nn.Module):
         """Forward pass through the mean, and a classifier layer after."""
         return self.head(self._encode(input_ids))
 
-    def tokenize(self, texts: list[str], max_length: int | None = 512) -> torch.Tensor:
+    def tokenize(self, texts: list[str]) -> torch.Tensor:
         """Tokenize a bunch of strings into a single padded 2D tensor.
 
         Note that this is not used during training.
 
         :param texts: The texts to tokenize.
-        :param max_length: If this is None, the sequence lengths are truncated to 512.
         :return: A 2D padded tensor
         """
+        max_length = self.max_length
         encoded: list[Encoding] = self.tokenizer.encode_batch_fast(texts, add_special_tokens=False)
         encoded_ids: list[torch.Tensor] = [torch.Tensor(encoding.ids[:max_length]).long() for encoding in encoded]
         return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
@@ -256,6 +272,7 @@ class BaseFinetuneable(nn.Module):
                 tokenizer=self.tokenizer,
                 normalize=self.normalize,
                 token_mapping=None,
+                max_length=self.max_length,
             )
         return StaticModel(
             vectors=emb,
@@ -263,6 +280,7 @@ class BaseFinetuneable(nn.Module):
             tokenizer=self.tokenizer,
             normalize=self.normalize,
             token_mapping=self.token_mapping.numpy(),
+            max_length=self.max_length,
         )
 
     def to_pipeline(self) -> StaticModelPipeline:
@@ -366,21 +384,21 @@ class BaseFinetuneable(nn.Module):
 
         return val_check_interval, check_val_every_epoch
 
-    def _prepare_dataset(self, X: list[str], y: torch.Tensor, max_length: int = 512) -> TextDataset:
+    def _prepare_dataset(self, X: list[str], y: torch.Tensor, max_length: int | None) -> TextDataset:
         """Prepare a dataset.
 
         :param X: The texts.
         :param y: The labels.
-        :param max_length: The maximum length of the input.
+        :param max_length: The maximum length of the input in tokens. If this is None, no truncation is done.
         :return: A TextDataset.
         """
-        # This is a speed optimization.
-        # assumes a mean token length of 10, which is really high, so safe.
-        truncate_length = max_length * 10
         batch_size = 1024
         tokenized: list[list[int]] = []
         for batch_idx in trange(0, len(X), 1024, desc="Tokenizing data"):
-            batch = [x[:truncate_length] for x in X[batch_idx : batch_idx + batch_size]]
+            batch = X[batch_idx : batch_idx + batch_size]
+            if max_length is not None:
+                truncate_length = max_length * 10
+                batch = [x[:truncate_length] for x in batch]
             encoded = self.tokenizer.encode_batch_fast(batch, add_special_tokens=False)
             tokenized.extend([encoding.ids[:max_length] for encoding in encoded])
 
@@ -405,9 +423,9 @@ class BaseFinetuneable(nn.Module):
         y_val_tensor = self._labels_to_tensor(validation_labels)
 
         logger.info("Preparing train dataset.")
-        train_dataset = self._prepare_dataset(train_texts, y_tensor)
+        train_dataset = self._prepare_dataset(train_texts, y_tensor, self.max_length)
         logger.info("Preparing validation dataset.")
-        val_dataset = self._prepare_dataset(validation_texts, y_val_tensor)
+        val_dataset = self._prepare_dataset(validation_texts, y_val_tensor, self.max_length)
 
         return train_dataset, val_dataset
 
