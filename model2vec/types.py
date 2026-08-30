@@ -4,8 +4,7 @@ from typing import Any, TypedDict
 
 
 class _UnsetType:
-    def __repr__(self) -> str:
-        return "<unset>"
+    pass
 
 
 _UNSET = _UnsetType()
