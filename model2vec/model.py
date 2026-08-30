@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 import math
 import os
-import warnings
 from collections.abc import Iterator, Sequence
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, overload
+from typing import Any, TypeVar, overload
 
 import numpy as np
 from joblib import delayed
@@ -172,7 +171,7 @@ class StaticModel:
 
     @classmethod
     def from_pretrained(
-        cls: type[StaticModel],
+        cls: type[T],
         path: PathLike,
         token: str | None = None,
         normalize: bool | None = None,
@@ -181,7 +180,7 @@ class StaticModel:
         dimensionality: int | None = None,
         vocabulary_quantization: int | None = None,
         force_download: bool = True,
-    ) -> StaticModel:
+    ) -> T:
         """Load a StaticModel from a local path or huggingface hub path.
 
         NOTE: if you load a private model from the huggingface hub, you need to pass a token.
@@ -209,35 +208,6 @@ class StaticModel:
             dimensionality=dimensionality,
             normalize=normalize,
             subfolder=subfolder,
-            force_download=force_download,
-        )
-
-    @classmethod
-    def from_sentence_transformers(
-        cls: type[StaticModel],
-        path: PathLike,
-        token: str | None = None,
-        normalize: bool | None = None,
-        quantize_to: str | DType | None = None,
-        dimensionality: int | None = None,
-        vocabulary_quantization: int | None = None,
-        force_download: bool = True,
-    ) -> StaticModel:
-        """Deprecated: use from_pretrained."""
-        warnings.warn(
-            "StaticModel.from_sentence_transformers() is deprecated; use from_pretrained() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _loading_helper(
-            cls=cls,
-            path=path,
-            token=token,
-            vocabulary_quantization=vocabulary_quantization,
-            quantize_to=quantize_to,
-            dimensionality=dimensionality,
-            normalize=normalize,
-            subfolder=None,
             force_download=force_download,
         )
 
@@ -464,11 +434,11 @@ class StaticModel:
 
 
 def quantize_model(
-    model: StaticModel,
+    model: T,
     vocabulary_quantization: int | None = None,
     quantize_to: str | DType | None = None,
     dimensionality: int | None = None,
-) -> StaticModel:
+) -> T:
     """Quantize the model to a lower precision and possibly lower dimensionality.
 
     :param model: The model to quantize.
@@ -501,7 +471,7 @@ def quantize_model(
             dimensionality=dimensionality,
         )
 
-    return StaticModel(
+    return type(model)(
         vectors=embeddings,
         tokenizer=model.tokenizer,
         config=dict(model.config),
@@ -514,7 +484,7 @@ def quantize_model(
 
 
 def _loading_helper(
-    cls: type[StaticModel],
+    cls: type[T],
     path: PathLike,
     token: str | None,
     vocabulary_quantization: int | None,
@@ -523,7 +493,7 @@ def _loading_helper(
     normalize: bool | None,
     subfolder: str | None,
     force_download: bool,
-) -> StaticModel:
+) -> T:
     """Helper function to load a model from a directory."""
     from model2vec.persistence import load_pretrained
 
@@ -569,3 +539,6 @@ def _get_unk_token_id(tokenizer: Tokenizer) -> int | None:
         return tokenizer.token_to_id(token)
     # Unigram
     return json.loads(tokenizer.to_str())["model"].get("unk_id")
+
+
+T = TypeVar("T", bound=StaticModel)
