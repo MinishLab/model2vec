@@ -14,7 +14,7 @@ class StaticModelConfig(TypedDict, total=False):
     """The metadata config stored alongside a model2vec model, e.g. in `config.json`."""
 
     normalize: bool
-    max_length: int
+    max_length: int | None
     model_type: str
     architectures: list[str]
     tokenizer_name: str

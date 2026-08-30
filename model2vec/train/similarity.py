@@ -7,7 +7,7 @@ import torch
 from tokenizers import Tokenizer
 from torch import nn
 
-from model2vec.model import _DEFAULT_MAX_LENGTH
+from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
@@ -45,7 +45,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
-        max_length: int = _DEFAULT_MAX_LENGTH,
+        max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a standard similarity model."""
         super().__init__(

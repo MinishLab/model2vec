@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import math
 import os
-import warnings
 from collections.abc import Iterator, Mapping, Sequence
 from logging import getLogger
 from pathlib import Path
@@ -23,7 +22,7 @@ PathLike = Path | str
 
 logger = getLogger(__name__)
 
-_DEFAULT_MAX_LENGTH = 512
+DEFAULT_MAX_LENGTH = 512
 _DEFAULT_NORMALIZE = False
 
 
@@ -33,12 +32,12 @@ class StaticModel:
         vectors: np.ndarray,
         tokenizer: Tokenizer,
         config: Mapping[str, Any] | None = None,
-        normalize: bool | None = None,
+        normalize: bool = _DEFAULT_NORMALIZE,
         base_model_name: str | None = None,
         language: list[str] | None = None,
         weights: np.ndarray | None = None,
         token_mapping: np.ndarray | None = None,
-        max_length: int | None = None,
+        max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize the StaticModel.
 
@@ -46,8 +45,8 @@ class StaticModel:
         :param tokenizer: The Transformers tokenizer to use.
         :param config: Any metadata config. Stored as a copy, so mutating it afterwards does not affect
             the model, and vice versa.
-        :param normalize: Whether to normalize the embeddings. If None, the value from `config["normalize"]`
-            is used, falling back to False if `config` does not specify one.
+        :param normalize: Whether to normalize the embeddings. Defaults to False. This value is authoritative:
+            it is written to `config["normalize"]`, and any conflicting value already in `config` is overridden.
         :param base_model_name: The used base model name. Used for creating a model card.
         :param language: The language of the model. Used for creating a model card.
         :param weights: The weights to use for the embeddings. If None, no weights are used.
@@ -57,8 +56,9 @@ class StaticModel:
             If None, we don't remap the tokens during inference.
             This is only used for models that have undergone vocabulary quantization.
         :param max_length: The default maximum sequence length (in tokens) used by `encode` when its own
-            `max_length` argument is not passed. If None, the value from `config["max_length"]` is used,
-            falling back to 512 if `config` does not specify one.
+            `max_length` argument is not passed. Defaults to 512; pass None to disable truncation. This value
+            is authoritative: it is written to `config["max_length"]`, and any conflicting value already in
+            `config` is overridden.
         :raises ValueError: if the number of tokens does not match the number of vectors.
         """
         super().__init__()
@@ -84,8 +84,8 @@ class StaticModel:
         self.config: StaticModelConfig = cast(StaticModelConfig, {**config}) if config is not None else {}
         self.base_model_name = base_model_name
         self.language = language
-        self.max_length = max_length if max_length is not None else self.config.get("max_length", _DEFAULT_MAX_LENGTH)
-        self.normalize = normalize if normalize is not None else self.config.get("normalize", _DEFAULT_NORMALIZE)
+        self.max_length = max_length
+        self.normalize = normalize
 
     @property
     def dim(self) -> int:
@@ -102,7 +102,7 @@ class StaticModel:
 
     @normalize.setter
     def normalize(self, value: bool) -> None:
-        """Update the config if the value of normalize changes."""
+        """Update the config."""
         config_normalize = self.config.get("normalize")
         self._normalize = value
         if config_normalize is not None and value != config_normalize:
@@ -112,7 +112,7 @@ class StaticModel:
         self.config["normalize"] = value
 
     @property
-    def max_length(self) -> int:
+    def max_length(self) -> int | None:
         """Get the max_length value.
 
         :return: The max_length value.
@@ -120,8 +120,8 @@ class StaticModel:
         return self._max_length
 
     @max_length.setter
-    def max_length(self, value: int) -> None:
-        """Update the config if the value of max_length changes."""
+    def max_length(self, value: int | None) -> None:
+        """Update the config."""
         config_max_length = self.config.get("max_length")
         self._max_length = value
         if config_max_length is not None and value != config_max_length:
@@ -199,6 +199,7 @@ class StaticModel:
         quantize_to: str | DType | None = None,
         dimensionality: int | None = None,
         vocabulary_quantization: int | None = None,
+        max_length: int | None | _UnsetType = _UNSET,
         force_download: bool = True,
     ) -> StaticModel:
         """Load a StaticModel from a local path or huggingface hub path.
@@ -216,10 +217,12 @@ class StaticModel:
             This is useful if you want to load a model with a lower dimensionality.
             Note that this only applies if you have trained your model using mrl or PCA.
         :param vocabulary_quantization: The number of clusters to use for vocabulary quantization.
+        :param max_length: The default maximum sequence length (in tokens) for `encode`. If not passed, the
+            value from the model's config is used, falling back to 512 if the config does not specify one.
+            Pass None to disable truncation.
         :param force_download: Whether to force the download of the model. If False, the model is only downloaded if it is not
             already present in the cache.
-        :return: A StaticModel. Its `max_length` is taken from the model's config, falling back to 512 if the
-            config does not specify one.
+        :return: A StaticModel.
         """
         return _loading_helper(
             cls=cls,
@@ -231,35 +234,7 @@ class StaticModel:
             normalize=normalize,
             subfolder=subfolder,
             force_download=force_download,
-        )
-
-    @classmethod
-    def from_sentence_transformers(
-        cls: type[StaticModel],
-        path: PathLike,
-        token: str | None = None,
-        normalize: bool | None = None,
-        quantize_to: str | DType | None = None,
-        dimensionality: int | None = None,
-        vocabulary_quantization: int | None = None,
-        force_download: bool = True,
-    ) -> StaticModel:
-        """Deprecated: use from_pretrained."""
-        warnings.warn(
-            "StaticModel.from_sentence_transformers() is deprecated; use from_pretrained() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _loading_helper(
-            cls=cls,
-            path=path,
-            token=token,
-            vocabulary_quantization=vocabulary_quantization,
-            quantize_to=quantize_to,
-            dimensionality=dimensionality,
-            normalize=normalize,
-            subfolder=None,
-            force_download=force_download,
+            max_length=max_length,
         )
 
     @overload
@@ -553,6 +528,7 @@ def _loading_helper(
     normalize: bool | None,
     subfolder: str | None,
     force_download: bool,
+    max_length: int | None | _UnsetType,
 ) -> StaticModel:
     """Helper function to load a model from a directory."""
     from model2vec.persistence import load_pretrained
@@ -564,6 +540,11 @@ def _loading_helper(
         force_download=force_download,
     )
 
+    normalize = normalize if normalize is not None else config.get("normalize", _DEFAULT_NORMALIZE)
+    resolved_max_length = (
+        config.get("max_length", DEFAULT_MAX_LENGTH) if isinstance(max_length, _UnsetType) else max_length
+    )
+
     model = cls(
         vectors=embeddings,
         tokenizer=tokenizer,
@@ -573,6 +554,7 @@ def _loading_helper(
         normalize=normalize,
         base_model_name=metadata.get("base_model"),
         language=metadata.get("language"),
+        max_length=resolved_max_length,
     )
 
     # If no quantization or dimensionality reduction is requested,

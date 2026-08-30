@@ -18,9 +18,9 @@ from skeletoken import TokenizerModel
 from tokenizers import Tokenizer
 from torch.export import Dim
 
-from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
 from model2vec.inference.mlp import Activation
+from model2vec.model import DEFAULT_MAX_LENGTH, StaticModel
 from model2vec.modelcards import create_model_card
 
 logger = logging.getLogger(__name__)
@@ -296,7 +296,7 @@ def _resolve_pad_token_id(tokenizer: Tokenizer, tokenizer_model: TokenizerModel)
 
 
 def _save_tokenizer_and_config(
-    tokenizer: Tokenizer, save_directory: Path, remove_post_processor: bool, max_length: int
+    tokenizer: Tokenizer, save_directory: Path, remove_post_processor: bool, max_length: int | None
 ) -> None:
     """Save tokenizer files in a format compatible with Transformers, plus config.json and special_tokens_map.json.
 
@@ -316,6 +316,9 @@ def _save_tokenizer_and_config(
     if pad_token:
         tokenizer_model.pad_token = pad_token
     hf = tokenizer_model.to_transformers()
+    if max_length is None:
+        logger.warning(f"Your model had no max length (i.e., unlimited), defaulting to {DEFAULT_MAX_LENGTH}.")
+        max_length = DEFAULT_MAX_LENGTH
     hf.model_max_length = max_length
     hf.save_pretrained(save_directory)
 

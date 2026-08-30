@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
-from model2vec.model import _DEFAULT_MAX_LENGTH, PathLike, StaticModel
+from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel
 from model2vec.train.dataset import TextDataset
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
@@ -43,7 +43,7 @@ class BaseFinetuneable(nn.Module):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
-        max_length: int = _DEFAULT_MAX_LENGTH,
+        max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a trainable StaticModel from a StaticModel.
 
