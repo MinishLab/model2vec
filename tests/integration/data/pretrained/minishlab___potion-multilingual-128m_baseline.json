@@ -8,6 +8,7 @@
         "StaticModel"
       ],
       "hidden_dim": 256,
+      "max_length": 512,
       "model_type": "model2vec",
       "normalize": true,
       "seq_length": 1000000,
@@ -22,8 +23,8 @@
     "embedding_rows": 500353,
     "embedding_std": 0.857525,
     "encoding_speed": {
-      "sentences_per_second": 117518.51,
-      "tokens_per_second": 1498360.99
+      "sentences_per_second": 111130.95,
+      "tokens_per_second": 1416919.65
     },
     "first_tokens": [
       "[PAD]",
@@ -170,7 +171,7 @@
     "normalize": true,
     "token_order_hash": "0b2eac292630557804d59ed065289d80954e3d56d793d0f7c4460fd19ec7cf22",
     "tokenizer_type": "Unigram",
-    "unk_token_id": null,
+    "unk_token_id": 1,
     "vocabulary_quantization": null
   },
   "model": "minishlab/potion-multilingual-128m"

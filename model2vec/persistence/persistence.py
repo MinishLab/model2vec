@@ -16,6 +16,7 @@ from model2vec.modelcards import get_metadata_from_readme
 from model2vec.persistence.datamodels import FOLDER_LAYOUTS, Layout
 from model2vec.persistence.hf import maybe_get_cached_model_path
 from model2vec.persistence.utils import SilentTqdm
+from model2vec.types import StaticModelConfig
 from model2vec.utils import SafeOpenProtocol
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ def save_pretrained(
     folder_path: Path,
     embeddings: np.ndarray,
     tokenizer: Tokenizer,
-    config: dict[str, Any],
+    config: StaticModelConfig,
     create_model_card: bool = True,
     subfolder: str | None = None,
     weights: np.ndarray | None = None,
@@ -84,7 +85,7 @@ def load_pretrained(
     subfolder: str | None,
     token: str | None,
     force_download: bool,
-) -> tuple[np.ndarray, Tokenizer, dict[str, Any], dict[str, Any], np.ndarray | None, np.ndarray | None]:
+) -> tuple[np.ndarray, Tokenizer, StaticModelConfig, dict[str, Any], np.ndarray | None, np.ndarray | None]:
     """Loads a pretrained model from a folder.
 
     :param folder_or_repo_path: The folder or repo path to load from.
