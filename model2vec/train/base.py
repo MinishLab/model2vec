@@ -139,12 +139,12 @@ class BaseFinetuneable(nn.Module):
 
     @classmethod
     def from_pretrained(
-        cls: type[ModelType],
+        cls: type[T],
         path: PathLike = "minishlab/potion-base-32m",
         *,
         token: str | None = None,
         **kwargs: Any,
-    ) -> ModelType:
+    ) -> T:
         """Load the model from a pretrained model2vec model."""
         if model_name := kwargs.pop("model_name", None):
             logger.warning("The 'model_name' argument is deprecated. Use 'path' instead.")
@@ -154,13 +154,13 @@ class BaseFinetuneable(nn.Module):
 
     @classmethod
     def from_static_model(
-        cls: type[ModelType],
+        cls: type[T],
         *,
         model: StaticModel,
         pad_token: str | None = None,
         max_length: int | None = None,
         **kwargs: Any,
-    ) -> ModelType:
+    ) -> T:
         """Load the model from a static model.
 
         :param model: The static model to load from.
@@ -430,4 +430,4 @@ class BaseFinetuneable(nn.Module):
         return train_dataset, val_dataset
 
 
-ModelType = TypeVar("ModelType", bound=BaseFinetuneable)
+T = TypeVar("T", bound=BaseFinetuneable)
