@@ -4,7 +4,7 @@ import warnings
 from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, TypeVar, cast
+from typing import TypeVar, cast
 
 import huggingface_hub
 import numpy as np
@@ -15,6 +15,7 @@ from model2vec.inference.evaluation import evaluate_single_or_multi_label
 from model2vec.inference.mlp import Activation, Layer, MLPHead
 from model2vec.model import PathLike, StaticModel
 from model2vec.persistence import save_pretrained
+from model2vec.types import _UNSET, StaticModelConfig, _UnsetType
 
 _DEFAULT_HEAD_FILENAME = "head.safetensors"
 _LEGACY_HEAD_FILENAME = "pipeline.skops"
@@ -74,7 +75,7 @@ class StaticModelPipeline:
         self,
         X: Sequence[str],
         show_progress_bar: bool,
-        max_length: int | None,
+        max_length: int | None | _UnsetType,
         batch_size: int,
         use_multiprocessing: bool,
         multiprocessing_threshold: int,
@@ -97,7 +98,7 @@ class StaticModelPipeline:
         self,
         X: Sequence[str],
         show_progress_bar: bool = False,
-        max_length: int | None = 512,
+        max_length: int | None | _UnsetType = _UNSET,
         batch_size: int = 1024,
         use_multiprocessing: bool = True,
         multiprocessing_threshold: int = 10_000,
@@ -107,7 +108,8 @@ class StaticModelPipeline:
 
         :param X: The input data to predict. Can be a list of strings or a single string.
         :param show_progress_bar: Whether to display a progress bar during prediction. Defaults to False.
-        :param max_length: The maximum length of the input sequences. Defaults to 512.
+        :param max_length: The maximum length of the input sequences. If not passed, the encoder model's
+            `max_length` is used. Pass `max_length=None` to disable truncation.
         :param batch_size: The batch size for prediction. Defaults to 1024.
         :param use_multiprocessing: Whether to use multiprocessing for encoding. Defaults to True.
         :param multiprocessing_threshold: The threshold for the number of samples to use multiprocessing. Defaults to 10,000.
@@ -139,7 +141,7 @@ class StaticModelPipeline:
         self,
         X: Sequence[str],
         show_progress_bar: bool = False,
-        max_length: int | None = 512,
+        max_length: int | None | _UnsetType = _UNSET,
         batch_size: int = 1024,
         use_multiprocessing: bool = True,
         multiprocessing_threshold: int = 10_000,
@@ -148,7 +150,8 @@ class StaticModelPipeline:
 
         :param X: The input data to predict. Can be a list of strings or a single string.
         :param show_progress_bar: Whether to display a progress bar during prediction. Defaults to False.
-        :param max_length: The maximum length of the input sequences. Defaults to 512.
+        :param max_length: The maximum length of the input sequences. If not passed, the encoder model's
+            `max_length` is used. Pass `max_length=None` to disable truncation.
         :param batch_size: The batch size for prediction. Defaults to 1024.
         :param use_multiprocessing: Whether to use multiprocessing for encoding. Defaults to True.
         :param multiprocessing_threshold: The threshold for the number of samples to use multiprocessing. Defaults to 10,000.
@@ -220,7 +223,7 @@ def _load_pipeline(folder_or_repo_path: PathLike, token: str | None = None) -> t
 
     model = StaticModel.from_pretrained(folder_or_repo_path)
 
-    head_config = cast(dict[str, Any], model.config.get("head_config", {}))
+    head_config = model.config.get("head_config", {})
     activation = Activation(head_config.get("activation", Activation.IDENTITY.value))
     n_layers = head_config.get("n_layers", 0)
     classes = head_config.get("classes")
@@ -337,7 +340,7 @@ def _save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> No
     save_file(tensors, folder_path / _DEFAULT_HEAD_FILENAME)
 
     model = pipeline.model
-    config = dict(model.config)
+    config: StaticModelConfig = {**model.config}
     config["head_config"] = {
         "n_layers": len(head.layers),
         "activation": head.activation.value,

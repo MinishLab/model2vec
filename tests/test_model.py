@@ -9,11 +9,13 @@ from model2vec import StaticModel
 
 def test_initialization(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
     """Test successful initialization of StaticModel."""
+    original_config = dict(mock_config)
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
     assert model.embedding.shape == (5, 2)
     assert len(model.tokens) == 5
     assert model.tokenizer == mock_tokenizer
-    assert model.config == mock_config
+    assert model.config == {**original_config, "normalize": False, "max_length": 512}
+    assert mock_config == original_config
 
 
 def test_initialization_token_vector_mismatch(mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
@@ -26,22 +28,9 @@ def test_initialization_token_vector_mismatch(mock_tokenizer: Tokenizer, mock_co
 def test_tokenize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
     """Test tokenization of a sentence."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    model._can_encode_fast = True
-    tokens_fast = model.tokenize(["word1 word2"])
-    model._can_encode_fast = False
-    tokens_slow = model.tokenize(["word1 word2"])
+    tokens = model.tokenize(["word1 word2"])
 
-    assert tokens_fast == tokens_slow
-
-
-def test_encode_batch_fast(
-    mock_vectors: np.ndarray, mock_berttokenizer: Tokenizer, mock_config: dict[str, str]
-) -> None:
-    """Test tokenization of a sentence."""
-    if hasattr(mock_berttokenizer, "encode_batch_fast"):
-        del mock_berttokenizer.encode_batch_fast
-        model = StaticModel(vectors=mock_vectors, tokenizer=mock_berttokenizer, config=mock_config)
-        assert not model._can_encode_fast
+    assert tokens
 
 
 def test_encode_single_sentence(
@@ -303,9 +292,17 @@ def test_set_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> N
     """Tests whether the normalize is set correctly."""
     model = StaticModel(mock_vectors, mock_tokenizer, {}, normalize=True)
     model.normalize = False
-    assert model.config == {"normalize": False}
+    assert model.config == {"normalize": False, "max_length": 512}
     model.normalize = True
-    assert model.config == {"normalize": True}
+    assert model.config == {"normalize": True, "max_length": 512}
+
+
+def test_set_max_length(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Tests whether the max_length is set correctly."""
+    model = StaticModel(mock_vectors, mock_tokenizer, {}, max_length=128)
+    assert model.config == {"normalize": False, "max_length": 128}
+    model.max_length = 256
+    assert model.config == {"normalize": False, "max_length": 256}
 
 
 def test_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:

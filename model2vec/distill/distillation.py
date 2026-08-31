@@ -16,6 +16,7 @@ from model2vec.distill.utils import select_optimal_device
 from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
 from model2vec.tokenizer import clean_and_create_vocabulary, turn_tokens_into_ids
+from model2vec.types import StaticModelConfig
 from model2vec.vocabulary_quantization import quantize_vocabulary
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ def distill_from_model(
 
     model_name = getattr(model, "name_or_path", "")
 
-    config = {
+    config: StaticModelConfig = {
         "model_type": "model2vec",
         "architectures": ["StaticModel"],
         "tokenizer_name": model_name,
