@@ -17,6 +17,7 @@ from transformers import AutoTokenizer
 from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
 from model2vec.inference.mlp import Activation
+from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.onnx import (
     TorchStaticModel,
     TorchStaticModelPipeline,
@@ -116,6 +117,19 @@ def test_resolve_pad_token_id_falls_back_to_unk_when_no_pad_registered() -> None
     assert _resolve_pad_token_id(tokenizer, tokenizer_model) == tokenizer.token_to_id("[UNK]")
 
 
+def test_resolve_pad_token_id_falls_back_to_zero_when_no_pad_or_unk() -> None:
+    """With no registered pad token, no literal "[PAD]" entry, and no unk token, fall back to id 0."""
+    vocab = ["!", "hello", "world"]
+    tokenizer = Tokenizer(BPE(vocab={t: i for i, t in enumerate(vocab)}, merges=[]))
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore[assignment]
+    tokenizer_model = TokenizerModel.from_tokenizer(tokenizer)
+    assert tokenizer_model.pad_token_id is None
+    assert tokenizer.token_to_id("[PAD]") is None
+    assert tokenizer_model.unk_token_id is None
+
+    assert _resolve_pad_token_id(tokenizer, tokenizer_model) == 0
+
+
 def test_pipeline_onnx_matches_projector(
     mock_inference_pipeline_projector: StaticModelPipeline, tmp_path: Path
 ) -> None:
@@ -191,6 +205,19 @@ def test_save_tokenizer_and_config_no_warning_without_post_processor(
         _save_tokenizer_and_config(tokenizer, tmp_path, remove_post_processor=True, max_length=512)
 
     assert "removing a post processor" not in caplog.text
+
+
+def test_save_tokenizer_and_config_defaults_max_length_when_none(
+    mock_static_model: StaticModel, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A `None` max_length is warned about and replaced with `DEFAULT_MAX_LENGTH` in the saved tokenizer."""
+    with caplog.at_level(logging.WARNING, logger="model2vec.onnx"):
+        _save_tokenizer_and_config(mock_static_model.tokenizer, tmp_path, remove_post_processor=True, max_length=None)
+
+    assert "no max length" in caplog.text
+
+    saved_tokenizer = AutoTokenizer.from_pretrained(tmp_path)
+    assert saved_tokenizer.model_max_length == DEFAULT_MAX_LENGTH
 
 
 def test_export_model_to_onnx_remove_post_processor_default_true(
