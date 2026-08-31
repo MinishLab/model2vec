@@ -61,7 +61,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         )
 
     def fit(
-        self: _T,
+        self: T,
         X: list[str],
         y: torch.Tensor,
         learning_rate: float = 1e-3,
@@ -75,7 +75,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         y_val: torch.Tensor | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
-    ) -> _T:
+    ) -> T:
         """Fit a model.
 
         This function trains the model with a plain torch training loop.
@@ -129,4 +129,4 @@ class StaticModelForSimilarity(BaseFinetuneable):
         return self
 
 
-_T = TypeVar("_T", bound=StaticModelForSimilarity)
+T = TypeVar("T", bound=StaticModelForSimilarity)
