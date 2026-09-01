@@ -27,3 +27,6 @@ test-integration:
 
 test-integration-update:
 	uv run python -m tests.integration.update_distill_baseline
+
+test-integration-pretrained-update:
+	uv run python -m tests.integration.update_pretrained_baseline

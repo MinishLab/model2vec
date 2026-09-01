@@ -7,6 +7,7 @@ import torch
 from tokenizers import Tokenizer
 from torch import nn
 
+from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
@@ -44,6 +45,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a standard similarity model."""
         super().__init__(
@@ -58,10 +60,11 @@ class StaticModelForSimilarity(BaseFinetuneable):
             n_layers=n_layers,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            max_length=max_length,
         )
 
     def fit(
-        self: _T,
+        self: T,
         X: list[str],
         y: torch.Tensor,
         learning_rate: float = 1e-3,
@@ -75,7 +78,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         y_val: torch.Tensor | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
-    ) -> _T:
+    ) -> T:
         """Fit a model.
 
         This function trains the model with a plain torch training loop.
@@ -129,4 +132,4 @@ class StaticModelForSimilarity(BaseFinetuneable):
         return self
 
 
-_T = TypeVar("_T", bound=StaticModelForSimilarity)
+T = TypeVar("T", bound=StaticModelForSimilarity)

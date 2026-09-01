@@ -23,9 +23,9 @@ def test_init_predict(mock_inference_pipeline: StaticModelPipeline) -> None:
     if mock_inference_pipeline.head.activation == Activation.SIGMOID:
         assert mock_inference_pipeline.classes_ is not None
         if isinstance(mock_inference_pipeline.classes_[0], str):
-            target = [["a", "b"]]
+            target = [["b"]]
         else:
-            target = [[0, 1]]  # type: ignore
+            target = [[1]]  # type: ignore
     else:
         assert mock_inference_pipeline.classes_ is not None
         if isinstance(mock_inference_pipeline.classes_[0], str):
@@ -82,9 +82,9 @@ def test_roundtrip_save(mock_inference_pipeline: StaticModelPipeline) -> None:
         if mock_inference_pipeline.head.activation == Activation.SIGMOID:
             assert mock_inference_pipeline.classes_ is not None
             if isinstance(mock_inference_pipeline.classes_[0], str):
-                target = [["a", "b"]]
+                target = [["b"]]
             else:
-                target = [[0, 1]]  # type: ignore
+                target = [[1]]  # type: ignore
         else:
             assert mock_inference_pipeline.classes_ is not None
             if isinstance(mock_inference_pipeline.classes_[0], str):

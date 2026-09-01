@@ -54,7 +54,7 @@ def quantize_vocabulary(
         labels = _drop_low_weight_clusters(normed, weights, labels, drop_fraction=drop_fraction)
 
     new_embeddings = _spherical_centroids(normed, labels, weights).astype(orig_dtype)
-    return new_embeddings, labels, weights / weights.max()
+    return new_embeddings, labels, weights
 
 
 def _merge_similar_tokens(normed: np.ndarray, sim_threshold: float, n_neighbors: int) -> np.ndarray:

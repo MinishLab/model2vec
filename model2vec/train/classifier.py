@@ -12,6 +12,7 @@ from torch import nn
 from tqdm import trange
 
 from model2vec.inference import evaluate_single_or_multi_label
+from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
@@ -59,6 +60,7 @@ class StaticModelForClassification(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a standard classifier model."""
         # Alias: Follows scikit-learn. Set to dummy classes
@@ -77,6 +79,7 @@ class StaticModelForClassification(BaseFinetuneable):
             n_layers=n_layers,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            max_length=max_length,
         )
 
     @property

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Sequence
 
 from skeletoken import TokenizerModel
 
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def clean_and_create_vocabulary(
     model: TokenizerModel,
-    vocabulary_to_add: list[str],
+    vocabulary_to_add: Sequence[str],
     token_remove_regex: re.Pattern[str] | None,
 ) -> TokenizerModel:
     """Clean a vocabulary by removing duplicates and tokens that were already in the vocabulary.
@@ -30,6 +31,9 @@ def clean_and_create_vocabulary(
     n_empty = 0
     n_regex_removed = 0
 
+    # Remove the post processor.
+    model.post_processor = None
+
     internal_tokens: list[str] = model.sorted_vocabulary
     if token_remove_regex:
         tokens_to_remove = [token for token in internal_tokens if token_remove_regex.match(token)]
@@ -40,8 +44,9 @@ def clean_and_create_vocabulary(
     seen_tokens = set(internal_tokens)
     tokens_to_add: list[str] = []
     added_tokens_to_add: list[str] = []
+    seen_added = set()
     for token in vocabulary_to_add:
-        preprocessed = preprocessor.preprocess(token, had_word_prefix=True)
+        preprocessed = preprocessor.preprocess(token, had_initial_subword_prefix=True)
         if len(preprocessed) < 1:
             logger.warning(f"Token '{token}' was empty after preprocessing.")
             n_empty += 1
@@ -55,7 +60,15 @@ def clean_and_create_vocabulary(
             if token in model.vocabulary:
                 # If the unprocessed token (incorrectly) is in the vocabulary, we should remove it.
                 model = model.remove_token_from_vocabulary(token)
+            if preprocessor.normalizer:
+                token = preprocessor.normalizer.normalize_str(token)
+            # We need to strip because our AddedTokens also get stripped
+            token = token.strip()
+            if token in seen_added:
+                logger.warning(f"Normalized added token '{token}' was in the added vocabulary twice.")
+                continue
             added_tokens_to_add.append(token)
+            seen_added.add(token)
             continue
         token = preprocessed[0]
         if token in seen_tokens:
@@ -69,8 +82,6 @@ def clean_and_create_vocabulary(
         seen_tokens.add(token)
         tokens_to_add.append(token)
 
-    # Remove the post processor.
-    model.post_processor = None
     # Remove all prior added tokens
     model = model.prune_added_tokens()
     # Preprocess tokens is False because tokens are already preprocessed.
