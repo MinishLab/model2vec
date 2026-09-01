@@ -147,6 +147,19 @@ def test_textdataset_init_incorrect() -> None:
         TextDataset([[0]], torch.arange(2))
 
 
+def test_training_batch_padding_is_masked(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Training batches should pad with the model's pad id, so padding stays masked and out of the mean."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, pad_id=1)
+    texts = ["word2", "word2 word3"]
+
+    dataset = s._prepare_dataset(texts, torch.arange(2), max_length=None)
+    batch, _ = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
+
+    assert torch.equal(batch, s.tokenize(texts))
+    with torch.no_grad():
+        assert torch.allclose(s._encode(batch)[0], s._encode(s.tokenize(texts[:1]))[0])
+
+
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
