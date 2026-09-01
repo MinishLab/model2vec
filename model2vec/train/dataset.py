@@ -4,17 +4,19 @@ from torch.utils.data import DataLoader, Dataset
 
 
 class TextDataset(Dataset):
-    def __init__(self, tokenized_texts: list[list[int]], targets: torch.Tensor) -> None:
+    def __init__(self, tokenized_texts: list[list[int]], targets: torch.Tensor, pad_id: int = 0) -> None:
         """A dataset of texts.
 
         :param tokenized_texts: The tokenized texts. Each text is a list of token ids.
         :param targets: The targets.
+        :param pad_id: The id used to pad batches. Must match the `pad_id` of the model being trained.
         :raises ValueError: If the number of targets does not match the number of texts.
         """
         if len(targets) != len(tokenized_texts):
             raise ValueError("Number of targets does not match number of texts.")
         self.tokenized_texts = tokenized_texts
         self.targets = targets
+        self.pad_id = pad_id
 
     def __len__(self) -> int:
         """Return the length of the dataset."""
@@ -24,13 +26,12 @@ class TextDataset(Dataset):
         """Gets an item."""
         return self.tokenized_texts[index], self.targets[index]
 
-    @staticmethod
-    def collate_fn(batch: list[tuple[list[list[int]], int]]) -> tuple[torch.Tensor, torch.Tensor]:
+    def collate_fn(self, batch: list[tuple[list[list[int]], int]]) -> tuple[torch.Tensor, torch.Tensor]:
         """Collate function."""
         texts, targets = zip(*batch)
 
         tensors: list[torch.Tensor] = [torch.LongTensor(x) for x in texts]
-        padded = pad_sequence(tensors, batch_first=True, padding_value=0)
+        padded = pad_sequence(tensors, batch_first=True, padding_value=self.pad_id)
 
         return padded, torch.stack(targets)
 
