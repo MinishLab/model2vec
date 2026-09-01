@@ -402,7 +402,7 @@ class BaseFinetuneable(nn.Module):
             encoded = self.tokenizer.encode_batch_fast(batch, add_special_tokens=False)
             tokenized.extend([encoding.ids[:max_length] for encoding in encoded])
 
-        return TextDataset(tokenized, y)
+        return TextDataset(tokenized, y, pad_id=self.pad_id)
 
     def _labels_to_tensor(self, labels: Any) -> torch.Tensor:
         """Turn the labels into a tensor."""
