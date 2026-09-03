@@ -160,6 +160,17 @@ def test_training_batch_padding_is_masked(mock_vectors: np.ndarray, mock_tokeniz
         assert torch.allclose(s._encode(batch)[0], s._encode(s.tokenize(texts[:1]))[0])
 
 
+def test_unknown_tokens_are_dropped(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Training and inference should drop unknown tokens, the way `StaticModel.tokenize` does."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    static = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    texts = ["word1 unknownword", "unknownword word2 otherunknown"]
+    expected = static.tokenize(texts)
+
+    assert [row[row != s.pad_id].tolist() for row in s.tokenize(texts)] == expected
+    assert s._prepare_dataset(texts, torch.arange(2), max_length=None).tokenized_texts == expected
+
+
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
