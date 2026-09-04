@@ -6,6 +6,8 @@ import pytest
 import torch
 from skeletoken import TokenizerModel
 from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.pre_tokenizers import Whitespace
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from transformers import AutoTokenizer
@@ -165,6 +167,24 @@ def test_unknown_tokens_are_dropped(mock_vectors: np.ndarray, mock_tokenizer: To
     s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     static = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
     texts = ["word1 unknownword", "unknownword word2 otherunknown"]
+    expected = static.tokenize(texts)
+
+    assert [row[row != s.pad_id].tolist() for row in s.tokenize(texts)] == expected
+    assert s._prepare_dataset(texts, torch.arange(2), max_length=None).tokenized_texts == expected
+
+
+def test_tokenize_without_unk_token(mock_vectors: np.ndarray) -> None:
+    """A tokenizer with no unk token has nothing to drop, so tokenization is left as is."""
+    vocab = ["[PAD]", "word1", "word2", "word3"]
+    tokenizer = Tokenizer(BPE(vocab={token: idx for idx, token in enumerate(vocab)}, merges=[], ignore_merges=True))
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore[assignment]
+    vectors = mock_vectors[: len(vocab)]
+
+    s = StaticModelForClassification(vectors=torch.from_numpy(vectors).float(), tokenizer=tokenizer)
+    static = StaticModel(vectors=vectors, tokenizer=tokenizer)
+    assert s.unk_token_id is None
+
+    texts = ["word1 word2", "word3 word1 word2"]
     expected = static.tokenize(texts)
 
     assert [row[row != s.pad_id].tolist() for row in s.tokenize(texts)] == expected
