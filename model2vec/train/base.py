@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
-from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel
+from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _get_unk_token_id
 from model2vec.train.dataset import TextDataset
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
@@ -90,6 +90,13 @@ class BaseFinetuneable(nn.Module):
         self._weights = weights
         self.w = self.construct_weights()
         self.tokenizer = tokenizer
+        self.unk_token_id = _get_unk_token_id(tokenizer)
+
+    def _remove_unk(self, token_ids: list[int]) -> list[int]:
+        """Drop unknown tokens, mirroring `StaticModel.tokenize`."""
+        if self.unk_token_id is None:
+            return token_ids
+        return [token_id for token_id in token_ids if token_id != self.unk_token_id]
 
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""
@@ -248,7 +255,9 @@ class BaseFinetuneable(nn.Module):
         """
         max_length = self.max_length
         encoded: list[Encoding] = self.tokenizer.encode_batch_fast(texts, add_special_tokens=False)
-        encoded_ids: list[torch.Tensor] = [torch.Tensor(encoding.ids[:max_length]).long() for encoding in encoded]
+        encoded_ids: list[torch.Tensor] = [
+            torch.Tensor(self._remove_unk(encoding.ids)[:max_length]).long() for encoding in encoded
+        ]
         return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
 
     @property
@@ -400,7 +409,7 @@ class BaseFinetuneable(nn.Module):
                 truncate_length = max_length * 10
                 batch = [x[:truncate_length] for x in batch]
             encoded = self.tokenizer.encode_batch_fast(batch, add_special_tokens=False)
-            tokenized.extend([encoding.ids[:max_length] for encoding in encoded])
+            tokenized.extend([self._remove_unk(encoding.ids)[:max_length] for encoding in encoded])
 
         return TextDataset(tokenized, y, pad_id=self.pad_id)
 
