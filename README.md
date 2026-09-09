@@ -8,15 +8,6 @@
 
 <div align="center">
   <h2>
-    <a href="https://huggingface.co/minishlab"><strong>🤗 Models</strong></a> |
-    <a href="https://minish.ai/packages/model2vec/introduction"><strong>📖 Docs</strong></a> |
-    <a href="https://github.com/MinishLab/model2vec/blob/main/results/README.md"><strong>🏆 Results</strong></a> |
-    <a href="https://github.com/MinishLab/model2vec/tree/main/tutorials"><strong>📚 Tutorials</strong></a> |
-    <a href="https://minish.ai/blog"><strong>🌐 Blog</strong></a>
-</div>
-
-<div align="center">
-  <h2>
     <a href="https://pypi.org/project/model2vec/"><img src="https://img.shields.io/pypi/v/model2vec?color=%23007ec6&label=pypi%20package" alt="Package version"></a>
     <a href="https://minish.ai/packages/model2vec/introduction"><img src="https://img.shields.io/badge/docs-minish.ai-blue.svg" alt="Docs"></a>
     <a href="https://pepy.tech/project/model2vec">
@@ -31,24 +22,17 @@
     <a href="https://github.com/MinishLab/model2vec/blob/main/LICENSE">
       <img src="https://img.shields.io/badge/license-MIT-green" alt="License - MIT">
     </a>
-    <a href="https://github.com/MinishLab/model2vec/stargazers">
-      <img src="https://img.shields.io/github/stars/minishlab/model2vec.svg" alt=Stars">
-    </a>
-  </h2>
+ </h2>
+
+
+
+[Quickstart](#quickstart) • [Main Features](#main-features) • [Model List](#model-list)  • [Results](#results)
 </div>
-
-
 
 
 
 Model2Vec is a technique to turn any sentence transformer into a small, fast static embedding model. Model2Vec reduces model size by a factor up to 50 and makes models up to 500 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model in the world. See our [results](results/README.md), read our [docs](https://minish.ai/packages/model2vec/introduction), or dive in to see how it works.
 
-<div align="center">
-<h3>
-
-[Quickstart](#quickstart) • [Updates & Announcements](#updates--announcements) • [Main Features](#main-features) • [Model List](#model-list)
-</h3>
-</div>
 
 ## Quickstart
 
@@ -118,17 +102,6 @@ classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["labe
 
 For advanced usage, see our [training docs](https://minish.ai/packages/model2vec/training).
 
-## Updates & Announcements
-
-- **23/05/2025**: We released [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M), a multilingual model trained on 101 languages. It is the best performing static embedding model for multilingual tasks, and is capable of generating embeddings for any text in any language. The results can be found in our [results](results/README.md#mmteb-results-multilingual) section.
-
-- **01/05/2025**: We released backend support for `BPE` and `Unigram` tokenizers, along with quantization and dimensionality reduction. New Model2Vec models are now 50% of the original models size, and can be quantized to int8 to be 25% of the size, without loss of performance.
-
-- **12/02/2025**: We released **Model2Vec training**, allowing you to fine-tune your own classification models on top of Model2Vec models. Find out more in our [training documentation](https://github.com/MinishLab/model2vec/blob/main/model2vec/train/README.md) and [results](results/README.md#training-results).
-
-- **30/01/2025**: We released two new models: [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) and [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M). [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) is our most performant model to date, using a larger vocabulary and higher dimensions. [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) is a finetune of [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) that is optimized for retrieval tasks, and is the best performing static retrieval model currently available.
-
-- **30/10/2024**: We released three new models: [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M), [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M), and [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M). These models are trained using [Tokenlearn](https://github.com/MinishLab/tokenlearn). Find out more in our [blog post](https://minishlab.github.io/tokenlearn_blogpost/). NOTE: for users of any of our old English M2V models, we recommend switching to these new models as they [perform better on all tasks](https://github.com/MinishLab/model2vec/tree/main/results).
 
 ## Main Features
 
@@ -164,9 +137,7 @@ We provide a number of models that can be used out of the box. These models are 
 | [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M) | Multilingual | [bge-m3](https://huggingface.co/BAAI/bge-m3)      | 128M    | General   |
 | [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 32.3M   | Retrieval |
 | [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)     | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 7.5M    | General   |
-| [potion-base-4M](https://huggingface.co/minishlab/potion-base-4M)     | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 3.7M    | General   |
-| [potion-base-2M](https://huggingface.co/minishlab/potion-base-2M)     | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 1.8M    | General   |
-
+| [potion-code-16M-v2](https://huggingface.co/minishlab/potion-code-16M-v2) | Code       | [CodeRankEmbed](https://huggingface.co/nomic-ai/CodeRankEmbed) | 16.2M   | Code      |
 
 
 
