@@ -221,7 +221,7 @@ def _load_pipeline(folder_or_repo_path: PathLike, token: str | None = None) -> t
         except EntryNotFoundError:
             return _load_legacy_pipeline(folder_or_repo_path, token)
 
-    model = StaticModel.from_pretrained(folder_or_repo_path)
+    model = StaticModel.from_pretrained(folder_or_repo_path, token=token)
 
     head_config = model.config.get("head_config", {})
     activation = Activation(head_config.get("activation", Activation.IDENTITY.value))
@@ -291,7 +291,7 @@ def convert_legacy_pipeline(
             folder_or_repo_path.as_posix(), _LEGACY_HEAD_FILENAME, token=token
         )
 
-    model = StaticModel.from_pretrained(folder_or_repo_path)
+    model = StaticModel.from_pretrained(folder_or_repo_path, token=token)
     model.embedding = np.nan_to_num(model.embedding)
 
     untrusted_types = skops.io.get_untrusted_types(file=legacy_head_path)
