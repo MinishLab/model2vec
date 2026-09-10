@@ -135,6 +135,24 @@ def test_load_pipeline_from_hub(mock_inference_pipeline: StaticModelPipeline) ->
         assert loaded.predict(["dog"]).tolist() == mock_inference_pipeline.predict(["dog"]).tolist()
 
 
+def test_load_pipeline_from_hub_with_token(mock_inference_pipeline: StaticModelPipeline) -> None:
+    """Test that the token also reaches the encoder download, not just the head download."""
+    with TemporaryDirectory() as temp_dir:
+        mock_inference_pipeline.save_pretrained(temp_dir)
+        downloaded_model = StaticModel.from_pretrained(temp_dir)
+        head_path = os.path.join(temp_dir, "head.safetensors")
+
+        with (
+            patch("model2vec.inference.model.huggingface_hub.hf_hub_download", return_value=head_path),
+            patch(
+                "model2vec.inference.model.StaticModel.from_pretrained", return_value=downloaded_model
+            ) as mock_from_pretrained,
+        ):
+            StaticModelPipeline.from_pretrained("fake/repo-id", token="secret")
+
+        assert mock_from_pretrained.call_args.kwargs.get("token") == "secret"
+
+
 def test_push_to_hub(mock_inference_pipeline: StaticModelPipeline) -> None:
     """Test that push_to_hub saves the pipeline to a temp folder before pushing it to the hub."""
     captured: dict[str, object] = {}
@@ -276,6 +294,31 @@ def test_from_pretrained_legacy_fallback_hub(mock_static_model: StaticModel) -> 
     assert loaded.head.activation == Activation.IDENTITY
     encoded = mock_static_model.encode(["dog", "cat"])
     assert np.allclose(loaded.predict(["dog", "cat"]), legacy_pipeline.predict(encoded))
+
+
+def test_convert_legacy_pipeline_with_token(mock_static_model: StaticModel) -> None:
+    """Test that the token also reaches the encoder download on the legacy path."""
+    rng = np.random.RandomState(0)
+    X = rng.randn(30, mock_static_model.dim)
+    y = rng.randn(30, 4)
+    legacy_pipeline = make_pipeline(MLPRegressor(hidden_layer_sizes=(8,), max_iter=1, random_state=0).fit(X, y))
+
+    with TemporaryDirectory() as temp_dir:
+        _dump_legacy_pipeline(temp_dir, mock_static_model, legacy_pipeline)
+        downloaded_model = StaticModel.from_pretrained(temp_dir)
+
+        with (
+            patch(
+                "model2vec.inference.model.huggingface_hub.hf_hub_download",
+                return_value=os.path.join(temp_dir, "pipeline.skops"),
+            ),
+            patch(
+                "model2vec.inference.model.StaticModel.from_pretrained", return_value=downloaded_model
+            ) as mock_from_pretrained,
+        ):
+            convert_legacy_pipeline("fake/repo-id", token="secret")
+
+    assert mock_from_pretrained.call_args.kwargs.get("token") == "secret"
 
 
 def test_convert_legacy_pipeline_untrusted_type(mock_static_model: StaticModel) -> None:
