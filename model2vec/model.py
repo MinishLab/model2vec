@@ -130,10 +130,7 @@ class StaticModel:
                 f"Set max_length to `{value}`, which does not match config value `{config_max_length}`. Updating config."
             )
         self.config["max_length"] = value
-        if value is None:
-            self.tokenizer.no_truncation()
-        else:
-            self.tokenizer.enable_truncation(value)
+        self._set_max_length_in_tokenizer(value)
 
     @property
     def embedding_dtype(self) -> str:
