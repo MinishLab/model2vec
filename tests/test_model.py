@@ -298,8 +298,13 @@ def test_set_max_length(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> 
     """Tests whether the max_length is set correctly."""
     model = StaticModel(mock_vectors, mock_tokenizer, {}, max_length=128)
     assert model.config == {"normalize": False, "max_length": 128}
+    assert model.tokenizer.truncation["max_length"] == 128
     model.max_length = 256
     assert model.config == {"normalize": False, "max_length": 256}
+    assert model.tokenizer.truncation["max_length"] == 256
+    model.max_length = None
+    assert model.config == {"normalize": False, "max_length": None}
+    assert model.tokenizer.truncation is None
 
 
 def test_models_do_not_share_tokenizer(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
