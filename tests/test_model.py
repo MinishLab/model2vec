@@ -86,6 +86,18 @@ def test_encode_multiprocessing(
     assert encoded.shape == (15000, 2)
 
 
+def test_encode_as_sequence_max_length(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test encoding of sentences as tokens with max_length truncation."""
+    sentences = ["word1 word2 word3"]
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    full = model.encode_as_sequence(sentences)
+    truncated = model.encode_as_sequence(sentences, max_length=1)
+
+    assert len(truncated[0]) < len(full[0])
+
+
 def test_encode_as_sequence_multiprocessing(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
