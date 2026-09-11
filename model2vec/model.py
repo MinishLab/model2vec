@@ -243,6 +243,7 @@ class StaticModel:
         self,
         sentences: str,
         *,
+        max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
         use_multiprocessing: bool = True,
@@ -254,6 +255,7 @@ class StaticModel:
         self,
         sentences: list[str],
         *,
+        max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
         use_multiprocessing: bool = True,
@@ -264,6 +266,7 @@ class StaticModel:
         self,
         sentences: str | list[str],
         *,
+        max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
         use_multiprocessing: bool = True,
@@ -276,12 +279,15 @@ class StaticModel:
         Note that if you just want the mean, you should use the `encode` method.
         This is about twice as slow.
         Sentences that do not contain any tokens will be turned into an empty array.
-        Unlike `encode`, this method never truncates: the full sequence of token embeddings is always returned.
+        Unlike `encode`, this method ignores the model's `max_length`: truncation is only applied if you
+        explicitly pass `max_length` here.
 
         NOTE: the input type is currently underspecified. The actual input type is `Sequence[str] | str`, but this
             is not possible to implement in python typing currently.
 
         :param sentences: The list of sentences to encode.
+        :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
+            If this is None, no truncation is done. Note that this is independent of the model's `max_length`.
         :param batch_size: The batch size to use.
         :param show_progress_bar: Whether to show the progress bar.
         :param use_multiprocessing: Whether to use multiprocessing.
@@ -293,12 +299,15 @@ class StaticModel:
         if isinstance(sentences, str):
             sentences = [sentences]
             was_single = True
+        if max_length is not None:
+            m = max_length * self.median_token_length
+            sentences = [sentence[:m] for sentence in sentences]
 
         # Prepare all batches
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        self._set_max_length_in_tokenizer(None)
+        self._set_max_length_in_tokenizer(max_length)
         try:
             # Use joblib for multiprocessing if requested, and if we have enough sentences
             if use_multiprocessing and len(sentences) > multiprocessing_threshold:
