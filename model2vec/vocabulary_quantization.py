@@ -4,6 +4,7 @@ import logging
 from typing import cast
 
 import numpy as np
+from tqdm import tqdm
 
 # Lazy import
 try:
@@ -50,8 +51,10 @@ def quantize_vocabulary(
     normed = (embeddings / norms[:, None]).astype(np.float32)
 
     labels = _merge_similar_tokens(normed, sim_threshold=sim_threshold, n_neighbors=n_neighbors)
+    logger.info(f"Merged {len(normed)} tokens into {int(labels.max()) + 1} clusters.")
     if drop_fraction > 0:
         labels = _drop_low_weight_clusters(normed, weights, labels, drop_fraction=drop_fraction)
+        logger.info(f"Dropped low-weight clusters, {int(labels.max()) + 1} remaining.")
 
     new_embeddings = _spherical_centroids(normed, labels, weights).astype(orig_dtype)
     return new_embeddings, labels, weights
@@ -160,29 +163,42 @@ def _bounded_merge_unique(vectors: np.ndarray, sim_threshold: float, n_neighbors
     centroid = vectors.astype(np.float64)
 
     roots = np.arange(n)
-    for _ in range(max_rounds):
-        if len(roots) <= 1:
-            break
-        k = min(n_neighbors, len(roots) - 1)
-        root_vectors = centroid[roots].astype(np.float32)
-        rows, cols, cand_angle = _nearest_neighbor_candidates(root_vectors, k)
-        if len(rows) == 0:
-            break
-        cand_i, cand_j = roots[rows], roots[cols]
+    with tqdm(total=max_rounds, desc="Merging vocabulary", unit="round") as pbar:
+        pbar.set_postfix(clusters=len(roots))
+        for _ in range(max_rounds):
+            if len(roots) <= 1:
+                break
+            k = min(n_neighbors, len(roots) - 1)
+            root_vectors = centroid[roots].astype(np.float32)
+            rows, cols, cand_angle = _nearest_neighbor_candidates(root_vectors, k)
+            if len(rows) == 0:
+                break
+            cand_i, cand_j = roots[rows], roots[cols]
 
-        n_merged = 0
-        for idx in range(len(cand_i)):
-            # We can only merge roots.
-            i, j = int(cand_i[idx]), int(cand_j[idx])
-            if parent[i] != i or parent[j] != j:
-                continue
-            # Do a merge in place, and record whether we did one.
-            n_merged += _try_merge(i, j, cand_angle[idx], theta_max, parent, radius, mass, centroid)
+            n_merged = 0
+            n_candidates = len(cand_i)
+            chunk = 8192
+            with tqdm(total=n_candidates, desc="  scanning pairs", unit="pair", leave=False) as cand_bar:
+                for idx in range(n_candidates):
+                    # We can only merge roots.
+                    i, j = int(cand_i[idx]), int(cand_j[idx])
+                    if parent[i] == i and parent[j] == j:
+                        # Do a merge in place, and record whether we did one.
+                        n_merged += _try_merge(i, j, cand_angle[idx], theta_max, parent, radius, mass, centroid)
+                    if (idx + 1) % chunk == 0:
+                        cand_bar.update(chunk)
+                cand_bar.update(n_candidates % chunk)
 
-        # Quit if we didn't merge anything.
-        if n_merged == 0:
-            break
-        roots = np.unique(np.fromiter((_find(parent, int(r)) for r in roots), dtype=np.int64, count=len(roots)))
+            pbar.update(1)
+            # Quit if we didn't merge anything.
+            if n_merged == 0:
+                pbar.set_postfix(clusters=len(roots))
+                break
+            roots = np.unique(np.fromiter((_find(parent, int(r)) for r in roots), dtype=np.int64, count=len(roots)))
+            pbar.set_postfix(clusters=len(roots))
+
+        pbar.total = pbar.n
+        pbar.refresh()
 
     labels = np.fromiter((_find(parent, i) for i in range(n)), dtype=np.int64, count=n)
     _, compact = np.unique(labels, return_inverse=True)
