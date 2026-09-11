@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import math
 import os
@@ -77,7 +78,7 @@ class StaticModel:
         # We can't use or short circuit here because np.ndarray as booleans are ambiguous.
         self.token_mapping: np.ndarray | None = token_mapping
 
-        self.tokenizer = tokenizer
+        self.tokenizer = copy.deepcopy(tokenizer)
         self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
@@ -129,6 +130,7 @@ class StaticModel:
                 f"Set max_length to `{value}`, which does not match config value `{config_max_length}`. Updating config."
             )
         self.config["max_length"] = value
+        self._set_max_length_in_tokenizer(value)
 
     @property
     def embedding_dtype(self) -> str:
@@ -163,18 +165,12 @@ class StaticModel:
             mapping=self.token_mapping,
         )
 
-    def tokenize(self, sentences: Sequence[str], max_length: int | None = None) -> list[list[int]]:
+    def tokenize(self, sentences: Sequence[str]) -> list[list[int]]:
         """Tokenize a list of sentences.
 
         :param sentences: The sentences to tokenize.
-        :param max_length: The maximum length of the sentences in tokens. If this is None, sequences
-            are not truncated.
         :return: A list of list of tokens.
         """
-        if max_length is not None:
-            m = max_length * self.median_token_length
-            sentences = [sentence[:m] for sentence in sentences]
-
         encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
 
         encodings_ids = [encoding.ids for encoding in encodings]
@@ -184,8 +180,6 @@ class StaticModel:
             encodings_ids = [
                 [token_id for token_id in token_ids if token_id != self.unk_token_id] for token_ids in encodings_ids
             ]
-        if max_length is not None:
-            encodings_ids = [token_ids[:max_length] for token_ids in encodings_ids]
 
         return encodings_ids
 
@@ -237,10 +231,18 @@ class StaticModel:
             force_download=force_download,
         )
 
+    def _set_max_length_in_tokenizer(self, max_length: int | None) -> None:
+        """Sets the max length in the tokenizer."""
+        if max_length is None:
+            self.tokenizer.no_truncation()
+        else:
+            self.tokenizer.enable_truncation(max_length)
+
     @overload
     def encode_as_sequence(
         self,
         sentences: str,
+        *,
         max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
@@ -252,6 +254,7 @@ class StaticModel:
     def encode_as_sequence(
         self,
         sentences: list[str],
+        *,
         max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
@@ -262,6 +265,7 @@ class StaticModel:
     def encode_as_sequence(
         self,
         sentences: str | list[str],
+        *,
         max_length: int | None = None,
         batch_size: int = 1024,
         show_progress_bar: bool = False,
@@ -275,13 +279,15 @@ class StaticModel:
         Note that if you just want the mean, you should use the `encode` method.
         This is about twice as slow.
         Sentences that do not contain any tokens will be turned into an empty array.
+        Unlike `encode`, this method ignores the model's `max_length`: truncation is only applied if you
+        explicitly pass `max_length` here.
 
         NOTE: the input type is currently underspecified. The actual input type is `Sequence[str] | str`, but this
             is not possible to implement in python typing currently.
 
         :param sentences: The list of sentences to encode.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
-            If this is None, no truncation is done.
+            If this is None, no truncation is done. Note that this is independent of the model's `max_length`.
         :param batch_size: The batch size to use.
         :param show_progress_bar: Whether to show the progress bar.
         :param use_multiprocessing: Whether to use multiprocessing.
@@ -293,38 +299,45 @@ class StaticModel:
         if isinstance(sentences, str):
             sentences = [sentences]
             was_single = True
+        if max_length is not None:
+            m = max_length * self.median_token_length
+            sentences = [sentence[:m] for sentence in sentences]
 
         # Prepare all batches
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        # Use joblib for multiprocessing if requested, and if we have enough sentences
-        if use_multiprocessing and len(sentences) > multiprocessing_threshold:
-            # Disable parallelism for tokenizers
-            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        self._set_max_length_in_tokenizer(max_length)
+        try:
+            # Use joblib for multiprocessing if requested, and if we have enough sentences
+            if use_multiprocessing and len(sentences) > multiprocessing_threshold:
+                # Disable parallelism for tokenizers
+                os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-            results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
-                delayed(self._encode_batch_as_sequence)(batch, max_length) for batch in sentence_batches
-            )
-            out_array: list[np.ndarray] = []
-            for r in results:
-                out_array.extend(r)
-        else:
-            out_array = []
-            for batch in tqdm(
-                sentence_batches,
-                total=total_batches,
-                disable=not show_progress_bar,
-            ):
-                out_array.extend(self._encode_batch_as_sequence(batch, max_length))
+                results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
+                    delayed(self._encode_batch_as_sequence)(batch) for batch in sentence_batches
+                )
+                out_array: list[np.ndarray] = []
+                for r in results:
+                    out_array.extend(r)
+            else:
+                out_array = []
+                for batch in tqdm(
+                    sentence_batches,
+                    total=total_batches,
+                    disable=not show_progress_bar,
+                ):
+                    out_array.extend(self._encode_batch_as_sequence(batch))
+        finally:
+            self._set_max_length_in_tokenizer(self.max_length)
 
         if was_single:
             return out_array[0]
         return out_array
 
-    def _encode_batch_as_sequence(self, sentences: Sequence[str], max_length: int | None) -> list[np.ndarray]:
+    def _encode_batch_as_sequence(self, sentences: Sequence[str]) -> list[np.ndarray]:
         """Encode a batch of sentences as a sequence."""
-        ids = self.tokenize(sentences=sentences, max_length=max_length)
+        ids = self.tokenize(sentences=sentences)
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
@@ -375,30 +388,37 @@ class StaticModel:
             max_length = self.max_length
         if normalize is None:
             normalize = self.normalize
+        if max_length is not None:
+            m = max_length * self.median_token_length
+            sentences = [sentence[:m] for sentence in sentences]
 
         # Prepare all batches
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        # Use joblib for multiprocessing if requested, and if we have enough sentences
-        if use_multiprocessing and len(sentences) > multiprocessing_threshold:
-            # Disable parallelism for tokenizers
-            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        self._set_max_length_in_tokenizer(max_length)
+        try:
+            # Use joblib for multiprocessing if requested, and if we have enough sentences
+            if use_multiprocessing and len(sentences) > multiprocessing_threshold:
+                # Disable parallelism for tokenizers
+                os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-            results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
-                delayed(self._encode_batch)(batch, max_length, normalize) for batch in sentence_batches
-            )
-            out_array = np.concatenate(results, axis=0)
-        else:
-            # Don't use multiprocessing
-            out_arrays: list[np.ndarray] = []
-            for batch in tqdm(
-                sentence_batches,
-                total=total_batches,
-                disable=not show_progress_bar,
-            ):
-                out_arrays.append(self._encode_batch(batch, max_length, normalize))
-            out_array = np.concatenate(out_arrays, axis=0)
+                results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
+                    delayed(self._encode_batch)(batch, normalize) for batch in sentence_batches
+                )
+                out_array = np.concatenate(results, axis=0)
+            else:
+                # Don't use multiprocessing
+                out_arrays: list[np.ndarray] = []
+                for batch in tqdm(
+                    sentence_batches,
+                    total=total_batches,
+                    disable=not show_progress_bar,
+                ):
+                    out_arrays.append(self._encode_batch(batch, normalize))
+                out_array = np.concatenate(out_arrays, axis=0)
+        finally:
+            self._set_max_length_in_tokenizer(self.max_length)
 
         if was_single:
             return out_array[0]
@@ -424,9 +444,9 @@ class StaticModel:
 
         return emb
 
-    def _encode_batch(self, sentences: Sequence[str], max_length: int | None, normalize: bool) -> np.ndarray:
+    def _encode_batch(self, sentences: Sequence[str], normalize: bool) -> np.ndarray:
         """Encode a batch of sentences."""
-        ids = self.tokenize(sentences=sentences, max_length=max_length)
+        ids = self.tokenize(sentences=sentences)
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
