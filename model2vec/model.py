@@ -81,6 +81,7 @@ class StaticModel:
         self.tokenizer = copy.deepcopy(tokenizer)
         self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
+        self.median_token_length = int(np.median([len(token) for token in self.tokens]))
         self.config: StaticModelConfig = cast(StaticModelConfig, {**config}) if config is not None else {}
         self.base_model_name = base_model_name
         self.language = language
@@ -299,13 +300,17 @@ class StaticModel:
         if isinstance(sentences, str):
             sentences = [sentences]
             was_single = True
+        if isinstance(max_length, _UnsetType):
+            max_length = self.max_length
+        if max_length is not None:
+            m = max_length * self.median_token_length
+            sentences = [sentence[:m] for sentence in sentences]
 
         # Prepare all batches
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        if not isinstance(max_length, _UnsetType):
-            self._set_max_length_in_tokenizer(max_length)
+        self._set_max_length_in_tokenizer(max_length)
         try:
             # Use joblib for multiprocessing if requested, and if we have enough sentences
             if use_multiprocessing and len(sentences) > multiprocessing_threshold:
@@ -327,8 +332,7 @@ class StaticModel:
                 ):
                     out_array.extend(self._encode_batch_as_sequence(batch))
         finally:
-            if not isinstance(max_length, _UnsetType):
-                self._set_max_length_in_tokenizer(self.max_length)
+            self._set_max_length_in_tokenizer(self.max_length)
 
         if was_single:
             return out_array[0]
@@ -387,13 +391,15 @@ class StaticModel:
             max_length = self.max_length
         if normalize is None:
             normalize = self.normalize
+        if max_length is not None:
+            m = max_length * self.median_token_length
+            sentences = [sentence[:m] for sentence in sentences]
 
         # Prepare all batches
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        if not isinstance(max_length, _UnsetType):
-            self._set_max_length_in_tokenizer(max_length)
+        self._set_max_length_in_tokenizer(max_length)
         try:
             # Use joblib for multiprocessing if requested, and if we have enough sentences
             if use_multiprocessing and len(sentences) > multiprocessing_threshold:
@@ -401,7 +407,7 @@ class StaticModel:
                 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
                 results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
-                    delayed(self._encode_batch)(batch, max_length, normalize) for batch in sentence_batches
+                    delayed(self._encode_batch)(batch, normalize) for batch in sentence_batches
                 )
                 out_array = np.concatenate(results, axis=0)
             else:
@@ -412,11 +418,10 @@ class StaticModel:
                     total=total_batches,
                     disable=not show_progress_bar,
                 ):
-                    out_arrays.append(self._encode_batch(batch, max_length, normalize))
+                    out_arrays.append(self._encode_batch(batch, normalize))
                 out_array = np.concatenate(out_arrays, axis=0)
         finally:
-            if not isinstance(max_length, _UnsetType):
-                self._set_max_length_in_tokenizer(self.max_length)
+            self._set_max_length_in_tokenizer(self.max_length)
 
         if was_single:
             return out_array[0]
@@ -442,7 +447,7 @@ class StaticModel:
 
         return emb
 
-    def _encode_batch(self, sentences: Sequence[str], max_length: int | None, normalize: bool) -> np.ndarray:
+    def _encode_batch(self, sentences: Sequence[str], normalize: bool) -> np.ndarray:
         """Encode a batch of sentences."""
         ids = self.tokenize(sentences=sentences)
         out: list[np.ndarray] = []
