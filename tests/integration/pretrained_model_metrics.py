@@ -87,7 +87,7 @@ def compute_metrics(model: StaticModel) -> dict[str, Any]:
         "token_order_hash": token_order_hash,
         "first_tokens": tokens[:10],
         "last_tokens": tokens[-10:],
-        "median_token_length": int(np.median([len(token) for token in tokens])),
+        "median_token_length": model.median_token_length,
         "unk_token_id": model.unk_token_id,
         "normalize": bool(model.normalize),
         "base_model_name": model.base_model_name,
