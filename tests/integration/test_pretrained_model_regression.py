@@ -77,7 +77,8 @@ def test_all_attributes_are_loaded(model: StaticModel) -> None:
     assert model.embedding_dtype == np.dtype(model.embedding.dtype).name
     assert isinstance(model.config, dict) and model.config
     assert isinstance(model.normalize, bool)
-    assert isinstance(model.median_token_length, int) and model.median_token_length > 0
+    median_token_length = np.median([len(token) for token in model.tokens])
+    assert median_token_length > 0
     assert model.unk_token_id is None or isinstance(model.unk_token_id, int)
     assert model.base_model_name is None or isinstance(model.base_model_name, str)
     assert model.language is None or isinstance(model.language, list)
