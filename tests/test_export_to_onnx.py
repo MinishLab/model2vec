@@ -17,7 +17,7 @@ from transformers import AutoTokenizer
 from model2vec import StaticModel
 from model2vec.inference import StaticModelPipeline
 from model2vec.inference.mlp import Activation
-from model2vec.model import DEFAULT_MAX_LENGTH
+from model2vec.model import DEFAULT_MAX_LENGTH, quantize_model
 from model2vec.onnx import (
     TorchStaticModel,
     TorchStaticModelPipeline,
@@ -27,6 +27,7 @@ from model2vec.onnx import (
     _save_tokenizer_and_config,
     export_model_to_onnx,
 )
+from model2vec.train import StaticModelForClassification
 
 
 def _tokenize(pipeline: StaticModelPipeline, texts: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
@@ -290,3 +291,48 @@ def test_encoder_onnx_without_unk_token(tmp_path: Path) -> None:
     expected = model.encode(texts)
 
     np.testing.assert_allclose(onnx_output, expected, atol=1e-5)
+
+
+def _vocabulary_quantized_model() -> StaticModel:
+    """Build a small model whose vocabulary has been quantized, so ids go through `token_mapping` and `weights`."""
+    vocab = ["[PAD]", "dog", "cat", "fish", "bird", "cow", "horse", "[UNK]"]
+    tokenizer = Tokenizer(
+        BPE(vocab={t: i for i, t in enumerate(vocab)}, merges=[], unk_token="[UNK]", ignore_merges=True)
+    )
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore[assignment]
+    vectors = np.random.RandomState(0).randn(len(vocab), 8).astype(np.float32)
+    model = quantize_model(
+        StaticModel(vectors=vectors, tokenizer=tokenizer, normalize=False), vocabulary_quantization=3
+    )
+    assert model.token_mapping is not None and model.weights is not None
+    assert len(model.embedding) < len(model.tokens)
+    return model
+
+
+def test_encoder_onnx_vocabulary_quantized(tmp_path: Path) -> None:
+    """A vocabulary-quantized encoder maps ids through `token_mapping` and applies `weights`, like `encode`."""
+    model = _vocabulary_quantized_model()
+
+    texts = ["dog cat", "horse cow fish", "bird zzz"]
+    onnx_output = _encoder_onnx_output(model, texts, tmp_path / "model.onnx")
+    expected = model.encode(texts)
+
+    np.testing.assert_allclose(onnx_output, expected, atol=1e-5)
+
+
+def test_pipeline_onnx_vocabulary_quantized(tmp_path: Path) -> None:
+    """A classifier trained on a vocabulary-quantized model exports with its mapping and weights intact."""
+    torch.random.manual_seed(42)
+    classifier = StaticModelForClassification.from_static_model(model=_vocabulary_quantized_model(), hidden_dim=8)
+    classifier.fit(["dog cat", "horse cow"], ["a", "b"])
+    pipeline = classifier.to_pipeline()
+    assert pipeline.model.token_mapping is not None
+
+    texts = ["dog cat", "horse cow fish", "bird"]
+    torch_model = TorchStaticModelPipeline(pipeline)
+    input_ids, attention_mask = _tokenize(pipeline, texts)
+
+    onnx_output = _export(torch_model, input_ids, attention_mask, tmp_path / "model.onnx")
+    expected = pipeline.predict_proba(texts, use_multiprocessing=False)
+
+    np.testing.assert_allclose(onnx_output, expected, atol=1e-4)
