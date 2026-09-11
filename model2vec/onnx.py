@@ -65,6 +65,9 @@ def _dynamic_shapes() -> dict[str, dict[int, Dim]]:
 
 
 class TorchStaticModel(torch.nn.Module):
+    token_mapping: torch.Tensor | None
+    weights: torch.Tensor | None
+
     def __init__(self, model: StaticModel) -> None:
         """Initialize the TorchStaticModel with a StaticModel instance."""
         super().__init__()
@@ -72,6 +75,11 @@ class TorchStaticModel(torch.nn.Module):
         if embeddings.dtype in {torch.int8, torch.uint8}:
             embeddings = embeddings.to(torch.float16)
         self.embeddings = torch.nn.Embedding.from_pretrained(embeddings, freeze=True)
+        # Vocabulary-quantized models look up ids through `token_mapping` and weigh tokens, like `_encode_helper`
+        token_mapping = None if model.token_mapping is None else torch.from_numpy(model.token_mapping).long()
+        weights = None if model.weights is None else torch.from_numpy(model.weights).to(embeddings.dtype)
+        self.register_buffer("token_mapping", token_mapping)
+        self.register_buffer("weights", weights)
         self.normalize = model.normalize
         self.unk_token_id = model.unk_token_id
 
@@ -85,8 +93,11 @@ class TorchStaticModel(torch.nn.Module):
         mask = attention_mask.unsqueeze(-1).to(self.embeddings.weight.dtype)
         if self.unk_token_id is not None:
             mask[input_ids == self.unk_token_id] = 0
+        embedding_ids = input_ids if self.token_mapping is None else self.token_mapping[input_ids]
         # Zero out padding
-        embeddings = self.embeddings(input_ids) * mask
+        embeddings = self.embeddings(embedding_ids) * mask
+        if self.weights is not None:
+            embeddings = embeddings * self.weights[input_ids].unsqueeze(-1)
         embeddings = embeddings.sum(dim=1) / mask.sum(dim=1).clamp(min=1)
         # Normalize if required
         if self.normalize:
