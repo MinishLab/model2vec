@@ -238,6 +238,60 @@ class StaticModel:
         else:
             self.tokenizer.enable_truncation(max_length)
 
+    def _encode_dispatch(
+        self,
+        sentences: str | Sequence[str],
+        *,
+        max_length: int | None,
+        batch_size: int,
+        show_progress_bar: bool,
+        use_multiprocessing: bool,
+        multiprocessing_threshold: int,
+        batch_fn: Any,
+        batch_args: tuple[Any, ...] = (),
+    ) -> tuple[list[Any], bool]:
+        """Shared truncation, batching, and multiprocessing dispatch logic for `encode` and `encode_as_sequence`.
+
+        :param sentences: The sentence or sentences to encode.
+        :param max_length: The maximum length of the sentences. Any tokens beyond this length are truncated.
+        :param batch_size: The batch size to use.
+        :param show_progress_bar: Whether to show the progress bar.
+        :param use_multiprocessing: Whether to use multiprocessing.
+        :param multiprocessing_threshold: The threshold in number of sentences for using multiprocessing.
+        :param batch_fn: The function to apply to each batch of sentences.
+        :param batch_args: Additional positional arguments passed to `batch_fn` after the batch.
+        :return: A tuple of the per-batch results and whether the input was a single sentence.
+        """
+        was_single = False
+        if isinstance(sentences, str):
+            sentences = [sentences]
+            was_single = True
+        if max_length is not None:
+            m = max_length * self.median_token_length
+            sentences = [sentence[:m] for sentence in sentences]
+
+        sentence_batches = list(self._batch(sentences, batch_size))
+        total_batches = math.ceil(len(sentences) / batch_size)
+
+        self._set_max_length_in_tokenizer(max_length)
+        try:
+            if use_multiprocessing and len(sentences) > multiprocessing_threshold:
+                # Disable parallelism for tokenizers
+                os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+                results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
+                    delayed(batch_fn)(batch, *batch_args) for batch in sentence_batches
+                )
+            else:
+                results = [
+                    batch_fn(batch, *batch_args)
+                    for batch in tqdm(sentence_batches, total=total_batches, disable=not show_progress_bar)
+                ]
+        finally:
+            self._set_max_length_in_tokenizer(self.max_length)
+
+        return results, was_single
+
     @overload
     def encode_as_sequence(
         self,
@@ -295,41 +349,18 @@ class StaticModel:
         :param multiprocessing_threshold: The threshold in number of sentences for using multiprocessing.
         :return: The encoded sentences with an embedding per token.
         """
-        was_single = False
-        if isinstance(sentences, str):
-            sentences = [sentences]
-            was_single = True
-        if max_length is not None:
-            m = max_length * self.median_token_length
-            sentences = [sentence[:m] for sentence in sentences]
-
-        # Prepare all batches
-        sentence_batches = list(self._batch(sentences, batch_size))
-        total_batches = math.ceil(len(sentences) / batch_size)
-
-        self._set_max_length_in_tokenizer(max_length)
-        try:
-            # Use joblib for multiprocessing if requested, and if we have enough sentences
-            if use_multiprocessing and len(sentences) > multiprocessing_threshold:
-                # Disable parallelism for tokenizers
-                os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-                results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
-                    delayed(self._encode_batch_as_sequence)(batch) for batch in sentence_batches
-                )
-                out_array: list[np.ndarray] = []
-                for r in results:
-                    out_array.extend(r)
-            else:
-                out_array = []
-                for batch in tqdm(
-                    sentence_batches,
-                    total=total_batches,
-                    disable=not show_progress_bar,
-                ):
-                    out_array.extend(self._encode_batch_as_sequence(batch))
-        finally:
-            self._set_max_length_in_tokenizer(self.max_length)
+        results, was_single = self._encode_dispatch(
+            sentences,
+            max_length=max_length,
+            batch_size=batch_size,
+            show_progress_bar=show_progress_bar,
+            use_multiprocessing=use_multiprocessing,
+            multiprocessing_threshold=multiprocessing_threshold,
+            batch_fn=self._encode_batch_as_sequence,
+        )
+        out_array: list[np.ndarray] = []
+        for r in results:
+            out_array.extend(r)
 
         if was_single:
             return out_array[0]
@@ -380,45 +411,22 @@ class StaticModel:
         :param **kwargs: Any additional arguments. These are ignored.
         :return: The encoded sentences. If a single sentence was passed, a vector is returned.
         """
-        was_single = False
-        if isinstance(sentences, str):
-            sentences = [sentences]
-            was_single = True
         if isinstance(max_length, _UnsetType):
             max_length = self.max_length
         if normalize is None:
             normalize = self.normalize
-        if max_length is not None:
-            m = max_length * self.median_token_length
-            sentences = [sentence[:m] for sentence in sentences]
 
-        # Prepare all batches
-        sentence_batches = list(self._batch(sentences, batch_size))
-        total_batches = math.ceil(len(sentences) / batch_size)
-
-        self._set_max_length_in_tokenizer(max_length)
-        try:
-            # Use joblib for multiprocessing if requested, and if we have enough sentences
-            if use_multiprocessing and len(sentences) > multiprocessing_threshold:
-                # Disable parallelism for tokenizers
-                os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-                results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
-                    delayed(self._encode_batch)(batch, normalize) for batch in sentence_batches
-                )
-                out_array = np.concatenate(results, axis=0)
-            else:
-                # Don't use multiprocessing
-                out_arrays: list[np.ndarray] = []
-                for batch in tqdm(
-                    sentence_batches,
-                    total=total_batches,
-                    disable=not show_progress_bar,
-                ):
-                    out_arrays.append(self._encode_batch(batch, normalize))
-                out_array = np.concatenate(out_arrays, axis=0)
-        finally:
-            self._set_max_length_in_tokenizer(self.max_length)
+        results, was_single = self._encode_dispatch(
+            sentences,
+            max_length=max_length,
+            batch_size=batch_size,
+            show_progress_bar=show_progress_bar,
+            use_multiprocessing=use_multiprocessing,
+            multiprocessing_threshold=multiprocessing_threshold,
+            batch_fn=self._encode_batch,
+            batch_args=(normalize,),
+        )
+        out_array = np.concatenate(results, axis=0)
 
         if was_single:
             return out_array[0]
