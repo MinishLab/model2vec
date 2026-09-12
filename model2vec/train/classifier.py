@@ -173,8 +173,9 @@ class StaticModelForClassification(BaseFinetuneable):
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :param X_val: The texts to be used for validation.
         :param y_val: The labels to be used for validation.
-        :param class_weight: The weight of the classes. If None, all classes are weighted equally. Must
-            have the same length as the number of classes.
+        :param class_weight: The weight of the classes. If None, all classes are weighted equally.
+            If "balanced", weights are computed as the inverse class frequency.
+            If a dict, it must map each class to its weight.
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
         :return: The fitted model.
