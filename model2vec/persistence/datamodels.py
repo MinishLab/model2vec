@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 
 
@@ -48,3 +49,11 @@ FOLDER_LAYOUTS: tuple[Layout, ...] = (
         is_sentence_transformers=True,
     ),
 )
+
+
+@cache
+def get_all_model2vec_paths() -> list[str]:
+    """Get all paths used across all folder layouts."""
+    return sorted(
+        {path.as_posix() for layout in FOLDER_LAYOUTS for path in (layout.embeddings, layout.config, layout.tokenizer)}
+    )

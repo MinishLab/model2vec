@@ -13,7 +13,7 @@ from tokenizers import Tokenizer
 
 from model2vec.modelcards import create_model_card as make_model_card
 from model2vec.modelcards import get_metadata_from_readme
-from model2vec.persistence.datamodels import FOLDER_LAYOUTS, Layout
+from model2vec.persistence.datamodels import FOLDER_LAYOUTS, Layout, get_all_model2vec_paths
 from model2vec.persistence.hf import maybe_get_cached_model_path
 from model2vec.persistence.utils import SilentTqdm
 from model2vec.types import StaticModelConfig
@@ -148,7 +148,11 @@ def _resolve_folder(folder_or_repo_path: Path, token: str | None, force_download
     # No partial because that doesn't always work, this is safer.
     folder = Path(
         huggingface_hub.snapshot_download(
-            str(folder_or_repo_path.as_posix()), repo_type="model", token=token, tqdm_class=SilentTqdm
+            str(folder_or_repo_path.as_posix()),
+            repo_type="model",
+            token=token,
+            tqdm_class=SilentTqdm,
+            allow_patterns=get_all_model2vec_paths(),
         )
     )
 
