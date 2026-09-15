@@ -476,8 +476,9 @@ class StaticModel:
                     out[i] = emb.mean(axis=0)
 
         if normalize:
-            norm = np.linalg.norm(out, axis=1, keepdims=True) + 1e-32
-            np.divide(out, norm, out=out)
+            out32 = out.astype(np.float32)
+            norm = np.linalg.norm(out32, axis=1, keepdims=True) + 1e-32
+            return (out32 / norm).astype(out.dtype)
 
         return out
 
