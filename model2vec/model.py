@@ -456,7 +456,10 @@ class StaticModel:
     def _encode_batch(self, sentences: Sequence[str], normalize: bool) -> np.ndarray:
         """Encode a batch of sentences."""
         ids = self.tokenize(sentences=sentences)
-        out = np.zeros((len(ids), self.dim), dtype=self.embedding_dtype)
+        dtype = self.embedding.dtype
+        if dtype == np.int8:
+            dtype = np.float32
+        out = np.zeros((len(ids), self.dim), dtype=dtype)
 
         if self.token_mapping is None and self.weights is None:
             buckets: dict[int, list[int]] = defaultdict(list)
