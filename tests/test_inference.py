@@ -118,6 +118,75 @@ def test_mlp_head_predict_proba_identity() -> None:
     assert np.allclose(proba, X)
 
 
+def test_layer_no_weight() -> None:
+    """Test that a layer without a weight only applies the bias."""
+    layer = Layer(weight=None, bias=np.array([1.0, 2.0, 3.0]))
+
+    X = np.array([[1.0, -2.0, 3.0]])
+    out = layer(X)
+
+    assert np.allclose(out, [[2.0, 0.0, 6.0]])
+
+
+def test_layer_no_bias() -> None:
+    """Test that a layer without a bias only applies the weight."""
+    layer = Layer(weight=np.eye(3) * 2, bias=None)
+
+    X = np.array([[1.0, -2.0, 3.0]])
+    out = layer(X)
+
+    assert np.allclose(out, [[2.0, -4.0, 6.0]])
+
+
+def test_layer_no_weight_no_bias() -> None:
+    """Test that a layer without a weight or bias is a no-op."""
+    layer = Layer(weight=None, bias=None)
+
+    X = np.array([[1.0, -2.0, 3.0]])
+    out = layer(X)
+
+    assert np.allclose(out, X)
+
+
+def test_mlp_head_no_layers() -> None:
+    """Test that a head without layers returns the input unchanged."""
+    head = MLPHead(layers=[], activation=Activation.IDENTITY)
+
+    X = np.array([[1.0, -2.0, 3.0]])
+    proba = head.predict_proba(X)
+
+    assert np.allclose(proba, X)
+
+
+def test_mlp_head_mixed_optional_layers() -> None:
+    """Test a multi-layer head where some layers are missing a weight or bias."""
+    hidden = Layer(weight=np.eye(3), bias=None)
+    output = Layer(weight=None, bias=np.array([1.0, 1.0, 1.0]))
+    head = MLPHead(layers=[hidden, output], activation=Activation.IDENTITY)
+
+    X = np.array([[1.0, -2.0, 3.0]])
+    proba = head.predict_proba(X)
+
+    assert np.allclose(proba, [[2.0, 1.0, 4.0]])
+
+
+def test_roundtrip_save_layer_no_weight_no_bias(mock_static_model: StaticModel) -> None:
+    """Test that a head with a weightless/biasless layer survives a save/load roundtrip."""
+    layer = Layer(weight=None, bias=None)
+    head = MLPHead(layers=[layer], activation=Activation.IDENTITY)
+    pipeline = StaticModelPipeline(mock_static_model, head)
+
+    with TemporaryDirectory() as temp_dir:
+        pipeline.save_pretrained(temp_dir)
+        loaded = StaticModelPipeline.from_pretrained(temp_dir)
+
+    assert loaded.head.layers[0].weight is None
+    assert loaded.head.layers[0].bias is None
+
+    X = np.array([[1.0, -2.0, 3.0]])
+    assert np.allclose(loaded.head.predict_proba(X), X)
+
+
 def test_load_pipeline_from_hub(mock_inference_pipeline: StaticModelPipeline) -> None:
     """Test that a repo id that isn't a local path is downloaded from the hub."""
     with TemporaryDirectory() as temp_dir:

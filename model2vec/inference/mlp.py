@@ -26,12 +26,16 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
 
 @dataclass
 class Layer:
-    weight: np.ndarray
-    bias: np.ndarray
+    weight: np.ndarray | None
+    bias: np.ndarray | None
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
         """Apply the linear transformation."""
-        return x @ self.weight.T + self.bias
+        if self.weight is not None:
+            x = x @ self.weight.T
+        if self.bias is not None:
+            x = x + self.bias
+        return x
 
 
 class MLPHead:
@@ -54,6 +58,8 @@ class MLPHead:
     def _logits(self, X: np.ndarray) -> np.ndarray:
         """Run the forward through the layers."""
         out = X
+        if not self.layers:
+            return out
         *hidden_layers, last_layer = self.layers
         for layer in hidden_layers:
             out = np.maximum(layer(out), 0.0)

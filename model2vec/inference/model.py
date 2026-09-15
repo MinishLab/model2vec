@@ -230,7 +230,8 @@ def _load_pipeline(folder_or_repo_path: PathLike, token: str | None = None) -> t
 
     tensors = load_file(head_path)
     layers = [
-        Layer(weight=tensors[f"head.{index}.weight"], bias=tensors[f"head.{index}.bias"]) for index in range(n_layers)
+        Layer(weight=tensors.get(f"head.{index}.weight"), bias=tensors.get(f"head.{index}.bias"))
+        for index in range(n_layers)
     ]
 
     head = MLPHead(
@@ -335,8 +336,10 @@ def _save_pipeline(pipeline: StaticModelPipeline, folder_path: str | Path) -> No
     head = pipeline.head
     tensors: dict[str, np.ndarray] = {}
     for index, layer in enumerate(head.layers):
-        tensors[f"head.{index}.weight"] = layer.weight
-        tensors[f"head.{index}.bias"] = layer.bias
+        if layer.weight is not None:
+            tensors[f"head.{index}.weight"] = layer.weight
+        if layer.bias is not None:
+            tensors[f"head.{index}.bias"] = layer.bias
     save_file(tensors, folder_path / _DEFAULT_HEAD_FILENAME)
 
     model = pipeline.model
