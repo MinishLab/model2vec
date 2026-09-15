@@ -4,6 +4,7 @@ import copy
 import json
 import math
 import os
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from logging import getLogger
 from pathlib import Path
@@ -279,9 +280,9 @@ class StaticModel:
                 # Disable parallelism for tokenizers
                 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-                results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
-                    delayed(batch_fn)(batch, *batch_args) for batch in sentence_batches
-                )
+                results = ProgressParallel(
+                    n_jobs=-1, backend="threading", use_tqdm=show_progress_bar, total=total_batches
+                )(delayed(batch_fn)(batch, *batch_args) for batch in sentence_batches)
             else:
                 results = [
                     batch_fn(batch, *batch_args)
@@ -455,20 +456,30 @@ class StaticModel:
     def _encode_batch(self, sentences: Sequence[str], normalize: bool) -> np.ndarray:
         """Encode a batch of sentences."""
         ids = self.tokenize(sentences=sentences)
-        out: list[np.ndarray] = []
-        for id_list in ids:
-            if id_list:
-                emb = self._encode_helper(id_list)
-                out.append(emb.mean(axis=0))
-            else:
-                out.append(np.zeros(self.dim))
+        dtype = self.embedding.dtype
+        if dtype == np.int8:
+            dtype = np.float32
+        out = np.zeros((len(ids), self.dim), dtype=dtype)
 
-        out_array = np.stack(out)
+        if self.token_mapping is None and self.weights is None:
+            buckets: dict[int, list[int]] = defaultdict(list)
+            for i, id_list in enumerate(ids):
+                if id_list:
+                    buckets[len(id_list)].append(i)
+            for _, indices in buckets.items():
+                id_matrix = np.array([ids[i] for i in indices], dtype=np.int64)
+                out[indices] = self.embedding[id_matrix].mean(axis=1)
+        else:
+            for i, id_list in enumerate(ids):
+                if id_list:
+                    emb = self._encode_helper(id_list)
+                    out[i] = emb.mean(axis=0)
+
         if normalize:
-            norm = np.linalg.norm(out_array, axis=1, keepdims=True) + 1e-32
-            out_array = out_array / norm
+            norm = np.linalg.norm(out, axis=1, keepdims=True) + 1e-32
+            np.divide(out, norm, out=out)
 
-        return out_array
+        return out
 
     @staticmethod
     def _batch(sentences: Sequence[str], batch_size: int) -> Iterator[Sequence[str]]:

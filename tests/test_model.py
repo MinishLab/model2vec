@@ -62,6 +62,20 @@ def test_encode_multiple_sentences(
     assert encoded.shape == (2, 2)
 
 
+def test_encode_int8_quantized(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test that encoding an int8-quantized model returns float32 output."""
+    from model2vec.model import quantize_model
+
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    quantized = quantize_model(model, quantize_to="int8")
+    assert quantized.embedding.dtype == np.int8
+
+    encoded = quantized.encode(["word1 word2", "word1 word3"])
+    assert encoded.dtype == np.float32
+
+
 def test_encode_as_sequence(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]) -> None:
     """Test encoding of sentences as tokens."""
     sentences = ["word1 word2", "word1 word3"]
