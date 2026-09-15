@@ -42,11 +42,12 @@ def test_encode_single_sentence(
     assert encoded.shape == (2,)
 
 
+@pytest.mark.parametrize("dtype", ["float16", "float32", "float64"])
 def test_encode_single_sentence_empty(
-    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str], dtype: str
 ) -> None:
     """Test encoding of a single empty sentence."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    model = StaticModel(vectors=mock_vectors.astype(dtype), tokenizer=mock_tokenizer, config=mock_config)
     model.normalize = True
     encoded = model.encode("")
     assert not np.isnan(encoded).any()
@@ -157,6 +158,22 @@ def test_normalize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_con
     expected = X / np.linalg.norm(X)
 
     np.testing.assert_almost_equal(normalized, expected)
+
+
+@pytest.mark.parametrize("dtype", ["float16", "float32", "float64"])
+@pytest.mark.parametrize("scale", [1e-4, 1.0, 1e4])
+def test_normalize_zero_and_nonzero_embeddings(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, dtype: str, scale: float
+) -> None:
+    """Keep zero vectors finite and normalize nonzero vectors across precisions and scales."""
+    model = StaticModel(vectors=(mock_vectors * scale).astype(dtype), tokenizer=mock_tokenizer, normalize=True)
+    with np.errstate(divide="raise", invalid="raise", over="raise"):
+        encoded = model.encode(["", "unknown", "word3", "word1 word2"])
+
+    assert encoded.dtype == np.dtype(dtype)
+    assert np.isfinite(encoded).all()
+    np.testing.assert_array_equal(encoded[:3], np.zeros((3, model.dim)))
+    assert np.linalg.norm(encoded[3].astype(np.float64)) == pytest.approx(1.0, abs=1e-3)
 
 
 def test_save_pretrained(
