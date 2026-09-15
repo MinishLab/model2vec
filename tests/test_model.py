@@ -53,6 +53,18 @@ def test_encode_single_sentence_empty(
     assert np.all(encoded == 0)
 
 
+def test_encode_single_sentence_empty_float16(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
+) -> None:
+    """Test encoding of a single empty sentence with float16 embeddings."""
+    model = StaticModel(vectors=mock_vectors.astype(np.float16), tokenizer=mock_tokenizer, config=mock_config)
+    model.normalize = True
+    encoded = model.encode("")
+    assert not np.isnan(encoded).any()
+    assert np.all(encoded == 0)
+    assert encoded.dtype == model.embedding.dtype
+
+
 def test_encode_multiple_sentences(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
