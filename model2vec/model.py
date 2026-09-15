@@ -280,9 +280,9 @@ class StaticModel:
                 # Disable parallelism for tokenizers
                 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-                results = ProgressParallel(n_jobs=-1, use_tqdm=show_progress_bar, total=total_batches)(
-                    delayed(batch_fn)(batch, *batch_args) for batch in sentence_batches
-                )
+                results = ProgressParallel(
+                    n_jobs=-1, backend="threading", use_tqdm=show_progress_bar, total=total_batches
+                )(delayed(batch_fn)(batch, *batch_args) for batch in sentence_batches)
             else:
                 results = [
                     batch_fn(batch, *batch_args)
