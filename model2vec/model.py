@@ -386,8 +386,8 @@ class StaticModel:
         show_progress_bar: bool = False,
         max_length: int | None | _UnsetType = _UNSET,
         normalize: bool | None = None,
-        batch_size: int = 131072,
-        use_multiprocessing: bool = False,
+        batch_size: int = 1024,
+        use_multiprocessing: bool = True,
         multiprocessing_threshold: int = 10_000,
         **kwargs: Any,
     ) -> np.ndarray:
