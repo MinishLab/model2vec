@@ -88,7 +88,7 @@ def test_init_classifier_from_model_w(mock_vectors: np.ndarray, mock_tokenizer: 
     assert torch.all(s._weights == torch.ones(len(mock_vectors)))
     w = s.construct_weights()
     assert w.shape[0] == mock_vectors.shape[0]
-    assert torch.all(w == logit(torch.ones(len(mock_vectors))))
+    assert torch.all(w == torch.ones(len(mock_vectors)))
 
 
 def test_pad_token(mock_tokenizer: Tokenizer) -> None:

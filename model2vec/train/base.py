@@ -17,7 +17,6 @@ from model2vec.train.dataset import TextDataset
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
     get_probable_pad_token_id,
-    logit,
     to_pipeline,
     train_test_split,
 )
@@ -101,10 +100,10 @@ class BaseFinetuneable(nn.Module):
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""
         if self._weights is not None:
-            w = logit(self._weights)
+            w = self._weights
         else:
-            w = torch.zeros(len(self.token_mapping)).float()
-            w[self.pad_id] = -10_000
+            w = torch.ones(len(self.token_mapping)).float()
+            w[self.pad_id] = 0
         return nn.Parameter(w, requires_grad=not self.freeze_weights)
 
     def construct_head(self) -> nn.Sequential:
@@ -216,7 +215,6 @@ class BaseFinetuneable(nn.Module):
         embedded = self.embeddings(input_ids_embeddings)
 
         w = self.w[input_ids]
-        w = torch.sigmoid(w)
         w = w * zeros
         # Weigh each token
         embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
@@ -270,7 +268,7 @@ class BaseFinetuneable(nn.Module):
         with torch.no_grad():
             emb = self.embeddings.weight
             emb = emb.cpu().numpy()
-            w = torch.sigmoid(self.w).cpu().numpy()
+            w = self.w.cpu().numpy()
 
         # If the weights and emb are the same length, the model was not quantized before training.
         if len(w) == len(emb):
