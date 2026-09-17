@@ -3,12 +3,16 @@ from __future__ import annotations
 
 import json
 from importlib import import_module
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 from pytest import LogCaptureFixture
 from skeletoken import TokenizerModel
+from tokenizers import Tokenizer
+from tokenizers.models import WordLevel
+from tokenizers.pre_tokenizers import Whitespace
 from transformers import BertTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_tokenizers import PreTrainedTokenizerFast
@@ -16,7 +20,7 @@ from transformers.tokenization_utils_tokenizers import PreTrainedTokenizerFast
 from model2vec.distill.distillation import distill, distill_from_model
 from model2vec.distill.inference import PoolingMode, apply_pca, compute_weights, create_embeddings
 from model2vec.model import StaticModel
-from model2vec.tokenizer import clean_and_create_vocabulary
+from model2vec.tokenizer import add_vocabulary_to_model, clean_and_create_vocabulary, prune_vocabulary
 
 try:
     # For huggingface_hub>=0.25.0
@@ -345,6 +349,128 @@ def test_clean_and_create_vocabulary(
         logged_warnings = [record.message for record in caplog.records]
         for expected_warning in expected_warnings:
             assert any(expected_warning in logged_warning for logged_warning in logged_warnings)
+
+
+def _make_small_static_model(vectors: np.ndarray | None = None, **kwargs: Any) -> StaticModel:
+    """Build a small StaticModel with a WordLevel tokenizer for testing."""
+    vocab = {"[UNK]": 0, "hello": 1, "world": 2}
+    tokenizer = Tokenizer(WordLevel(vocab, unk_token="[UNK]"))
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore  # Tokenizer issue
+    if vectors is None:
+        vectors = np.random.RandomState(42).randn(len(vocab), 4)
+    return StaticModel(vectors=vectors, tokenizer=tokenizer, config={}, **kwargs)
+
+
+def test_add_vocabulary_to_model() -> None:
+    """Test that add_vocabulary_to_model adds new tokens and reshapes the embeddings."""
+    model = _make_small_static_model()
+    original_vocab_size = len(model.tokenizer.get_vocab())
+    new_tokens = ["foo", "bar"]
+
+    new_model = add_vocabulary_to_model(model, new_tokens)
+
+    new_vocab = new_model.tokenizer.get_vocab()
+    assert set(new_tokens) <= set(new_vocab)
+    assert len(new_vocab) == original_vocab_size + len(new_tokens)
+    assert new_model.embedding.shape == (len(new_vocab), model.embedding.shape[1])
+
+    # The original model should be untouched.
+    assert len(model.tokenizer.get_vocab()) == original_vocab_size
+
+
+def test_add_vocabulary_to_model_duplicate() -> None:
+    """Test that adding a token that already exists in the vocabulary does not add a duplicate."""
+    model = _make_small_static_model()
+    original_vocab_size = len(model.tokenizer.get_vocab())
+
+    new_model = add_vocabulary_to_model(model, ["hello"])
+
+    assert len(new_model.tokenizer.get_vocab()) == original_vocab_size
+
+
+def test_add_vocabulary_to_model_multiword() -> None:
+    """Test that a token that is split by the pretokenizer is added as a multi-word (added) token."""
+    model = _make_small_static_model()
+    original_vocab_size = len(model.tokenizer.get_vocab())
+
+    new_model = add_vocabulary_to_model(model, ["hello world"])
+
+    new_vocab_size = len(new_model.tokenizer.get_vocab())
+    assert new_vocab_size == original_vocab_size + 1
+    assert new_model.embedding.shape == (new_vocab_size, model.embedding.shape[1])
+    encoding = new_model.tokenizer.encode("hello world", add_special_tokens=False)
+    assert len(encoding.ids) == 1
+
+
+def test_add_vocabulary_to_model_quantized() -> None:
+    """Test that add_vocabulary_to_model raises for a vocabulary-quantized model."""
+    vectors = np.array([[1.0, 0.0], [0.0, 1.0]])
+    token_mapping = np.array([0, 1, 1])
+    model = _make_small_static_model(vectors=vectors, token_mapping=token_mapping)
+    assert model.vocabulary_quantization is not None
+
+    with pytest.raises(ValueError):
+        add_vocabulary_to_model(model, ["foo"])
+
+
+def test_add_vocabulary_to_model_encode_init() -> None:
+    """Test that new tokens are initialized from the model's own encoding of them."""
+    vectors = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+    model = _make_small_static_model(vectors=vectors)
+
+    new_model = add_vocabulary_to_model(model, ["hello world"])
+
+    new_vocab = new_model.tokenizer.get_vocab()
+    expected = model.encode(["hello", "world"]).mean(axis=0)
+    assert np.allclose(new_model.embedding[new_vocab["hello world"]], expected)
+
+
+def test_add_vocabulary_to_model_zero_vector_fallback() -> None:
+    """Test that a token that encodes to a zero vector is initialized randomly instead."""
+    vectors = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+    model = _make_small_static_model(vectors=vectors)
+
+    # "zzz" only tokenizes to the unknown token, so it encodes to a zero vector.
+    new_model = add_vocabulary_to_model(model, ["zzz"])
+
+    new_vocab = new_model.tokenizer.get_vocab()
+    assert not np.allclose(new_model.embedding[new_vocab["zzz"]], 0.0)
+
+
+def test_prune_vocabulary() -> None:
+    """Test that prune_vocabulary removes tokens and reshapes the embeddings."""
+    vectors = np.random.RandomState(42).randn(3, 4)
+    model = _make_small_static_model(vectors=vectors)
+
+    new_model = prune_vocabulary(model, ["world"])
+
+    new_vocab = new_model.tokenizer.get_vocab()
+    assert "world" not in new_vocab
+    assert set(new_vocab) == {"[UNK]", "hello"}
+    assert new_model.embedding.shape == (len(new_vocab), model.embedding.shape[1])
+    assert np.allclose(new_model.embedding[new_vocab["hello"]], vectors[1])
+
+    # The original model should be untouched.
+    assert set(model.tokenizer.get_vocab()) == {"[UNK]", "hello", "world"}
+
+
+def test_prune_vocabulary_unknown_token() -> None:
+    """Test that prune_vocabulary raises if a token is not in the vocabulary."""
+    model = _make_small_static_model()
+
+    with pytest.raises(ValueError):
+        prune_vocabulary(model, ["not_in_vocab"])
+
+
+def test_prune_vocabulary_quantized() -> None:
+    """Test that prune_vocabulary raises for a vocabulary-quantized model."""
+    vectors = np.array([[1.0, 0.0], [0.0, 1.0]])
+    token_mapping = np.array([0, 1, 1])
+    model = _make_small_static_model(vectors=vectors, token_mapping=token_mapping)
+    assert model.vocabulary_quantization is not None
+
+    with pytest.raises(ValueError):
+        prune_vocabulary(model, ["hello"])
 
 
 @pytest.mark.parametrize(

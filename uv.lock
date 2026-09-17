@@ -1283,6 +1283,9 @@ tests = [
     { name = "scikit-learn", version = "1.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "skops" },
 ]
+tokenizer = [
+    { name = "skeletoken" },
+]
 train = [
     { name = "torch" },
 ]
@@ -1309,6 +1312,7 @@ requires-dist = [
     { name = "setuptools", marker = "extra == 'dev'" },
     { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.6.0,<0.7.0" },
     { name = "skeletoken", marker = "extra == 'onnx'", specifier = ">=0.6.0,<0.7.0" },
+    { name = "skeletoken", marker = "extra == 'tokenizer'", specifier = ">=0.6.0,<0.7.0" },
     { name = "skops", marker = "extra == 'tests'" },
     { name = "tokenizers", specifier = ">=0.20" },
     { name = "torch", marker = "extra == 'distill'" },
@@ -1317,7 +1321,7 @@ requires-dist = [
     { name = "tqdm" },
     { name = "transformers", marker = "extra == 'distill'", specifier = "<5.4.0" },
 ]
-provides-extras = ["dev", "distill", "onnx", "train", "quantization", "integration", "tests"]
+provides-extras = ["dev", "distill", "onnx", "train", "quantization", "integration", "tests", "tokenizer"]
 
 [[package]]
 name = "mpmath"

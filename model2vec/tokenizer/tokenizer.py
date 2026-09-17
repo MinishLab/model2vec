@@ -1,12 +1,118 @@
 from __future__ import annotations
 
+import copy
 import logging
 import re
 from typing import Sequence
 
+import numpy as np
 from skeletoken import TokenizerModel
 
+from model2vec import StaticModel
+
 logger = logging.getLogger(__name__)
+
+
+def prune_vocabulary(model: StaticModel, vocabulary_to_prune: Sequence[str]) -> StaticModel:
+    """Removes tokens from a model2vec model's vocabulary.
+
+    :param model: The model2vec model to prune tokens from.
+    :param vocabulary_to_prune: The tokens to remove from the vocabulary. Every token must already
+        be present in the vocabulary.
+    :return: A new model, with an updated embedding and vocabulary. The input model is left untouched.
+    :raises ValueError: If the model is quantized, or if a token is not in the vocabulary.
+    """
+    if model.vocabulary_quantization is not None:
+        raise ValueError("Cannot prune tokens from a quantized model.")
+
+    tokenizer_model = TokenizerModel.from_tokenizer(model.tokenizer)
+    tokenizer_model = tokenizer_model.remove_tokens_from_vocabulary(vocabulary_to_prune)
+
+    delta = tokenizer_model.model_delta
+    vocab_size = tokenizer_model.vocabulary_size
+    embeddings = model.embedding
+
+    new_embeddings = np.zeros((vocab_size, embeddings.shape[1]))
+    if delta.token_mapping:
+        to_ids, from_ids = zip(*delta.token_mapping.items())
+        new_embeddings[np.asarray(to_ids)] = embeddings[np.asarray(from_ids)]
+
+    new_weights = None
+    if model.weights is not None:
+        new_weights = np.ones(vocab_size, dtype=model.weights.dtype)
+        if delta.token_mapping:
+            to_ids, from_ids = zip(*delta.token_mapping.items())
+            new_weights[np.asarray(to_ids)] = model.weights[np.asarray(from_ids)]
+
+    return StaticModel(
+        vectors=new_embeddings.astype(embeddings.dtype),
+        tokenizer=tokenizer_model.to_tokenizer(),
+        config=copy.deepcopy(model.config),
+        normalize=model.normalize,
+        base_model_name=model.base_model_name,
+        language=copy.deepcopy(model.language),
+        weights=new_weights,
+        token_mapping=None,
+        max_length=model.max_length,
+    )
+
+
+def add_vocabulary_to_model(model: StaticModel, vocabulary_to_add: Sequence[str]) -> StaticModel:
+    """Adds tokens to a model2vec model.
+
+    New tokens are initialized by encoding them with the existing model. Tokens that encode
+    to a zero vector (e.g. because they contain no known subwords) are initialized randomly instead.
+
+    :param model: The model2vec model to add tokens to.
+    :param vocabulary_to_add: The vocabulary to add to the model.
+    :return: A new model, with an updated embedding and vocabulary. The input model is left untouched.
+    :raises ValueError: If the model is quantized.
+    """
+    if model.vocabulary_quantization is not None:
+        raise ValueError("Cannot add tokens to a quantized model.")
+
+    tokenizer_model = TokenizerModel.from_tokenizer(model.tokenizer)
+    tokenizer_model = clean_and_create_vocabulary(tokenizer_model, vocabulary_to_add, None)
+
+    delta = tokenizer_model.model_delta
+    vocab_size = tokenizer_model.vocabulary_size
+    embeddings = model.embedding
+
+    new_embeddings = np.zeros((vocab_size, embeddings.shape[1]))
+    if delta.token_mapping:
+        to_ids, from_ids = zip(*delta.token_mapping.items())
+        new_embeddings[np.asarray(to_ids)] = embeddings[np.asarray(from_ids)]
+
+    new_weights = None
+    if model.weights is not None:
+        new_weights = np.ones(vocab_size, dtype=model.weights.dtype)
+        if delta.token_mapping:
+            to_ids, from_ids = zip(*delta.token_mapping.items())
+            new_weights[np.asarray(to_ids)] = model.weights[np.asarray(from_ids)]
+
+    if delta.new_tokens:
+        new_tokens, new_ids = zip(*sorted(delta.new_tokens.items(), key=lambda x: x[1]))
+        new_ids = np.asarray(new_ids)
+        new_token_embeddings = model.encode(new_tokens).astype(new_embeddings.dtype)
+        is_zero_vector = ~new_token_embeddings.any(axis=1)
+        if is_zero_vector.any():
+            rand_gen = np.random.default_rng()
+            new_token_embeddings[is_zero_vector] = rand_gen.normal(
+                size=(int(is_zero_vector.sum()), embeddings.shape[1])
+            )
+        new_embeddings[new_ids] = new_token_embeddings
+
+    return StaticModel(
+        vectors=new_embeddings.astype(embeddings.dtype),
+        tokenizer=tokenizer_model.to_tokenizer(),
+        config=copy.deepcopy(model.config),
+        normalize=model.normalize,
+        base_model_name=model.base_model_name,
+        language=copy.deepcopy(model.language),
+        weights=new_weights,
+        token_mapping=None,
+        max_length=model.max_length,
+    )
 
 
 def clean_and_create_vocabulary(
