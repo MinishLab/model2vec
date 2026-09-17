@@ -78,6 +78,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         y_val: torch.Tensor | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
+        token_dropout: float = 0.0,
     ) -> T:
         """Fit a model.
 
@@ -105,6 +106,8 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param y_val: The vectors to be used for validation.
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
+        :param token_dropout: The fraction of tokens to randomly drop from each training sample.
+            Has no effect during validation. Must be in the range [0, 1).
         :return: The fitted model.
         """
         seed_everything(random_seed)
@@ -127,6 +130,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
             max_epochs=max_epochs,
             device=device,
             validation_steps=validation_steps,
+            token_dropout=token_dropout,
         )
 
         return self

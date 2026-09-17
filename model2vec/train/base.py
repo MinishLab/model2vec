@@ -69,6 +69,7 @@ class BaseFinetuneable(nn.Module):
         self.normalize = normalize
         self.freeze_weights = freeze_weights
         self.max_length = max_length
+        self.token_dropout = 0.0
 
         self.vectors = vectors
         if self.vectors.dtype != torch.float32:
@@ -199,6 +200,22 @@ class BaseFinetuneable(nn.Module):
             **kwargs,
         )
 
+    def _apply_token_dropout(self, keep_mask: torch.Tensor) -> torch.Tensor:
+        """Randomly zero out a fraction of the kept tokens, leaving at least one token per sample.
+
+        :param keep_mask: A 2D float tensor (batch, seq_len), 1 for real tokens and 0 for padding.
+        :return: `keep_mask` with a random subset of real tokens additionally zeroed out.
+        """
+        if not self.training or self.token_dropout <= 0:
+            return keep_mask
+        survives = torch.rand_like(keep_mask) >= self.token_dropout
+        dropped_mask = keep_mask * survives
+        needs_rescue = (dropped_mask.sum(dim=1) == 0) & (keep_mask.sum(dim=1) > 0)
+        if needs_rescue.any():
+            rescue_idx = keep_mask.argmax(dim=1)
+            dropped_mask[needs_rescue, rescue_idx[needs_rescue]] = 1.0
+        return dropped_mask
+
     def _encode(self, input_ids: torch.Tensor) -> torch.Tensor:
         """A forward pass and mean pooling.
 
@@ -209,6 +226,7 @@ class BaseFinetuneable(nn.Module):
         :return: The mean over the input ids, weighted by token weights.
         """
         zeros = (input_ids != self.pad_id).float()
+        zeros = self._apply_token_dropout(zeros)
         # Add a small epsilon to avoid division by zero
         length = zeros.sum(1) + 1e-16
         input_ids_embeddings = self.token_mapping[input_ids]
@@ -341,7 +359,12 @@ class BaseFinetuneable(nn.Module):
         device: str,
         validation_steps: int | None,
         compute_metrics: MetricsFn = default_metrics,
+        token_dropout: float = 0.0,
     ) -> None:
+        if not 0.0 <= token_dropout < 1.0:
+            raise ValueError("token_dropout must be in the range [0, 1).")
+        self.token_dropout = token_dropout
+
         val_check_interval, check_val_every_epoch = self._determine_val_check_interval(
             validation_steps, len(train_dataset), batch_size
         )

@@ -147,6 +147,7 @@ class StaticModelForClassification(BaseFinetuneable):
         class_weight: Literal["balanced"] | dict[str, float] | torch.Tensor | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
+        token_dropout: float = 0.0,
     ) -> StaticModelForClassification:
         """Fit a model.
 
@@ -178,6 +179,8 @@ class StaticModelForClassification(BaseFinetuneable):
             If a dict, it must map each class to its weight.
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
+        :param token_dropout: The fraction of tokens to randomly drop from each training sample.
+            Has no effect during validation. Must be in the range [0, 1).
         :return: The fitted model.
         :raises ValueError: If either X_val or y_val are provided, but not both.
         """
@@ -220,6 +223,7 @@ class StaticModelForClassification(BaseFinetuneable):
             device=device,
             validation_steps=validation_steps,
             compute_metrics=compute_metrics,
+            token_dropout=token_dropout,
         )
 
         return self
