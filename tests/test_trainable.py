@@ -374,6 +374,24 @@ def test_pair_similarity_labels_mismatched_length(
         )
 
 
+def test_pair_similarity_fit_with_explicit_val(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A model can be fit with explicit validation pairs instead of an automatic split."""
+    model = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    text_a = ["word1", "word2", "word3", "word1 word2"]
+    text_b = ["word2", "word3", "word1", "word3 word1"]
+    labels = [1, 1, 0, 0]
+    model.fit(
+        text_a,
+        text_b,
+        labels=labels,
+        text_a_val=["word1"],
+        text_b_val=["word2"],
+        labels_val=[1],
+        early_stopping_patience=1,
+        max_epochs=1,
+    )
+
+
 def test_pair_similarity_fit_with_labels(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """A model can be fit with a mix of positive and negative pair labels."""
     model = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
