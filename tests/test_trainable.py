@@ -137,6 +137,108 @@ def test_conversion(mock_trained_pipeline: StaticModelForClassification) -> None
     assert np.allclose(result_1, result_2)
 
 
+def test_token_dropout_default_is_zero(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A freshly constructed model has token dropout disabled."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    assert s.token_dropout == 0.0
+
+
+def test_apply_token_dropout_noop_in_eval(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Token dropout has no effect in eval mode, even with a high dropout rate."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    s.token_dropout = 0.9
+    s.eval()
+    mask = torch.ones(4, 5)
+    assert torch.equal(s._apply_token_dropout(mask), mask)
+
+
+def test_apply_token_dropout_noop_when_rate_is_zero(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Token dropout has no effect when the rate is 0, even in training mode."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    s.train()
+    s.token_dropout = 0.0
+    mask = torch.ones(4, 5)
+    assert torch.equal(s._apply_token_dropout(mask), mask)
+
+
+def test_apply_token_dropout_never_empties_a_nonempty_row(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Even at a very high dropout rate, a row with at least one real token keeps at least one."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    s.train()
+    s.token_dropout = 0.99
+    mask = torch.tensor([[1.0, 1.0, 1.0, 1.0], [1.0, 0.0, 0.0, 0.0]])
+
+    torch.manual_seed(0)
+    for _ in range(20):
+        out = s._apply_token_dropout(mask)
+        assert (out.sum(dim=1) >= 1).all()
+
+
+def test_apply_token_dropout_leaves_fully_padded_rows_untouched(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """A row with no real tokens to begin with is not force-filled by the dropout rescue."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    s.train()
+    s.token_dropout = 0.99
+    mask = torch.zeros(1, 4)
+
+    torch.manual_seed(0)
+    for _ in range(20):
+        out = s._apply_token_dropout(mask)
+        assert out.sum() == 0
+
+
+def test_apply_token_dropout_drops_some_tokens(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A moderate dropout rate actually zeroes out some, but not all, tokens over enough trials."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    s.train()
+    s.token_dropout = 0.5
+    mask = torch.ones(1, 1000)
+
+    torch.manual_seed(0)
+    out = s._apply_token_dropout(mask)
+    assert 0 < out.sum().item() < mask.sum().item()
+
+
+def test_fit_invalid_token_dropout_raises() -> None:
+    """token_dropout must lie in [0, 1); out-of-range values raise ValueError."""
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    torch.random.manual_seed(42)
+    vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
+    model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+
+    X = ["dog", "cat"]
+    y = ["0", "1"]
+
+    with pytest.raises(ValueError):
+        model.fit(X, y, token_dropout=1.0, max_epochs=1)
+    with pytest.raises(ValueError):
+        model.fit(X, y, token_dropout=-0.1, max_epochs=1)
+
+
+def test_fit_sets_token_dropout_and_disables_it_after_training() -> None:
+    """fit() stores the requested token_dropout, and training ends in eval mode so it stops applying."""
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    torch.random.manual_seed(42)
+    vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
+    model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+
+    X = ["dog", "cat"]
+    y = ["0", "1"]
+
+    model.fit(X, y, token_dropout=0.3, max_epochs=2, early_stopping_patience=1)
+
+    assert model.token_dropout == 0.3
+    assert model.training is False
+
+    tokens = model.tokenize(["dog cat", "dog"])
+    with torch.no_grad():
+        first = model._encode(tokens)
+        second = model._encode(tokens)
+    assert torch.allclose(first, second)
+
+
 def test_textdataset_init() -> None:
     """Test the textdataset init."""
     dataset = TextDataset([[0], [1]], torch.arange(2))
