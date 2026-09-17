@@ -15,7 +15,8 @@ from transformers import AutoTokenizer
 from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.dataset import TextDataset
+from model2vec.train.dataset import PairDataset, TextDataset
+from model2vec.train.pairs import PairCosineLoss, StaticModelForPairSimilarity
 from model2vec.train.regression import StaticModelForRegression
 from model2vec.train.similarity import StaticModelForSimilarity
 from model2vec.train.trainer import _resolve_max_epochs, resolve_device, run_training_loop
@@ -358,6 +359,167 @@ def test_convert_to_pipeline_regression(mock_trained_regression_pipeline: Static
     assert np.allclose(encoded_pipeline, encoded_model)
     p1 = pipeline.predict(["dog cat", "dog"])
     p2 = mock_trained_regression_pipeline.encode(["dog cat", "dog"])
+    assert np.allclose(p1, p2, rtol=1e-5, atol=1e-4)
+
+
+def test_pairdataset_init() -> None:
+    """Test the pair dataset init."""
+    dataset = PairDataset([[0], [1]], [[2], [3]])
+    assert len(dataset) == 2
+
+
+def test_pairdataset_init_incorrect() -> None:
+    """Test the pair dataset init with mismatched lengths."""
+    with pytest.raises(ValueError):
+        PairDataset([[0]], [[2], [3]])
+
+
+def test_pairdataset_collate() -> None:
+    """Batches should stack the two padded halves into a single (2, batch, seq_len) tensor."""
+    dataset = PairDataset([[1], [1, 2]], [[1, 2, 3], [1]], pad_id=0)
+    batch, y = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
+    assert batch.shape == (2, 2, 3)
+    assert y.shape == (2,)
+    assert torch.equal(batch[0], torch.tensor([[1, 0, 0], [1, 2, 0]]))
+    assert torch.equal(batch[1], torch.tensor([[1, 2, 3], [1, 0, 0]]))
+
+
+def test_pairdataset_default_labels_are_positive() -> None:
+    """Without explicit labels, every pair defaults to label 1."""
+    dataset = PairDataset([[1], [2]], [[3], [4]])
+    assert torch.equal(dataset.labels, torch.tensor([1.0, 1.0]))
+
+
+def test_pairdataset_custom_labels() -> None:
+    """Custom labels are stored and returned by the collate function."""
+    dataset = PairDataset([[1], [2]], [[3], [4]], labels=[1, 0])
+    _, y = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
+    assert torch.equal(y, torch.tensor([1.0, 0.0]))
+
+
+def test_pairdataset_labels_mismatched_length() -> None:
+    """Labels must have one entry per pair."""
+    with pytest.raises(ValueError):
+        PairDataset([[1], [2]], [[3], [4]], labels=[1])
+
+
+def test_pair_cosine_loss_pushes_towards_label() -> None:
+    """Label 1 pairs are pushed towards a cosine similarity of 1, label 0 pairs towards 0."""
+    loss_fn = PairCosineLoss()
+    out_a = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+
+    identical = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    orthogonal = torch.tensor([[0.0, 1.0], [0.0, 1.0]])
+
+    assert loss_fn((out_a, identical), torch.tensor([1.0, 1.0])).item() == pytest.approx(0.0, abs=1e-6)
+    assert loss_fn((out_a, orthogonal), torch.tensor([1.0, 1.0])).item() == pytest.approx(1.0)
+    assert loss_fn((out_a, orthogonal), torch.tensor([0.0, 0.0])).item() == pytest.approx(0.0, abs=1e-6)
+    assert loss_fn((out_a, identical), torch.tensor([0.0, 0.0])).item() == pytest.approx(1.0)
+
+
+def test_pair_similarity_out_dim_defaults_to_embed_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """The output dimension defaults to the input embedding dimension when not specified."""
+    s = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    assert s.out_dim == mock_vectors.shape[1]
+
+    s = StaticModelForPairSimilarity(
+        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, out_dim=7
+    )
+    assert s.out_dim == 7
+
+
+def test_pair_similarity_forward(mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity) -> None:
+    """The forward pass should return one head output per half of the pair batch."""
+    model = mock_trained_pair_similarity_pipeline
+    dataset = model._prepare_pair_dataset(["dog cat", "dog"], ["puppy", "kitten cat"], [1, 1], max_length=None)
+    batch, _ = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
+
+    with torch.no_grad():
+        out_a, out_b = model(batch)
+    assert out_a.shape == (2, model.out_dim)
+    assert out_b.shape == (2, model.out_dim)
+
+
+def test_pair_similarity_mismatched_lengths(
+    mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity,
+) -> None:
+    """text_a and text_b must have the same length."""
+    with pytest.raises(ValueError):
+        mock_trained_pair_similarity_pipeline.fit(["dog", "cat"], ["puppy"])
+
+
+def test_pair_similarity_val_split_errors(mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity) -> None:
+    """Both validation halves must be provided together, or neither."""
+    with pytest.raises(ValueError):
+        mock_trained_pair_similarity_pipeline.fit(
+            ["dog", "cat"], ["puppy", "kitten"], text_a_val=["dog"], text_b_val=None
+        )
+    with pytest.raises(ValueError):
+        mock_trained_pair_similarity_pipeline.fit(
+            ["dog", "cat"], ["puppy", "kitten"], text_a_val=["dog", "cat"], text_b_val=["puppy"]
+        )
+
+
+def test_pair_similarity_labels_mismatched_length(
+    mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity,
+) -> None:
+    """Labels must have one entry per training pair, and labels_val one entry per validation pair."""
+    with pytest.raises(ValueError):
+        mock_trained_pair_similarity_pipeline.fit(["dog", "cat"], ["puppy", "kitten"], labels=[1])
+    with pytest.raises(ValueError):
+        mock_trained_pair_similarity_pipeline.fit(
+            ["dog", "cat"],
+            ["puppy", "kitten"],
+            text_a_val=["dog"],
+            text_b_val=["puppy"],
+            labels_val=[1, 0],
+        )
+
+
+def test_pair_similarity_fit_with_explicit_val(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A model can be fit with explicit validation pairs instead of an automatic split."""
+    model = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    text_a = ["word1", "word2", "word3", "word1 word2"]
+    text_b = ["word2", "word3", "word1", "word3 word1"]
+    labels = [1, 1, 0, 0]
+    model.fit(
+        text_a,
+        text_b,
+        labels=labels,
+        text_a_val=["word1"],
+        text_b_val=["word2"],
+        labels_val=[1],
+        early_stopping_patience=1,
+        max_epochs=1,
+    )
+
+
+def test_pair_similarity_fit_with_labels(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A model can be fit with a mix of positive and negative pair labels."""
+    model = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    text_a = ["word1", "word2", "word3", "word1 word2"]
+    text_b = ["word2", "word3", "word1", "word3 word1"]
+    labels = [1, 1, 0, 0]
+    model.fit(text_a, text_b, labels=labels, early_stopping_patience=1, max_epochs=1)
+
+
+def test_convert_to_pipeline_pair_similarity(
+    mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity,
+) -> None:
+    """Convert a model to a pipeline."""
+    mock_trained_pair_similarity_pipeline.eval()
+    pipeline = mock_trained_pair_similarity_pipeline.to_pipeline()
+    encoded_pipeline = pipeline.model.encode(["dog cat", "dog"])
+    encoded_model = (
+        mock_trained_pair_similarity_pipeline._encode(
+            mock_trained_pair_similarity_pipeline.tokenize(["dog cat", "dog"])
+        )
+        .detach()
+        .numpy()
+    )
+    assert np.allclose(encoded_pipeline, encoded_model)
+    p1 = pipeline.predict(["dog cat", "dog"])
+    p2 = mock_trained_pair_similarity_pipeline.encode(["dog cat", "dog"])
     assert np.allclose(p1, p2, rtol=1e-5, atol=1e-4)
 
 

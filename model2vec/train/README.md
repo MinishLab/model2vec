@@ -98,6 +98,27 @@ print(classification_report)
 
 The scores are competitive with the popular [roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions) model, while our model is orders of magnitude faster.
 
+## Pair similarity
+
+`StaticModelForPairSimilarity` trains a model to embed pairs of related texts (e.g. queries and their matching documents) close together, by encoding both sides with the same model and minimizing the cosine distance between them:
+
+```python
+from model2vec.train import StaticModelForPairSimilarity
+
+model = StaticModelForPairSimilarity.from_pretrained(model_name="minishlab/potion-base-32M")
+model.fit(text_a=["how tall is the eiffel tower?"], text_b=["the eiffel tower is 330 meters tall."])
+```
+
+Pairs can also be labeled: pairs labeled `1` are pushed together (cosine similarity towards 1), while pairs labeled `0` are pushed towards a cosine similarity of 0. If `labels` is omitted, every pair is treated as positive:
+
+```python
+model.fit(
+    text_a=["how tall is the eiffel tower?", "how tall is the eiffel tower?"],
+    text_b=["the eiffel tower is 330 meters tall.", "paris is the capital of france."],
+    labels=[1, 0],
+)
+```
+
 # Persistence
 
 You can turn a classifier into a lightweight inference pipeline, as follows:

@@ -16,7 +16,12 @@ from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.model import StaticModel
-from model2vec.train import StaticModelForClassification, StaticModelForRegression, StaticModelForSimilarity
+from model2vec.train import (
+    StaticModelForClassification,
+    StaticModelForPairSimilarity,
+    StaticModelForRegression,
+    StaticModelForSimilarity,
+)
 
 _TOKENIZER_TYPES = ["wordpiece", "bpe", "unigram"]
 
@@ -229,6 +234,21 @@ def mock_trained_regression_pipeline() -> StaticModelForRegression:
     X = ["dog", "cat"]
     y = torch.randn(2, 32)
     model.fit(X, y)
+
+    return model
+
+
+@pytest.fixture(scope="session")
+def mock_trained_pair_similarity_pipeline() -> StaticModelForPairSimilarity:
+    """Mock StaticModelForPairSimilarity."""
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    torch.random.manual_seed(42)
+    vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
+    model = StaticModelForPairSimilarity(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+
+    text_a = ["dog", "cat"]
+    text_b = ["puppy", "kitten"]
+    model.fit(text_a, text_b)
 
     return model
 
