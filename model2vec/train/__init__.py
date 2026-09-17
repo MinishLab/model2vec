@@ -6,7 +6,13 @@ for extra_dependency in get_package_extras("model2vec", _REQUIRED_EXTRA):
     importable(extra_dependency, _REQUIRED_EXTRA)
 
 from model2vec.train.classifier import StaticModelForClassification
+from model2vec.train.pairs import StaticModelForPairSimilarity
 from model2vec.train.regression import StaticModelForRegression
 from model2vec.train.similarity import StaticModelForSimilarity
 
-__all__ = ["StaticModelForClassification", "StaticModelForSimilarity", "StaticModelForRegression"]
+__all__ = [
+    "StaticModelForClassification",
+    "StaticModelForSimilarity",
+    "StaticModelForRegression",
+    "StaticModelForPairSimilarity",
+]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import random
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 import torch
@@ -69,11 +69,14 @@ def _index(sequence: Any, indices: list[int]) -> Any:
     return sequence[indices]
 
 
+X_co = TypeVar("X_co")
+
+
 def train_test_split(
-    X: list[str],
+    X: list[X_co],
     y: list,
     test_size: float,
-) -> tuple[list[str], list[str], list, list]:
+) -> tuple[list[X_co], list[X_co], list, list]:
     """Split the data.
 
     For single-label classification, stratification is attempted (if possible).

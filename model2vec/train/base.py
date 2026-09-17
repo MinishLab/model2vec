@@ -13,7 +13,7 @@ from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _get_unk_token_id
-from model2vec.train.dataset import TextDataset
+from model2vec.train.dataset import PairDataset, TextDataset
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
     get_probable_pad_token_id,
@@ -332,8 +332,8 @@ class BaseFinetuneable(nn.Module):
         self,
         loss_function: nn.Module,
         learning_rate: float,
-        train_dataset: TextDataset,
-        val_dataset: TextDataset,
+        train_dataset: TextDataset | PairDataset,
+        val_dataset: TextDataset | PairDataset,
         batch_size: int,
         early_stopping_patience: int | None,
         min_epochs: int | None,
@@ -391,6 +391,25 @@ class BaseFinetuneable(nn.Module):
 
         return val_check_interval, check_val_every_epoch
 
+    def _tokenize_texts(self, X: list[str], max_length: int | None) -> list[list[int]]:
+        """Tokenize a list of texts into lists of token ids.
+
+        :param X: The texts to tokenize.
+        :param max_length: The maximum length of the input in tokens. If this is None, no truncation is done.
+        :return: The tokenized texts.
+        """
+        batch_size = 1024
+        tokenized: list[list[int]] = []
+        for batch_idx in trange(0, len(X), batch_size, desc="Tokenizing data"):
+            batch = X[batch_idx : batch_idx + batch_size]
+            if max_length is not None:
+                truncate_length = max_length * 10
+                batch = [x[:truncate_length] for x in batch]
+            encoded = self.tokenizer.encode_batch_fast(batch, add_special_tokens=False)
+            tokenized.extend([self._remove_unk(encoding.ids)[:max_length] for encoding in encoded])
+
+        return tokenized
+
     def _prepare_dataset(self, X: list[str], y: torch.Tensor, max_length: int | None) -> TextDataset:
         """Prepare a dataset.
 
@@ -399,17 +418,7 @@ class BaseFinetuneable(nn.Module):
         :param max_length: The maximum length of the input in tokens. If this is None, no truncation is done.
         :return: A TextDataset.
         """
-        batch_size = 1024
-        tokenized: list[list[int]] = []
-        for batch_idx in trange(0, len(X), 1024, desc="Tokenizing data"):
-            batch = X[batch_idx : batch_idx + batch_size]
-            if max_length is not None:
-                truncate_length = max_length * 10
-                batch = [x[:truncate_length] for x in batch]
-            encoded = self.tokenizer.encode_batch_fast(batch, add_special_tokens=False)
-            tokenized.extend([self._remove_unk(encoding.ids)[:max_length] for encoding in encoded])
-
-        return TextDataset(tokenized, y, pad_id=self.pad_id)
+        return TextDataset(self._tokenize_texts(X, max_length), y, pad_id=self.pad_id)
 
     def _labels_to_tensor(self, labels: Any) -> torch.Tensor:
         """Turn the labels into a tensor."""
