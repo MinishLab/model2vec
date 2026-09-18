@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from collections.abc import Sequence
 from typing import Any, TypeVar
@@ -89,8 +90,10 @@ class BaseFinetuneable(nn.Module):
         self.head = self.construct_head()
         self._weights = weights
         self.w = self.construct_weights()
-        self.tokenizer = tokenizer
-        self.unk_token_id = _get_unk_token_id(tokenizer)
+        # Truncation happens here through `max_length`; a StaticModel's tokenizer carries its own setting.
+        self.tokenizer = copy.deepcopy(tokenizer)
+        self.tokenizer.no_truncation()
+        self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
     def _remove_unk(self, token_ids: list[int]) -> list[int]:
         """Drop unknown tokens, mirroring `StaticModel.tokenize`."""
