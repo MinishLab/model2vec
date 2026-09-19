@@ -294,6 +294,23 @@ def test_tokenize_without_unk_token(mock_vectors: np.ndarray) -> None:
     assert s._prepare_dataset(texts, torch.arange(2), max_length=None).tokenized_texts == expected
 
 
+def test_max_length_is_not_capped_by_the_static_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A trainer's `max_length` is its own: the static model's truncation must not cap it, in training or after export."""
+    static = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, max_length=2)
+    texts = ["word1 word2 word3 word1 word2 word3"]
+    assert len(static.tokenize(texts)[0]) == 2
+
+    s = StaticModelForClassification.from_static_model(model=static, max_length=4)
+    assert s.tokenize(texts).shape[1] == 4
+    assert [len(row) for row in s._prepare_dataset(texts, torch.arange(1), max_length=None).tokenized_texts] == [6]
+    assert len(s.to_static_model().tokenize(texts)[0]) == 4
+
+    # The static model keeps its own setting, and the trainer keeps its own once the static model changes.
+    assert len(static.tokenize(texts)[0]) == 2
+    static.max_length = None
+    assert s.tokenize(texts).shape[1] == 4
+
+
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()
