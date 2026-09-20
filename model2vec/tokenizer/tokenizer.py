@@ -11,9 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def _replace_padding(model: TokenizerModel) -> TokenizerModel:
-    """Replaces the model's padding module with a benign one if it isn't already."""
+    """Replaces the model's padding module with a benign one."""
     padding = model.padding
-    # If the model has a padding strategy that is not the standard one
     if padding is not None:
         model.padding = Padding(pad_id=padding.pad_id, pad_token=padding.pad_token, pad_type_id=0)
 
