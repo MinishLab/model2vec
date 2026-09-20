@@ -33,14 +33,14 @@
         "flimzycrag"
       ],
       "mteb_sts_scores": {
-        "BIOSSES": 0.500132,
-        "SICK-R": 0.565144,
-        "STS12": 0.594863,
-        "STS13": 0.653794,
-        "STS14": 0.596517,
-        "STS15": 0.611504,
-        "STS16": 0.569703,
-        "STSBenchmark": 0.559642
+        "BIOSSES": 0.497391,
+        "SICK-R": 0.567003,
+        "STS12": 0.590715,
+        "STS13": 0.663817,
+        "STS14": 0.600884,
+        "STS15": 0.614552,
+        "STS16": 0.574441,
+        "STSBenchmark": 0.565802
       },
       "token_order_hash": "09d9aaaedc7d41b2fd1e3ffa64f16794a2cefe9ffc7faf1055ae5d49350c3060"
     },
@@ -76,14 +76,14 @@
         "##\uff5e"
       ],
       "mteb_sts_scores": {
-        "BIOSSES": 0.656286,
-        "SICK-R": 0.611602,
-        "STS12": 0.620366,
-        "STS13": 0.735474,
-        "STS14": 0.670425,
-        "STS15": 0.745883,
-        "STS16": 0.67784,
-        "STSBenchmark": 0.655636
+        "BIOSSES": 0.6499,
+        "SICK-R": 0.612639,
+        "STS12": 0.617488,
+        "STS13": 0.739954,
+        "STS14": 0.672889,
+        "STS15": 0.747828,
+        "STS16": 0.68201,
+        "STSBenchmark": 0.660814
       },
       "token_order_hash": "d881fab650dd73240615f87f531ff31a6135f961933ebc32c0dfdd130763e7a8"
     }
