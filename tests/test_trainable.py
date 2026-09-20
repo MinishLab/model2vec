@@ -642,6 +642,20 @@ def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer, caplog: pytest.Log
     assert "No known pad token found, using 0 as default" in caplog.text
 
 
+def test_get_probable_pad_token_id_through_static_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test that a non-standard pad token survives StaticModel construction."""
+    tokenizer_model = TokenizerModel.from_tokenizer(mock_tokenizer)
+    tokenizer_model.pad_token = "word1"
+    pad_id = tokenizer_model.pad_token_id
+    assert pad_id != 0
+
+    t = tokenizer_model.to_tokenizer()
+    model = StaticModel(vectors=mock_vectors, tokenizer=t)
+
+    assert model.tokenizer.padding is not None
+    assert get_probable_pad_token_id(model.tokenizer) == pad_id
+
+
 def test_determine_class_weight(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test what the class weights are."""
     w_dict = dict(zip(mock_trained_pipeline.classes, [0.5, 3]))
