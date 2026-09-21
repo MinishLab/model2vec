@@ -5,8 +5,18 @@ import re
 from typing import Sequence
 
 from skeletoken import TokenizerModel
+from skeletoken.padding import Padding
 
 logger = logging.getLogger(__name__)
+
+
+def _replace_padding(model: TokenizerModel) -> TokenizerModel:
+    """Replaces the model's padding module with a benign one."""
+    padding = model.padding
+    if padding is not None:
+        model.padding = Padding(pad_id=padding.pad_id, pad_token=padding.pad_token, pad_type_id=0)
+
+    return model
 
 
 def clean_and_create_vocabulary(
@@ -33,6 +43,7 @@ def clean_and_create_vocabulary(
 
     # Remove the post processor.
     model.post_processor = None
+    model = _replace_padding(model)
 
     internal_tokens: list[str] = model.sorted_vocabulary
     if token_remove_regex:

@@ -80,6 +80,11 @@ class StaticModel:
         self.token_mapping: np.ndarray | None = token_mapping
 
         self.tokenizer = copy.deepcopy(tokenizer)
+        padding = self.tokenizer.padding
+        if padding is not None:
+            self.tokenizer.enable_padding(
+                pad_id=padding["pad_id"], pad_token=padding["pad_token"], pad_type_id=padding["pad_type_id"], length=0
+            )
         self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
