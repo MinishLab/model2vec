@@ -150,6 +150,10 @@ We have performed extensive experiments to evaluate the performance of Model2Vec
 - [Training Results](results/README.md#training-results)
 - [Ablations](results/README.md#ablations)
 
+## Acknowledgements
+
+Thanks to [Greptile](https://greptile.com) for providing free access to their AI code review platform.
+
 ## License
 
 MIT
