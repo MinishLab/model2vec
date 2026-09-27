@@ -87,6 +87,15 @@ class StaticModelForClassification(BaseFinetuneable):
         """Return all clasess in the correct order."""
         return np.array(self.classes_)
 
+    def construct_head(self) -> nn.Sequential:
+        """Constructs a classifier head, which always has at least one linear layer."""
+        if self.n_layers == 0:
+            linear = nn.Linear(self.embed_dim, self.out_dim)
+            nn.init.xavier_uniform_(linear.weight)
+            nn.init.zeros_(linear.bias)
+            return nn.Sequential(linear)
+        return super().construct_head()
+
     def predict(
         self, X: list[str], show_progress_bar: bool = False, batch_size: int = 1024, threshold: float = 0.5
     ) -> np.ndarray:

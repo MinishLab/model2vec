@@ -81,12 +81,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             max_length=max_length,
         )
 
-    def construct_head(self) -> nn.Sequential:
-        """Construct the head, which is empty if it has no layers and doesn't change the dimension."""
-        if self.n_layers == 0 and self.embed_dim == self.out_dim:
-            return nn.Sequential()
-        return super().construct_head()
-
     def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:  # type: ignore[override]
         """Encode both halves of a pair batch through the shared embeddings and head.
 
