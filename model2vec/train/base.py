@@ -13,7 +13,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
-from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _get_unk_token_id
+from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _disable_padding, _get_unk_token_id
 from model2vec.train.dataset import PairDataset, TextDataset
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
@@ -93,6 +93,7 @@ class BaseFinetuneable(nn.Module):
         # Truncation happens here through `max_length`; a StaticModel's tokenizer carries its own setting.
         self.tokenizer = copy.deepcopy(tokenizer)
         self.tokenizer.no_truncation()
+        _disable_padding(self.tokenizer)
         self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
     def _remove_unk(self, token_ids: list[int]) -> list[int]:
