@@ -445,6 +445,36 @@ def test_pair_similarity_out_dim_defaults_to_embed_dim(mock_vectors: np.ndarray,
     assert s.out_dim == 7
 
 
+def test_pair_similarity_no_head(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Without layers and with an unchanged dimension, the model has no head and matches its static model."""
+    model = StaticModelForPairSimilarity(
+        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0
+    )
+    assert len(model.head) == 0
+
+    texts = ["dog cat", "dog"]
+    np.testing.assert_allclose(model.encode(texts), model.to_static_model().encode(texts), atol=1e-6)
+    np.testing.assert_allclose(model.encode(texts), model.to_pipeline().predict(texts), atol=1e-6)
+
+
+def test_pair_similarity_head_changes_dimension(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Without layers but with a different output dimension, the head is a single linear layer."""
+    model = StaticModelForPairSimilarity(
+        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0, out_dim=3
+    )
+    assert len(model.head) == 1
+    assert isinstance(model.head[0], torch.nn.Linear)
+
+
+def test_classifier_keeps_head_when_dimensions_match(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A classifier without layers keeps its linear layer, even if the number of classes equals the dimension."""
+    model = StaticModelForClassification(
+        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0
+    )
+    assert model.out_dim == mock_vectors.shape[1]
+    assert isinstance(model.head[0], torch.nn.Linear)
+
+
 def test_pair_similarity_forward(mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity) -> None:
     """The forward pass should return one head output per half of the pair batch."""
     model = mock_trained_pair_similarity_pipeline

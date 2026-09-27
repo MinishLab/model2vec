@@ -27,7 +27,7 @@ from model2vec.onnx import (
     _save_tokenizer_and_config,
     export_model_to_onnx,
 )
-from model2vec.train import StaticModelForClassification
+from model2vec.train import StaticModelForClassification, StaticModelForPairSimilarity
 
 
 def _tokenize(pipeline: StaticModelPipeline, texts: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
@@ -144,6 +144,23 @@ def test_pipeline_onnx_matches_projector(
     expected = mock_inference_pipeline_projector.predict(texts, use_multiprocessing=False)
 
     assert onnx_output.shape == expected.shape
+    np.testing.assert_allclose(onnx_output, expected, atol=1e-4)
+
+
+def test_pipeline_onnx_matches_empty_head(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, tmp_path: Path) -> None:
+    """A pipeline whose head has no layers exports the static model's embeddings."""
+    model = StaticModelForPairSimilarity(
+        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0
+    )
+    pipeline = model.to_pipeline()
+    assert pipeline.head.layers == []
+    texts = ["dog", "cat"]
+    torch_model = TorchStaticModelPipeline(pipeline)
+    input_ids, attention_mask = _tokenize(pipeline, texts)
+
+    onnx_output = _export(torch_model, input_ids, attention_mask, tmp_path / "model.onnx")
+    expected = pipeline.predict(texts, use_multiprocessing=False)
+
     np.testing.assert_allclose(onnx_output, expected, atol=1e-4)
 
 
