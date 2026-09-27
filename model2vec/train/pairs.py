@@ -15,19 +15,41 @@ from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything, train_te
 logger = logging.getLogger(__name__)
 
 
-class PairCosineLoss(nn.Module):
-    def __call__(self, head_out: tuple[torch.Tensor, torch.Tensor], y: torch.Tensor) -> torch.Tensor:
-        """Returns the cosine loss between the two encoded halves of a pair batch, per pair label.
+class PairInfoNCELoss(nn.Module):
+    def __init__(self, temperature: float = 0.05) -> None:
+        """Initialize the InfoNCE loss.
 
-        Pairs labeled 1 are pushed towards a cosine similarity of 1, pairs labeled 0 are pushed
-        towards a cosine similarity of 0.
+        :param temperature: The temperature by which the cosine similarities are divided.
+        """
+        super().__init__()
+        self.temperature = temperature
+
+    def __call__(self, head_out: tuple[torch.Tensor, torch.Tensor], y: torch.Tensor) -> torch.Tensor:
+        """Returns the InfoNCE loss over a pair batch, using in-batch negatives.
+
+        Every first text labeled 1 is treated as an anchor, its paired second text as the positive, and
+        all other second texts in the batch as negatives. Pairs labeled 0 are not used as anchors, but
+        their second texts still serve as negatives for the other anchors. Second texts with the same
+        embedding as an anchor's positive, such as duplicates of the positive text, are not used as
+        negatives for that anchor.
+
+        :param head_out: The encoded first texts and second texts.
+        :param y: The label of each pair.
+        :return: The mean loss over the anchors.
         """
         out_a, out_b = head_out
         out_a = torch.nn.functional.normalize(out_a, dim=1)
         out_b = torch.nn.functional.normalize(out_b, dim=1)
-        cosine_sim = torch.sum(out_a * out_b, dim=1)
-        loss = torch.where(y == 1, 1 - cosine_sim, cosine_sim.abs())
-        return loss.mean()
+        logits = (out_a @ out_b.T) / self.temperature
+        targets = torch.arange(len(logits), device=logits.device)
+        duplicates = (out_b @ out_b.T) > 1 - 1e-6
+        duplicates[targets, targets] = False
+        logits = logits.masked_fill(duplicates, float("-inf"))
+        loss = torch.nn.functional.cross_entropy(logits, targets, reduction="none")
+        positive = y == 1
+        if not positive.any():
+            return (loss * 0).sum()
+        return loss[positive].mean()
 
 
 class StaticModelForPairSimilarity(BaseFinetuneable):
@@ -156,12 +178,14 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         labels_val: list[int] | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
+        temperature: float = 0.05,
     ) -> T:
-        """Fit a model that maximizes the cosine similarity between paired texts.
+        """Fit a model that embeds paired texts close together.
 
         This function trains the model with a plain torch training loop. Both `text_a` and `text_b`
-        are encoded with the same model. Pairs labeled 1 are pushed together, minimizing the cosine
-        distance between them. Pairs labeled 0 are pushed towards a cosine similarity of 0. We use
+        are encoded with the same model, and trained with an InfoNCE loss: each `text_a` labeled 1 is
+        pulled towards its paired `text_b` and pushed away from all other `text_b` in the batch. Pairs
+        labeled 0 are not used as anchors, but their `text_b` still serves as an in-batch negative. We use
         early stopping. After training, the weights of the best model are loaded back into the model.
 
         This function seeds everything with a seed of 42, so the results are reproducible.
@@ -172,8 +196,8 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
 
         :param text_a: The first half of each training pair.
         :param text_b: The second half of each training pair.
-        :param labels: The label for each training pair: 1 if the pair should be pushed together, 0 if
-            it should be pushed towards a cosine similarity of 0. If None, every pair is labeled 1.
+        :param labels: The label for each training pair: 1 if the pair should be pushed together, 0 otherwise.
+            If None, every pair is labeled 1.
         :param learning_rate: The learning rate.
         :param batch_size: The batch size. If None, a good batch size is chosen automatically.
         :param min_epochs: The minimum number of epochs to train for.
@@ -188,6 +212,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param labels_val: The label for each validation pair. If None, every validation pair is labeled 1.
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
+        :param temperature: The temperature of the InfoNCE loss.
         :return: The fitted model.
         """
         seed_everything(random_seed)
@@ -208,7 +233,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         batch_size = self._determine_batch_size(batch_size, len(train_dataset))
 
         self._train(
-            loss_function=PairCosineLoss(),
+            loss_function=PairInfoNCELoss(temperature=temperature),
             learning_rate=learning_rate,
             train_dataset=train_dataset,
             val_dataset=val_dataset,

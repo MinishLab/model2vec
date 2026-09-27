@@ -16,7 +16,7 @@ from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 from model2vec.train.base import BaseFinetuneable
 from model2vec.train.dataset import PairDataset, TextDataset
-from model2vec.train.pairs import PairCosineLoss, StaticModelForPairSimilarity
+from model2vec.train.pairs import PairInfoNCELoss, StaticModelForPairSimilarity
 from model2vec.train.regression import StaticModelForRegression
 from model2vec.train.similarity import StaticModelForSimilarity
 from model2vec.train.trainer import _resolve_max_epochs, resolve_device, run_training_loop
@@ -420,18 +420,38 @@ def test_pairdataset_labels_mismatched_length() -> None:
         PairDataset([[1], [2]], [[3], [4]], labels=[1])
 
 
-def test_pair_cosine_loss_pushes_towards_label() -> None:
-    """Label 1 pairs are pushed towards a cosine similarity of 1, label 0 pairs towards 0."""
-    loss_fn = PairCosineLoss()
-    out_a = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+def test_pair_infonce_loss_is_query_to_document() -> None:
+    """The loss is the cross-entropy of each first text over all second texts in the batch."""
+    torch.manual_seed(0)
+    out_a, out_b = torch.randn(4, 3), torch.randn(4, 3)
+    loss_fn = PairInfoNCELoss(temperature=0.1)
+    logits = torch.nn.functional.normalize(out_a, dim=1) @ torch.nn.functional.normalize(out_b, dim=1).T / 0.1
+    expected = torch.nn.functional.cross_entropy(logits, torch.arange(4))
 
-    identical = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
-    orthogonal = torch.tensor([[0.0, 1.0], [0.0, 1.0]])
+    assert loss_fn((out_a, out_b), torch.ones(4)).item() == pytest.approx(expected.item(), abs=1e-5)
 
-    assert loss_fn((out_a, identical), torch.tensor([1.0, 1.0])).item() == pytest.approx(0.0, abs=1e-6)
-    assert loss_fn((out_a, orthogonal), torch.tensor([1.0, 1.0])).item() == pytest.approx(1.0)
-    assert loss_fn((out_a, orthogonal), torch.tensor([0.0, 0.0])).item() == pytest.approx(0.0, abs=1e-6)
-    assert loss_fn((out_a, identical), torch.tensor([0.0, 0.0])).item() == pytest.approx(1.0)
+
+def test_pair_infonce_loss_ignores_negative_anchors() -> None:
+    """Pairs labeled 0 are not used as anchors, but their second text is still a negative."""
+    torch.manual_seed(0)
+    out_a, out_b = torch.randn(3, 3), torch.randn(3, 3)
+    loss_fn = PairInfoNCELoss(temperature=0.1)
+    logits = torch.nn.functional.normalize(out_a, dim=1) @ torch.nn.functional.normalize(out_b, dim=1).T / 0.1
+    per_pair = torch.nn.functional.cross_entropy(logits, torch.arange(3), reduction="none")
+
+    loss = loss_fn((out_a, out_b), torch.tensor([1.0, 0.0, 1.0]))
+    assert loss.item() == pytest.approx(per_pair[[0, 2]].mean().item(), abs=1e-5)
+    assert loss_fn((out_a, out_b), torch.zeros(3)).item() == 0.0
+
+
+def test_pair_infonce_loss_masks_duplicate_positives() -> None:
+    """Second texts identical to an anchor's positive are not used as negatives for that anchor."""
+    out_a = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
+    out_b = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    loss_fn = PairInfoNCELoss(temperature=0.05)
+
+    loss = loss_fn((out_a, out_b), torch.tensor([1.0, 0.0]))
+    assert loss.item() == pytest.approx(0.0, abs=1e-6)
 
 
 def test_pair_similarity_out_dim_defaults_to_embed_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:

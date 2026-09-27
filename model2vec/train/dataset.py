@@ -52,8 +52,8 @@ class PairDataset(Dataset):
 
         :param tokenized_texts_a: The tokenized first half of each pair. Each text is a list of token ids.
         :param tokenized_texts_b: The tokenized second half of each pair. Each text is a list of token ids.
-        :param labels: The label for each pair: 1 if the pair should be pushed together, 0 if it should be
-            pushed towards a cosine similarity of 0. If None, every pair is labeled 1.
+        :param labels: The label for each pair: 1 if the pair should be pushed together, 0 otherwise.
+            If None, every pair is labeled 1.
         :param pad_id: The id used to pad batches. Must match the `pad_id` of the model being trained.
         :raises ValueError: If the two halves don't have the same number of texts, or if `labels` doesn't
             have one entry per pair.

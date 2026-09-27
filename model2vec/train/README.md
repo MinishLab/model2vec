@@ -100,7 +100,7 @@ The scores are competitive with the popular [roberta-base-go_emotions](https://h
 
 ## Pair similarity
 
-`StaticModelForPairSimilarity` trains a model to embed pairs of related texts (e.g. queries and their matching documents) close together, by encoding both sides with the same model and minimizing the cosine distance between them:
+`StaticModelForPairSimilarity` trains a model to embed pairs of related texts (e.g. queries and their matching documents) close together, by encoding both sides with the same model. It is trained with an InfoNCE loss with in-batch negatives: each `text_a` is pulled towards its paired `text_b` and pushed away from every other `text_b` in the batch:
 
 ```python
 from model2vec.train import StaticModelForPairSimilarity
@@ -109,7 +109,7 @@ model = StaticModelForPairSimilarity.from_pretrained(model_name="minishlab/potio
 model.fit(text_a=["how tall is the eiffel tower?"], text_b=["the eiffel tower is 330 meters tall."])
 ```
 
-Pairs can also be labeled: pairs labeled `1` are pushed together (cosine similarity towards 1), while pairs labeled `0` are pushed towards a cosine similarity of 0. If `labels` is omitted, every pair is treated as positive:
+Pairs can also be labeled. If `labels` is omitted, every pair is treated as positive. Pairs labeled `0` are not used as anchors, but their `text_b` still serves as an additional negative for the other pairs in the batch:
 
 ```python
 model.fit(
@@ -118,6 +118,8 @@ model.fit(
     labels=[1, 0],
 )
 ```
+
+The InfoNCE temperature can be set with `temperature` (default `0.05`).
 
 # Persistence
 
