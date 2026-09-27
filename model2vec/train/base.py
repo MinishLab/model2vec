@@ -363,6 +363,7 @@ class BaseFinetuneable(nn.Module):
         validation_steps: int | None,
         compute_metrics: MetricsFn = default_metrics,
         token_dropout: float = 0.0,
+        max_steps: int | None = None,
     ) -> None:
         if not 0.0 <= token_dropout < 1.0:
             raise ValueError("token_dropout must be in the range [0, 1).")
@@ -387,6 +388,7 @@ class BaseFinetuneable(nn.Module):
             val_check_interval=val_check_interval,
             check_val_every_epoch=check_val_every_epoch,
             compute_metrics=compute_metrics,
+            max_steps=max_steps,
         )
 
         self.load_state_dict(state_dict)

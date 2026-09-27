@@ -156,6 +156,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         labels_val: list[int] | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
+        max_steps: int | None = None,
     ) -> T:
         """Fit a model that maximizes the cosine similarity between paired texts.
 
@@ -188,6 +189,8 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param labels_val: The label for each validation pair. If None, every validation pair is labeled 1.
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
+        :param max_steps: The maximum number of training steps. If None, the number of steps is not limited.
+            When it is reached, training stops, even before `min_epochs`.
         :return: The fitted model.
         """
         seed_everything(random_seed)
@@ -218,6 +221,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             max_epochs=max_epochs,
             device=device,
             validation_steps=validation_steps,
+            max_steps=max_steps,
         )
 
         return self

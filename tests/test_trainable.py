@@ -1,5 +1,6 @@
 import logging
 from tempfile import TemporaryDirectory
+from typing import Any
 
 import numpy as np
 import pytest
@@ -849,3 +850,93 @@ def test_run_training_loop_steps_scheduler_once_per_epoch(monkeypatch: pytest.Mo
         check_val_every_epoch=None,
     )
     assert len(step_calls) == 3
+
+
+class _CountingLoss(nn.Module):
+    def __init__(self, model: nn.Module) -> None:
+        super().__init__()
+        self.model = model
+        self.train_calls = 0
+        self.val_calls = 0
+        self.mse = nn.MSELoss()
+
+    def forward(self, head_out: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        if self.model.training:
+            self.train_calls += 1
+        else:
+            self.val_calls += 1
+        return self.mse(head_out, y)
+
+
+def _run_counting_loop(
+    max_steps: int | None, val_check_interval: int | None = None, min_epochs: int | None = None
+) -> _CountingLoss:
+    model = nn.Linear(3, 2)
+    loss = _CountingLoss(model)
+    run_training_loop(
+        model=model,
+        loss_function=loss,
+        learning_rate=1e-3,
+        val_metric="val_loss",
+        early_stopping_direction="min",
+        train_loader=_make_loader(10),
+        val_loader=_make_loader(2),
+        early_stopping_patience=None,
+        min_epochs=min_epochs,
+        max_epochs=None,
+        device=resolve_device("cpu"),
+        val_check_interval=val_check_interval,
+        check_val_every_epoch=None if val_check_interval else 1,
+        max_steps=max_steps,
+    )
+    return loss
+
+
+def test_run_training_loop_stops_at_max_steps() -> None:
+    """Training stops after max_steps, across epochs, and validates once at the end."""
+    loss = _run_counting_loop(max_steps=13)
+    assert loss.train_calls == 13
+    assert loss.val_calls == 2 * 2
+
+
+def test_run_training_loop_max_steps_does_not_validate_twice() -> None:
+    """If the last step is also a validation step, the model is validated once."""
+    loss = _run_counting_loop(max_steps=6, val_check_interval=3)
+    assert loss.train_calls == 6
+    assert loss.val_calls == 2 * 2
+
+
+def test_run_training_loop_max_steps_overrides_min_epochs() -> None:
+    """max_steps stops training even before min_epochs is reached."""
+    loss = _run_counting_loop(max_steps=4, min_epochs=5)
+    assert loss.train_calls == 4
+
+
+def test_run_training_loop_rejects_invalid_max_steps() -> None:
+    """max_steps must be at least 1."""
+    with pytest.raises(ValueError):
+        _run_counting_loop(max_steps=0)
+
+
+@pytest.mark.parametrize(
+    "model_class, y",
+    [
+        (StaticModelForClassification, ["a", "b"] * 4),
+        (StaticModelForRegression, torch.ones(8, 2)),
+        (StaticModelForPairSimilarity, ["word2", "word3"] * 4),
+    ],
+)
+def test_fit_passes_max_steps(
+    monkeypatch: pytest.MonkeyPatch, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, model_class: Any, y: Any
+) -> None:
+    """max_steps is passed from fit to the training loop."""
+    captured: list[object] = []
+
+    def fake_run_training_loop(**kwargs: Any) -> dict[str, torch.Tensor]:
+        captured.append(kwargs["max_steps"])
+        return kwargs["model"].state_dict()
+
+    monkeypatch.setattr("model2vec.train.base.run_training_loop", fake_run_training_loop)
+    model = model_class(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    model.fit(["word1", "word2", "word3", "word1 word2"] * 2, y, max_steps=7)
+    assert captured == [7]

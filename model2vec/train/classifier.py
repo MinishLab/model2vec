@@ -148,6 +148,7 @@ class StaticModelForClassification(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
         token_dropout: float = 0.0,
+        max_steps: int | None = None,
     ) -> StaticModelForClassification:
         """Fit a model.
 
@@ -181,6 +182,8 @@ class StaticModelForClassification(BaseFinetuneable):
         :param random_seed: The random seed to use. Defaults to 42.
         :param token_dropout: The fraction of tokens to randomly drop from each training sample.
             Has no effect during validation. Must be in the range [0, 1).
+        :param max_steps: The maximum number of training steps. If None, the number of steps is not limited.
+            When it is reached, training stops, even before `min_epochs`.
         :return: The fitted model.
         :raises ValueError: If either X_val or y_val are provided, but not both.
         """
@@ -224,6 +227,7 @@ class StaticModelForClassification(BaseFinetuneable):
             validation_steps=validation_steps,
             compute_metrics=compute_metrics,
             token_dropout=token_dropout,
+            max_steps=max_steps,
         )
 
         return self

@@ -103,6 +103,7 @@ def run_training_loop(  # noqa: C901
     val_check_interval: int | None,
     check_val_every_epoch: int | None,
     compute_metrics: MetricsFn = default_metrics,
+    max_steps: int | None = None,
 ) -> dict[str, torch.Tensor]:
     """Train `model` with a plain torch loop, validating and checkpointing on the configured cadence.
 
@@ -121,8 +122,13 @@ def run_training_loop(  # noqa: C901
     :param val_check_interval: If set, validate every this many training steps.
     :param check_val_every_epoch: If set, validate every this many epochs.
     :param compute_metrics: Computes validation metrics from `(head_out, y, loss)`. Defaults to just `val_loss`.
+    :param max_steps: The maximum number of training steps. When it is reached, the model is validated one last
+        time and training stops, even before `min_epochs`. If None, the number of steps is not limited.
     :return: The model's state dict from the validation check with the best `val_metric`.
+    :raises ValueError: If `max_steps` is smaller than 1.
     """
+    if max_steps is not None and max_steps < 1:
+        raise ValueError("max_steps must be at least 1.")
     model.to(device)
     loss_function.to(device)
 
@@ -150,9 +156,11 @@ def run_training_loop(  # noqa: C901
     global_step = 0
     postfix: dict[str, str] = {}
     latest_val_loss: float | None = None
+    last_validated_step = -1
 
     def validate_and_checkpoint() -> bool:
-        nonlocal best_checkpoint, best_val_metric, latest_val_loss
+        nonlocal best_checkpoint, best_val_metric, latest_val_loss, last_validated_step
+        last_validated_step = global_step
         metrics = _run_validation(model, loss_function, compute_metrics, val_loader, device)
         latest_val_loss = metrics["val_loss"]
         current = metrics[val_metric]
@@ -184,6 +192,11 @@ def run_training_loop(  # noqa: C901
                     pbar.set_postfix(postfix)
                     if should_stop and (min_epochs is None or current_epoch >= min_epochs):
                         return best_checkpoint
+
+                if max_steps is not None and global_step >= max_steps:
+                    if last_validated_step != global_step:
+                        validate_and_checkpoint()
+                    return best_checkpoint
 
             current_epoch += 1
 
