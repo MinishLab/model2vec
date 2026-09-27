@@ -420,6 +420,10 @@ def test_pairdataset_labels_mismatched_length() -> None:
         PairDataset([[1], [2]], [[3], [4]], labels=[1])
 
 
+def _distinct(n: int) -> torch.Tensor:
+    return torch.arange(n)
+
+
 def test_pair_infonce_loss_is_query_to_document() -> None:
     """The loss is the cross-entropy of each first text over all second texts in the batch."""
     torch.manual_seed(0)
@@ -428,7 +432,8 @@ def test_pair_infonce_loss_is_query_to_document() -> None:
     logits = torch.nn.functional.normalize(out_a, dim=1) @ torch.nn.functional.normalize(out_b, dim=1).T / 0.1
     expected = torch.nn.functional.cross_entropy(logits, torch.arange(4))
 
-    assert loss_fn((out_a, out_b), torch.ones(4)).item() == pytest.approx(expected.item(), abs=1e-5)
+    loss = loss_fn((out_a, out_b, _distinct(4), _distinct(4)), torch.ones(4))
+    assert loss.item() == pytest.approx(expected.item(), abs=1e-5)
 
 
 def test_pair_infonce_loss_ignores_negative_anchors() -> None:
@@ -439,9 +444,9 @@ def test_pair_infonce_loss_ignores_negative_anchors() -> None:
     logits = torch.nn.functional.normalize(out_a, dim=1) @ torch.nn.functional.normalize(out_b, dim=1).T / 0.1
     per_pair = torch.nn.functional.cross_entropy(logits, torch.arange(3), reduction="none")
 
-    loss = loss_fn((out_a, out_b), torch.tensor([1.0, 0.0, 1.0]))
+    loss = loss_fn((out_a, out_b, _distinct(3), _distinct(3)), torch.tensor([1.0, 0.0, 1.0]))
     assert loss.item() == pytest.approx(per_pair[[0, 2]].mean().item(), abs=1e-5)
-    assert loss_fn((out_a, out_b), torch.zeros(3)).item() == 0.0
+    assert loss_fn((out_a, out_b, _distinct(3), _distinct(3)), torch.zeros(3)).item() == 0.0
 
 
 def test_pair_infonce_loss_masks_duplicate_positives() -> None:
@@ -450,8 +455,45 @@ def test_pair_infonce_loss_masks_duplicate_positives() -> None:
     out_b = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
     loss_fn = PairInfoNCELoss(temperature=0.05)
 
-    loss = loss_fn((out_a, out_b), torch.tensor([1.0, 0.0]))
+    loss = loss_fn((out_a, out_b, _distinct(2), torch.tensor([0, 0])), torch.tensor([1.0, 0.0]))
     assert loss.item() == pytest.approx(0.0, abs=1e-6)
+
+
+def test_pair_infonce_loss_masks_other_positives_of_the_same_anchor() -> None:
+    """Pairs labeled 1 with an identical first text are all positives, so they don't compete."""
+    out_a = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    out_b = torch.tensor([[0.9, 0.1], [0.8, 0.2]])
+    loss_fn = PairInfoNCELoss(temperature=0.05)
+
+    loss = loss_fn((out_a, out_b, torch.tensor([0, 0]), _distinct(2)), torch.ones(2))
+    assert loss.item() == pytest.approx(0.0, abs=1e-6)
+
+
+def test_pair_infonce_loss_keeps_negatives_of_the_same_anchor() -> None:
+    """A pair labeled 0 with an identical first text still provides a negative for that anchor."""
+    out_a = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    out_b = torch.tensor([[0.9, 0.1], [0.8, 0.2]])
+    loss_fn = PairInfoNCELoss(temperature=0.05)
+
+    loss = loss_fn((out_a, out_b, torch.tensor([0, 0]), _distinct(2)), torch.tensor([1.0, 0.0]))
+    assert loss.item() > 0.1
+
+
+def test_pair_infonce_loss_keeps_distinct_but_parallel_negatives() -> None:
+    """Distinct second texts are negatives, even if their embeddings are nearly parallel."""
+    out_a = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
+    out_b = torch.tensor([[1.0, 0.0], [1.0, 1e-4]])
+    loss_fn = PairInfoNCELoss(temperature=0.05)
+
+    loss = loss_fn((out_a, out_b, _distinct(2), _distinct(2)), torch.tensor([1.0, 0.0]))
+    assert loss.item() == pytest.approx(float(np.log(2)), abs=1e-3)
+
+
+@pytest.mark.parametrize("temperature", [0.0, -0.05])
+def test_pair_infonce_loss_rejects_non_positive_temperature(temperature: float) -> None:
+    """The temperature must be positive."""
+    with pytest.raises(ValueError):
+        PairInfoNCELoss(temperature=temperature)
 
 
 def test_pair_similarity_out_dim_defaults_to_embed_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -472,9 +514,11 @@ def test_pair_similarity_forward(mock_trained_pair_similarity_pipeline: StaticMo
     batch, _ = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
 
     with torch.no_grad():
-        out_a, out_b = model(batch)
+        out_a, out_b, ids_a, ids_b = model(batch)
     assert out_a.shape == (2, model.out_dim)
     assert out_b.shape == (2, model.out_dim)
+    assert ids_a.tolist()[0] != ids_a.tolist()[1]
+    assert ids_b.tolist()[0] != ids_b.tolist()[1]
 
 
 def test_pair_similarity_mismatched_lengths(
@@ -523,12 +567,62 @@ def test_pair_similarity_fit_with_explicit_val(mock_vectors: np.ndarray, mock_to
         text_a,
         text_b,
         labels=labels,
-        text_a_val=["word1"],
-        text_b_val=["word2"],
-        labels_val=[1],
+        text_a_val=["word1", "word3"],
+        text_b_val=["word2", "word1"],
+        labels_val=[1, 1],
         early_stopping_patience=1,
         max_epochs=1,
     )
+
+
+def test_pair_similarity_fit_rejects_splits_it_cannot_learn_from(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Both splits need at least two pairs and a pair labeled 1."""
+    model = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    with pytest.raises(ValueError, match="training set needs at least two pairs"):
+        model.fit(["word1", "word2"], ["word2", "word3"], labels=[1, 0])
+    with pytest.raises(ValueError, match="validation set needs at least one pair labeled 1"):
+        model.fit(
+            ["word1", "word2"],
+            ["word2", "word3"],
+            text_a_val=["word1", "word3"],
+            text_b_val=["word3", "word2"],
+            labels_val=[0, 0],
+        )
+
+
+def test_pair_similarity_fit_rejects_invalid_temperature_and_batch_size(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """A non-positive temperature and a batch size of 1 are rejected."""
+    model = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    text_a, text_b = ["word1", "word2", "word3", "word1 word2"], ["word2", "word3", "word1", "word3"]
+    with pytest.raises(ValueError, match="temperature"):
+        model.fit(text_a, text_b, test_size=0.5, temperature=0.0)
+    with pytest.raises(ValueError, match="batch_size"):
+        model.fit(text_a, text_b, test_size=0.5, batch_size=1)
+
+
+def test_pairdataset_drops_single_pair_batches() -> None:
+    """A final batch with a single pair is dropped, unless it is the only pair."""
+    dataset = PairDataset([[1], [2], [3]], [[1], [2], [3]])
+    assert [len(y) for _, y in dataset.to_dataloader(shuffle=False, batch_size=2)] == [2]
+    single = PairDataset([[1]], [[1]])
+    assert [len(y) for _, y in single.to_dataloader(shuffle=False, batch_size=2)] == [1]
+
+
+def test_pair_similarity_forward_ids_identical_texts(
+    mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity,
+) -> None:
+    """Identical texts in a batch get the same id."""
+    model = mock_trained_pair_similarity_pipeline
+    dataset = model._prepare_pair_dataset(["dog", "cat", "dog"], ["puppy", "puppy", "kitten"], [1, 1, 1], None)
+    batch, _ = next(iter(dataset.to_dataloader(shuffle=False, batch_size=3)))
+    with torch.no_grad():
+        _, _, ids_a, ids_b = model(batch)
+    assert ids_a[0] == ids_a[2] and ids_a[0] != ids_a[1]
+    assert ids_b[0] == ids_b[1] and ids_b[0] != ids_b[2]
 
 
 def test_pair_similarity_fit_with_labels(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:

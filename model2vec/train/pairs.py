@@ -19,34 +19,42 @@ class PairInfoNCELoss(nn.Module):
     def __init__(self, temperature: float = 0.05) -> None:
         """Initialize the InfoNCE loss.
 
-        :param temperature: The temperature by which the cosine similarities are divided.
+        :param temperature: The temperature by which the cosine similarities are divided. Must be positive.
+        :raises ValueError: If `temperature` is not positive.
         """
         super().__init__()
+        if temperature <= 0:
+            raise ValueError(f"temperature must be positive, got {temperature}.")
         self.temperature = temperature
 
-    def __call__(self, head_out: tuple[torch.Tensor, torch.Tensor], y: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, head_out: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], y: torch.Tensor
+    ) -> torch.Tensor:
         """Returns the InfoNCE loss over a pair batch, using in-batch negatives.
 
         Every first text labeled 1 is treated as an anchor, its paired second text as the positive, and
         all other second texts in the batch as negatives. Pairs labeled 0 are not used as anchors, but
-        their second texts still serve as negatives for the other anchors. Second texts with the same
-        embedding as an anchor's positive, such as duplicates of the positive text, are not used as
-        negatives for that anchor.
+        their second texts still serve as negatives for the other anchors. A second text is not used as a
+        negative for an anchor if it is identical to the anchor's positive, or if it belongs to another
+        pair labeled 1 with an identical first text.
 
-        :param head_out: The encoded first texts and second texts.
+        :param head_out: The encoded first texts and second texts, followed by an id for each first text and
+            each second text. Identical texts have the same id.
         :param y: The label of each pair.
         :return: The mean loss over the anchors.
         """
-        out_a, out_b = head_out
+        out_a, out_b, ids_a, ids_b = head_out
+        positive = y == 1
         out_a = torch.nn.functional.normalize(out_a, dim=1)
         out_b = torch.nn.functional.normalize(out_b, dim=1)
         logits = (out_a @ out_b.T) / self.temperature
         targets = torch.arange(len(logits), device=logits.device)
-        duplicates = (out_b @ out_b.T) > 1 - 1e-6
-        duplicates[targets, targets] = False
-        logits = logits.masked_fill(duplicates, float("-inf"))
+        same_positive = ids_b[:, None] == ids_b[None, :]
+        other_positive = (ids_a[:, None] == ids_a[None, :]) & positive[None, :]
+        false_negatives = same_positive | other_positive
+        false_negatives[targets, targets] = False
+        logits = logits.masked_fill(false_negatives, float("-inf"))
         loss = torch.nn.functional.cross_entropy(logits, targets, reduction="none")
-        positive = y == 1
         if not positive.any():
             return (loss * 0).sum()
         return loss[positive].mean()
@@ -102,15 +110,20 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             max_length=max_length,
         )
 
-    def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:  # type: ignore[override]
+    def forward(  # type: ignore[override]
+        self, input_ids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Encode both halves of a pair batch through the shared embeddings and head.
 
         :param input_ids: A `(2, batch_size, seq_len)` tensor, stacking the two padded text sets.
-        :return: The head outputs for the first and second set of texts.
+        :return: The head outputs for the first and second set of texts, followed by an id for each first
+            text and each second text. Identical texts have the same id.
         """
         out_a = self.head(self._encode(input_ids[0]))
         out_b = self.head(self._encode(input_ids[1]))
-        return out_a, out_b
+        ids_a = torch.unique(input_ids[0], dim=0, return_inverse=True)[1]
+        ids_b = torch.unique(input_ids[1], dim=0, return_inverse=True)[1]
+        return out_a, out_b, ids_a, ids_b
 
     def _check_pair_val_split(
         self,
@@ -142,6 +155,23 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         train_a, train_b = map(list, zip(*train_pairs)) if train_pairs else ([], [])
         val_a, val_b = map(list, zip(*val_pairs)) if val_pairs else ([], [])
         return train_a, val_a, train_b, val_b, train_labels, val_labels
+
+    @staticmethod
+    def _check_pair_splits(train_labels: list[int], val_labels: list[int]) -> None:
+        """Check that the training and validation sets each have at least two pairs, and a pair labeled 1.
+
+        :param train_labels: The labels of the training pairs.
+        :param val_labels: The labels of the validation pairs.
+        :raises ValueError: If either set has fewer than two pairs, or no pair labeled 1.
+        """
+        for name, split_labels in (("training", train_labels), ("validation", val_labels)):
+            if len(split_labels) < 2:
+                raise ValueError(
+                    f"The {name} set needs at least two pairs, got {len(split_labels)}. Pass more pairs, "
+                    "a different test_size, or an explicit validation set."
+                )
+            if not any(label == 1 for label in split_labels):
+                raise ValueError(f"The {name} set needs at least one pair labeled 1.")
 
     def _prepare_pair_dataset(
         self, text_a: list[str], text_b: list[str], labels: list[int], max_length: int | None
@@ -214,15 +244,18 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param random_seed: The random seed to use. Defaults to 42.
         :param temperature: The temperature of the InfoNCE loss.
         :return: The fitted model.
+        :raises ValueError: If `batch_size` is smaller than 2.
         """
         seed_everything(random_seed)
         logger.info("Re-initializing model.")
+        loss_function = PairInfoNCELoss(temperature=temperature)
 
         labels = [1] * len(text_a) if labels is None else labels
 
         train_a, val_a, train_b, val_b, train_labels, val_labels = self._check_pair_val_split(
             text_a, text_b, labels, text_a_val, text_b_val, labels_val, test_size
         )
+        self._check_pair_splits(train_labels, val_labels)
         self._initialize()
 
         logger.info("Preparing train dataset.")
@@ -231,9 +264,11 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         val_dataset = self._prepare_pair_dataset(val_a, val_b, val_labels, self.max_length)
 
         batch_size = self._determine_batch_size(batch_size, len(train_dataset))
+        if batch_size < 2:
+            raise ValueError(f"batch_size must be at least 2, got {batch_size}.")
 
         self._train(
-            loss_function=PairInfoNCELoss(temperature=temperature),
+            loss_function=loss_function,
             learning_rate=learning_rate,
             train_dataset=train_dataset,
             val_dataset=val_dataset,

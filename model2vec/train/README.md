@@ -106,20 +106,18 @@ The scores are competitive with the popular [roberta-base-go_emotions](https://h
 from model2vec.train import StaticModelForPairSimilarity
 
 model = StaticModelForPairSimilarity.from_pretrained(model_name="minishlab/potion-base-32M")
-model.fit(text_a=["how tall is the eiffel tower?"], text_b=["the eiffel tower is 330 meters tall."])
+model.fit(text_a=queries, text_b=documents)
 ```
 
-Pairs can also be labeled. If `labels` is omitted, every pair is treated as positive. Pairs labeled `0` are not used as anchors, but their `text_b` still serves as an additional negative for the other pairs in the batch:
+Because the other pairs in a batch serve as negatives, the training and validation sets each need at least two pairs. Pairs with the same `text_a` are treated as alternative positives for that text, so they don't serve as negatives for each other.
+
+Pairs can also be labeled. If `labels` is omitted, every pair is treated as positive. Pairs labeled `0` are not used as anchors, but their `text_b` still serves as an additional negative for the other pairs in the batch, including pairs with the same `text_a`:
 
 ```python
-model.fit(
-    text_a=["how tall is the eiffel tower?", "how tall is the eiffel tower?"],
-    text_b=["the eiffel tower is 330 meters tall.", "paris is the capital of france."],
-    labels=[1, 0],
-)
+model.fit(text_a=queries, text_b=documents, labels=labels)
 ```
 
-The InfoNCE temperature can be set with `temperature` (default `0.05`).
+The InfoNCE temperature can be set with `temperature` (default `0.05`). It must be positive.
 
 # Persistence
 

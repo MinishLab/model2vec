@@ -90,5 +90,6 @@ class PairDataset(Dataset):
         return torch.stack([padded_a, padded_b]), torch.stack(labels)
 
     def to_dataloader(self, shuffle: bool, batch_size: int = 32) -> DataLoader:
-        """Convert the dataset to a DataLoader."""
-        return DataLoader(self, collate_fn=self.collate_fn, shuffle=shuffle, batch_size=batch_size)
+        """Convert the dataset to a DataLoader. A final batch with a single pair is dropped, unless it is the only pair."""
+        drop_last = len(self) > 1 and len(self) % batch_size == 1
+        return DataLoader(self, collate_fn=self.collate_fn, shuffle=shuffle, batch_size=batch_size, drop_last=drop_last)
