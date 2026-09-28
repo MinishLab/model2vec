@@ -124,10 +124,13 @@ class TorchStaticModelPipeline(torch.nn.Module):
     def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """Encode the inputs and run them through the head, applying the output activation."""
         out = self.encoder(input_ids, attention_mask).float()
-        *hidden_layers, last_layer = self.layers
-        for layer in hidden_layers:
-            out = torch.relu(layer(out))
-        logits = last_layer(out)
+        if len(self.layers) == 0:
+            logits = out
+        else:
+            *hidden_layers, last_layer = self.layers
+            for layer in hidden_layers:
+                out = torch.relu(layer(out))
+            logits = last_layer(out)
         if self.activation == Activation.SOFTMAX:
             return torch.softmax(logits, dim=-1)
         if self.activation == Activation.SIGMOID:

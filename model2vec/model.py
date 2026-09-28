@@ -80,11 +80,7 @@ class StaticModel:
         self.token_mapping: np.ndarray | None = token_mapping
 
         self.tokenizer = copy.deepcopy(tokenizer)
-        padding = self.tokenizer.padding
-        if padding is not None:
-            self.tokenizer.enable_padding(
-                pad_id=padding["pad_id"], pad_token=padding["pad_token"], pad_type_id=padding["pad_type_id"], length=0
-            )
+        _disable_padding(self.tokenizer)
         self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
         self.median_token_length = int(np.median([len(token) for token in self.tokens]))
@@ -613,6 +609,15 @@ def _loading_helper(
         quantize_to=quantize_to,
         dimensionality=dimensionality,
     )
+
+
+def _disable_padding(tokenizer: Tokenizer) -> None:
+    """Stop the tokenizer from padding, while keeping its pad token."""
+    padding = tokenizer.padding
+    if padding is not None:
+        tokenizer.enable_padding(
+            pad_id=padding["pad_id"], pad_token=padding["pad_token"], pad_type_id=padding["pad_type_id"], length=0
+        )
 
 
 def _get_unk_token_id(tokenizer: Tokenizer) -> int | None:

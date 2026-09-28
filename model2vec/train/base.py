@@ -13,7 +13,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
-from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _get_unk_token_id
+from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _disable_padding, _get_unk_token_id
 from model2vec.train.dataset import PairDataset, TextDataset
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
@@ -50,7 +50,8 @@ class BaseFinetuneable(nn.Module):
         :param vectors: The embeddings of the staticmodel.
         :param tokenizer: The tokenizer.
         :param hidden_dim: The hidden dimension of the head.
-        :param n_layers: The number of layers in the head.
+        :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
+            dimension, the model has no head and the embeddings are used as is.
         :param out_dim: The output dimension of the head.
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
@@ -93,6 +94,7 @@ class BaseFinetuneable(nn.Module):
         # Truncation happens here through `max_length`; a StaticModel's tokenizer carries its own setting.
         self.tokenizer = copy.deepcopy(tokenizer)
         self.tokenizer.no_truncation()
+        _disable_padding(self.tokenizer)
         self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
     def _remove_unk(self, token_ids: list[int]) -> list[int]:
@@ -111,7 +113,9 @@ class BaseFinetuneable(nn.Module):
         return nn.Parameter(w, requires_grad=not self.freeze_weights)
 
     def construct_head(self) -> nn.Sequential:
-        """Constructs a simple classifier head."""
+        """Constructs a simple head, which is empty if it has no layers and doesn't change the dimension."""
+        if self.n_layers == 0 and self.embed_dim == self.out_dim:
+            return nn.Sequential()
         modules: list[nn.Module] = []
         if self.n_layers == 0:
             modules.append(nn.Linear(self.embed_dim, self.out_dim))
@@ -230,8 +234,7 @@ class BaseFinetuneable(nn.Module):
         """
         zeros = (input_ids != self.pad_id).float()
         zeros = self._apply_token_dropout(zeros)
-        # Add a small epsilon to avoid division by zero
-        length = zeros.sum(1) + 1e-16
+        length = zeros.sum(1).clamp(min=1)
         input_ids_embeddings = self.token_mapping[input_ids]
         embedded = self.embeddings(input_ids_embeddings)
 

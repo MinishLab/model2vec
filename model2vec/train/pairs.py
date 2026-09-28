@@ -75,7 +75,8 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
 
         :param vectors: The embeddings of the staticmodel.
         :param tokenizer: The tokenizer.
-        :param n_layers: The number of layers in the head.
+        :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
+            dimension, the model has no head, and the embeddings are used as is.
         :param hidden_dim: The hidden dimension of the head.
         :param out_dim: The output embedding dimension. If None, defaults to the input embedding dimension.
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models.

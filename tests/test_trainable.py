@@ -1,5 +1,6 @@
 import logging
 from tempfile import TemporaryDirectory
+from typing import Any
 
 import numpy as np
 import pytest
@@ -44,13 +45,37 @@ def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) ->
     """Test successful initialization of the base class."""
     vectors_torched = torch.from_numpy(mock_vectors)
     s = BaseFinetuneable(
-        vectors=vectors_torched, tokenizer=mock_tokenizer, hidden_dim=256, out_dim=2, n_layers=0, pad_id=0
+        vectors=vectors_torched, tokenizer=mock_tokenizer, hidden_dim=256, out_dim=3, n_layers=0, pad_id=0
     )
     assert s.vectors.shape == mock_vectors.shape
     assert s.w.shape[0] == mock_vectors.shape[0]
 
     head = s.construct_head()
     assert head[0].in_features == mock_vectors.shape[1]
+
+
+def test_trainable_tokenizer_does_not_pad(mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity) -> None:
+    """The tokenizer of a trainable model keeps its pad token, but doesn't pad."""
+    model = mock_trained_pair_similarity_pipeline
+    assert model.tokenizer.padding is not None
+    assert (
+        model._tokenize_texts(["word1 word2", "word2"], max_length=None)[1]
+        == model._tokenize_texts(["word2"], max_length=None)[0]
+    )
+
+
+def test_empty_texts_have_finite_gradients(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Texts without any tokens encode to zero vectors and don't produce NaN gradients."""
+    torch.manual_seed(0)
+    model = StaticModelForClassification(
+        vectors=torch.from_numpy(mock_vectors).float() * 1e20, tokenizer=mock_tokenizer, n_layers=0
+    )
+    dataset = model._prepare_dataset(["word1 word2", ""], torch.tensor([0, 1]), max_length=None)
+    batch, y = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
+
+    nn.functional.cross_entropy(model(batch), y).backward()
+
+    assert all(torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None)
 
 
 def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -463,6 +488,63 @@ def test_pair_similarity_out_dim_defaults_to_embed_dim(mock_vectors: np.ndarray,
         vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, out_dim=7
     )
     assert s.out_dim == 7
+
+
+@pytest.mark.parametrize(
+    "model_class", [StaticModelForSimilarity, StaticModelForRegression, StaticModelForPairSimilarity]
+)
+def test_no_head_without_layers(model_class: Any, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Without layers and with an unchanged dimension, the model has no head and matches its static model."""
+    model = model_class(
+        vectors=torch.from_numpy(mock_vectors).float(),
+        tokenizer=mock_tokenizer,
+        n_layers=0,
+        out_dim=mock_vectors.shape[1],
+    )
+    assert len(model.head) == 0
+
+    texts = ["dog cat", "dog"]
+    np.testing.assert_allclose(model.encode(texts), model.to_static_model().encode(texts), atol=1e-6)
+    np.testing.assert_allclose(model.encode(texts), model.to_pipeline().predict(texts), atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    "model_class", [StaticModelForSimilarity, StaticModelForRegression, StaticModelForPairSimilarity]
+)
+def test_head_without_layers_changes_dimension(
+    model_class: Any, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Without layers but with a different output dimension, the head is a single linear layer."""
+    model = model_class(
+        vectors=torch.from_numpy(mock_vectors).float(),
+        tokenizer=mock_tokenizer,
+        n_layers=0,
+        out_dim=mock_vectors.shape[1] + 1,
+    )
+    assert len(model.head) == 1
+    assert isinstance(model.head[0], torch.nn.Linear)
+
+
+def test_similarity_fit_without_layers(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """The head of a similarity model follows the dimension of the targets it is fit on."""
+    model = StaticModelForSimilarity(
+        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0
+    )
+    texts = ["word1", "word2", "word3", "word1 word2"] * 2
+    model.fit(texts, torch.randn(len(texts), mock_vectors.shape[1]), max_epochs=1)
+    assert len(model.head) == 0
+
+    model.fit(texts, torch.randn(len(texts), mock_vectors.shape[1] + 1), max_epochs=1)
+    assert isinstance(model.head[0], torch.nn.Linear)
+
+
+def test_classifier_keeps_head_when_dimensions_match(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A classifier without layers keeps its linear layer, even if the number of classes equals the dimension."""
+    model = StaticModelForClassification(
+        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0
+    )
+    assert model.out_dim == mock_vectors.shape[1]
+    assert isinstance(model.head[0], torch.nn.Linear)
 
 
 def test_pair_similarity_forward(mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity) -> None:
