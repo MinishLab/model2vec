@@ -50,7 +50,8 @@ class BaseFinetuneable(nn.Module):
         :param vectors: The embeddings of the staticmodel.
         :param tokenizer: The tokenizer.
         :param hidden_dim: The hidden dimension of the head.
-        :param n_layers: The number of layers in the head.
+        :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
+            dimension, the model has no head and the embeddings are used as is.
         :param out_dim: The output dimension of the head.
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
@@ -112,7 +113,9 @@ class BaseFinetuneable(nn.Module):
         return nn.Parameter(w, requires_grad=not self.freeze_weights)
 
     def construct_head(self) -> nn.Sequential:
-        """Constructs a simple classifier head."""
+        """Constructs a simple head, which is empty if it has no layers and doesn't change the dimension."""
+        if self.n_layers == 0 and self.embed_dim == self.out_dim:
+            return nn.Sequential()
         modules: list[nn.Module] = []
         if self.n_layers == 0:
             modules.append(nn.Linear(self.embed_dim, self.out_dim))

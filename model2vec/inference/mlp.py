@@ -43,7 +43,7 @@ class MLPHead:
     ) -> None:
         """An MLP with ReLU activation.
 
-        :param layers: The linear layers, in order.
+        :param layers: The linear layers, in order. If empty, the input is passed through unchanged.
         :param activation: The output activation.
         :param classes: The classes, if the task is a classification task.
         """
@@ -54,6 +54,8 @@ class MLPHead:
     def _logits(self, X: np.ndarray) -> np.ndarray:
         """Run the forward through the layers."""
         out = X
+        if not self.layers:
+            return out
         *hidden_layers, last_layer = self.layers
         for layer in hidden_layers:
             out = np.maximum(layer(out), 0.0)
