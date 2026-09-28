@@ -63,6 +63,20 @@ def test_trainable_tokenizer_does_not_pad(mock_trained_pair_similarity_pipeline:
     )
 
 
+def test_empty_texts_have_finite_gradients(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Texts without any tokens encode to zero vectors and don't produce NaN gradients."""
+    torch.manual_seed(0)
+    model = StaticModelForClassification(
+        vectors=torch.from_numpy(mock_vectors).float() * 1e20, tokenizer=mock_tokenizer, n_layers=0
+    )
+    dataset = model._prepare_dataset(["word1 word2", ""], torch.tensor([0, 1]), max_length=None)
+    batch, y = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
+
+    nn.functional.cross_entropy(model(batch), y).backward()
+
+    assert all(torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None)
+
+
 def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test initializion from a static model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)

@@ -231,8 +231,7 @@ class BaseFinetuneable(nn.Module):
         """
         zeros = (input_ids != self.pad_id).float()
         zeros = self._apply_token_dropout(zeros)
-        # Add a small epsilon to avoid division by zero
-        length = zeros.sum(1) + 1e-16
+        length = zeros.sum(1).clamp(min=1)
         input_ids_embeddings = self.token_mapping[input_ids]
         embedded = self.embeddings(input_ids_embeddings)
 
