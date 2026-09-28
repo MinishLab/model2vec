@@ -53,6 +53,16 @@ def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) ->
     assert head[0].in_features == mock_vectors.shape[1]
 
 
+def test_trainable_tokenizer_does_not_pad(mock_trained_pair_similarity_pipeline: StaticModelForPairSimilarity) -> None:
+    """The tokenizer of a trainable model keeps its pad token, but doesn't pad."""
+    model = mock_trained_pair_similarity_pipeline
+    assert model.tokenizer.padding is not None
+    assert (
+        model._tokenize_texts(["word1 word2", "word2"], max_length=None)[1]
+        == model._tokenize_texts(["word2"], max_length=None)[0]
+    )
+
+
 def test_empty_texts_have_finite_gradients(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Texts without any tokens encode to zero vectors and don't produce NaN gradients."""
     torch.manual_seed(0)
