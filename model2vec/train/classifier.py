@@ -22,9 +22,9 @@ LabelType = list[str] | list[list[str]]
 
 
 def _classifier_metrics(head_out: torch.Tensor, y: torch.Tensor, loss: torch.Tensor) -> dict[str, float]:
-    """Validation metrics for single-label classification: loss and accuracy."""
+    """Metrics for single-label classification: loss and accuracy."""
     accuracy = (head_out.argmax(dim=1) == y).float().mean()
-    return {"val_loss": loss.item(), "val_accuracy": accuracy.item()}
+    return {"loss": loss.item(), "accuracy": accuracy.item()}
 
 
 def _compute_accuracy(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
@@ -36,10 +36,10 @@ def _compute_accuracy(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
 
 
 def _multilabel_classifier_metrics(head_out: torch.Tensor, y: torch.Tensor, loss: torch.Tensor) -> dict[str, float]:
-    """Validation metrics for multi-label classification: loss and Jaccard accuracy."""
+    """Metrics for multi-label classification: loss and Jaccard accuracy."""
     preds = (torch.sigmoid(head_out) > 0.5).float()
     accuracy = _compute_accuracy(y, preds)
-    return {"val_loss": loss.item(), "val_accuracy": accuracy}
+    return {"loss": loss.item(), "accuracy": accuracy}
 
 
 class StaticModelForClassification(BaseFinetuneable):
