@@ -176,7 +176,10 @@ def run_training_loop(  # noqa: C901
                 optimizer.step()
                 global_step += 1
 
-                postfix["train_loss"] = f"{loss.item():.4f}"
+                with torch.no_grad():
+                    train_metrics = compute_metrics(head_out, y, loss)
+                for key, value in train_metrics.items():
+                    postfix[key.replace("val_", "train_", 1)] = f"{value:.4f}"
                 pbar.set_postfix(postfix)
 
                 if val_check_interval is not None and global_step % val_check_interval == 0:
