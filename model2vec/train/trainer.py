@@ -16,8 +16,8 @@ _TRAIN_METRICS_WINDOW = 50
 
 
 def default_metrics(head_out: torch.Tensor, y: torch.Tensor, loss: torch.Tensor) -> dict[str, float]:
-    """Validation metrics for tasks that only track loss (used for early stopping on val_loss)."""
-    return {"val_loss": loss.item()}
+    """Metrics for tasks that only track loss (used for early stopping on val_loss)."""
+    return {"loss": loss.item()}
 
 
 class EarlyStopper:
@@ -83,7 +83,7 @@ def _run_validation(
         head_out = model(x)
         loss = loss_function(head_out, y)
         for key, value in compute_metrics(head_out, y, loss).items():
-            weighted_sums[key] += value * batch_size
+            weighted_sums[f"val_{key}"] += value * batch_size
         total_samples += batch_size
     model.train()
     return {key: total / total_samples for key, total in weighted_sums.items()}
@@ -110,7 +110,7 @@ def run_training_loop(  # noqa: C901
     :param model: The model to train, called as `head_out = model(x)`.
     :param loss_function: Computes the training and validation loss from `(head_out, y)`.
     :param learning_rate: The Adam learning rate.
-    :param val_metric: The metric key (returned by `compute_metrics`) used for early stopping.
+    :param val_metric: The metric key used for early stopping: a key returned by `compute_metrics`, prefixed with `val_`.
     :param early_stopping_direction: Either "min" or "max", the direction of improvement for `val_metric`.
     :param train_loader: The training data loader.
     :param val_loader: The validation data loader.
@@ -121,7 +121,7 @@ def run_training_loop(  # noqa: C901
     :param device: The device to train on.
     :param val_check_interval: If set, validate every this many training steps.
     :param check_val_every_epoch: If set, validate every this many epochs.
-    :param compute_metrics: Computes validation metrics from `(head_out, y, loss)`. Defaults to just `val_loss`.
+    :param compute_metrics: Computes unprefixed metrics from `(head_out, y, loss)`. Defaults to just `loss`.
     :return: The model's state dict from the validation check with the best `val_metric`.
     """
     model.to(device)
@@ -181,8 +181,7 @@ def run_training_loop(  # noqa: C901
                 with torch.no_grad():
                     train_metrics = compute_metrics(head_out, y, loss)
                 for key, value in train_metrics.items():
-                    window = train_metric_windows[key.replace("val_", "train_", 1)]
-                    window.append(value)
+                    train_metric_windows[f"train_{key}"].append(value)
                 for key, window in train_metric_windows.items():
                     postfix[key] = f"{sum(window) / len(window):.4f}"
                 pbar.set_postfix(postfix)

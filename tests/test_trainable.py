@@ -936,7 +936,7 @@ def test_run_training_loop_mid_epoch_early_stop() -> None:
         device=resolve_device("cpu"),
         val_check_interval=1,
         check_val_every_epoch=None,
-        compute_metrics=lambda head_out, y, loss: {"val_loss": 1.0},
+        compute_metrics=lambda head_out, y, loss: {"loss": 1.0},
     )
     assert set(state_dict) == set(model.state_dict())
 
