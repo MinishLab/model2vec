@@ -15,19 +15,40 @@ from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything, train_te
 logger = logging.getLogger(__name__)
 
 
-class PairCosineLoss(nn.Module):
-    def __call__(self, head_out: tuple[torch.Tensor, torch.Tensor], y: torch.Tensor) -> torch.Tensor:
-        """Returns the cosine loss between the two encoded halves of a pair batch, per pair label.
+class PairInfoNCELoss(nn.Module):
+    def __init__(self, temperature: float = 0.05) -> None:
+        """Initialize the InfoNCE loss.
 
-        Pairs labeled 1 are pushed towards a cosine similarity of 1, pairs labeled 0 are pushed
-        towards a cosine similarity of 0.
+        :param temperature: The temperature by which the cosine similarities are divided. Must be positive.
+        :raises ValueError: If `temperature` is not positive.
         """
-        out_a, out_b = head_out
+        super().__init__()
+        if temperature <= 0:
+            raise ValueError(f"temperature must be positive, got {temperature}.")
+        self.temperature = temperature
+
+    def __call__(
+        self, head_out: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], y: torch.Tensor
+    ) -> torch.Tensor:
+        """Returns the InfoNCE loss over a pair batch, using in-batch negatives.
+
+        Every first text is an anchor, its paired second text the positive, and all other second texts in
+        the batch negatives. A second text is not used as a negative for an anchor if it is identical to
+        the anchor's positive, or if it is paired with a first text identical to the anchor.
+
+        :param head_out: The encoded first texts and second texts, followed by an id for each first text and
+            each second text. Identical texts have the same id.
+        :param y: For each anchor, the index of its positive among the second texts.
+        :return: The mean loss over the anchors.
+        """
+        out_a, out_b, ids_a, ids_b = head_out
         out_a = torch.nn.functional.normalize(out_a, dim=1)
         out_b = torch.nn.functional.normalize(out_b, dim=1)
-        cosine_sim = torch.sum(out_a * out_b, dim=1)
-        loss = torch.where(y == 1, 1 - cosine_sim, cosine_sim.abs())
-        return loss.mean()
+        logits = (out_a @ out_b.T) / self.temperature
+        false_negatives = (ids_a[:, None] == ids_a[None, :]) | (ids_b[:, None] == ids_b[None, :])
+        false_negatives[torch.arange(len(y), device=y.device), y] = False
+        logits = logits.masked_fill(false_negatives, float("-inf"))
+        return torch.nn.functional.cross_entropy(logits, y)
 
 
 class StaticModelForPairSimilarity(BaseFinetuneable):
@@ -81,62 +102,71 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             max_length=max_length,
         )
 
-    def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:  # type: ignore[override]
+    def forward(  # type: ignore[override]
+        self, input_ids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Encode both halves of a pair batch through the shared embeddings and head.
 
         :param input_ids: A `(2, batch_size, seq_len)` tensor, stacking the two padded text sets.
-        :return: The head outputs for the first and second set of texts.
+        :return: The head outputs for the first and second set of texts, followed by an id for each first
+            text and each second text. Identical texts have the same id.
         """
         out_a = self.head(self._encode(input_ids[0]))
         out_b = self.head(self._encode(input_ids[1]))
-        return out_a, out_b
+        ids_a = torch.unique(input_ids[0], dim=0, return_inverse=True)[1]
+        ids_b = torch.unique(input_ids[1], dim=0, return_inverse=True)[1]
+        return out_a, out_b, ids_a, ids_b
 
     def _check_pair_val_split(
         self,
         text_a: list[str],
         text_b: list[str],
-        labels: list[int],
         text_a_val: list[str] | None,
         text_b_val: list[str] | None,
-        labels_val: list[int] | None,
         test_size: float,
-    ) -> tuple[list[str], list[str], list[str], list[str], list[int], list[int]]:
+    ) -> tuple[list[str], list[str], list[str], list[str]]:
         if len(text_a) != len(text_b):
             raise ValueError("text_a and text_b must have the same length.")
-        if len(labels) != len(text_a):
-            raise ValueError("labels must have the same length as text_a and text_b.")
         if (text_a_val is not None) != (text_b_val is not None):
             raise ValueError("Both text_a_val and text_b_val must be provided together, or neither.")
 
         if text_a_val is not None and text_b_val is not None:
             if len(text_a_val) != len(text_b_val):
                 raise ValueError("text_a_val and text_b_val must have the same length.")
-            labels_val = [1] * len(text_a_val) if labels_val is None else labels_val
-            if len(labels_val) != len(text_a_val):
-                raise ValueError("labels_val must have the same length as text_a_val and text_b_val.")
-            return text_a, text_a_val, text_b, text_b_val, labels, labels_val
+            return text_a, text_a_val, text_b, text_b_val
 
         pairs = list(zip(text_a, text_b))
-        train_pairs, val_pairs, train_labels, val_labels = train_test_split(pairs, labels, test_size=test_size)
+        train_pairs, val_pairs, _, _ = train_test_split(pairs, pairs, test_size=test_size)
         train_a, train_b = map(list, zip(*train_pairs)) if train_pairs else ([], [])
         val_a, val_b = map(list, zip(*val_pairs)) if val_pairs else ([], [])
-        return train_a, val_a, train_b, val_b, train_labels, val_labels
+        return train_a, val_a, train_b, val_b
 
-    def _prepare_pair_dataset(
-        self, text_a: list[str], text_b: list[str], labels: list[int], max_length: int | None
-    ) -> PairDataset:
+    @staticmethod
+    def _check_pair_splits(n_train: int, n_val: int) -> None:
+        """Check that the training and validation sets each have at least two pairs.
+
+        :param n_train: The number of training pairs.
+        :param n_val: The number of validation pairs.
+        :raises ValueError: If either set has fewer than two pairs.
+        """
+        for name, n_pairs in (("training", n_train), ("validation", n_val)):
+            if n_pairs < 2:
+                raise ValueError(
+                    f"The {name} set needs at least two pairs, got {n_pairs}. Pass more pairs, "
+                    "a different test_size, or an explicit validation set."
+                )
+
+    def _prepare_pair_dataset(self, text_a: list[str], text_b: list[str], max_length: int | None) -> PairDataset:
         """Tokenize both halves of a pair dataset.
 
         :param text_a: The first half of each pair.
         :param text_b: The second half of each pair.
-        :param labels: The label for each pair.
         :param max_length: The maximum length of the input in tokens. If this is None, no truncation is done.
         :return: A PairDataset.
         """
         return PairDataset(
             self._tokenize_texts(text_a, max_length),
             self._tokenize_texts(text_b, max_length),
-            labels=labels,
             pad_id=self.pad_id,
         )
 
@@ -144,7 +174,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         self: T,
         text_a: list[str],
         text_b: list[str],
-        labels: list[int] | None = None,
         learning_rate: float = 1e-3,
         batch_size: int | None = None,
         min_epochs: int | None = None,
@@ -154,16 +183,16 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         device: str = "auto",
         text_a_val: list[str] | None = None,
         text_b_val: list[str] | None = None,
-        labels_val: list[int] | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
+        temperature: float = 0.05,
     ) -> T:
-        """Fit a model that maximizes the cosine similarity between paired texts.
+        """Fit a model that embeds paired texts close together.
 
         This function trains the model with a plain torch training loop. Both `text_a` and `text_b`
-        are encoded with the same model. Pairs labeled 1 are pushed together, minimizing the cosine
-        distance between them. Pairs labeled 0 are pushed towards a cosine similarity of 0. We use
-        early stopping. After training, the weights of the best model are loaded back into the model.
+        are encoded with the same model, and trained with an InfoNCE loss: each `text_a` is pulled towards
+        its paired `text_b` and pushed away from all other `text_b` in the batch. Pairs with the same
+        `text_a` are not used as negatives for each other. We use early stopping. After training, the weights of the best model are loaded back into the model.
 
         This function seeds everything with a seed of 42, so the results are reproducible.
         It also splits the data into a train and validation set, again with a random seed.
@@ -173,8 +202,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
 
         :param text_a: The first half of each training pair.
         :param text_b: The second half of each training pair.
-        :param labels: The label for each training pair: 1 if the pair should be pushed together, 0 if
-            it should be pushed towards a cosine similarity of 0. If None, every pair is labeled 1.
         :param learning_rate: The learning rate.
         :param batch_size: The batch size. If None, a good batch size is chosen automatically.
         :param min_epochs: The minimum number of epochs to train for.
@@ -186,30 +213,31 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :param text_a_val: The first half of each validation pair.
         :param text_b_val: The second half of each validation pair.
-        :param labels_val: The label for each validation pair. If None, every validation pair is labeled 1.
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
+        :param temperature: The temperature of the InfoNCE loss.
         :return: The fitted model.
+        :raises ValueError: If `batch_size` is smaller than 2.
         """
         seed_everything(random_seed)
         logger.info("Re-initializing model.")
+        loss_function = PairInfoNCELoss(temperature=temperature)
 
-        labels = [1] * len(text_a) if labels is None else labels
-
-        train_a, val_a, train_b, val_b, train_labels, val_labels = self._check_pair_val_split(
-            text_a, text_b, labels, text_a_val, text_b_val, labels_val, test_size
-        )
+        train_a, val_a, train_b, val_b = self._check_pair_val_split(text_a, text_b, text_a_val, text_b_val, test_size)
+        self._check_pair_splits(len(train_a), len(val_a))
         self._initialize()
 
         logger.info("Preparing train dataset.")
-        train_dataset = self._prepare_pair_dataset(train_a, train_b, train_labels, self.max_length)
+        train_dataset = self._prepare_pair_dataset(train_a, train_b, self.max_length)
         logger.info("Preparing validation dataset.")
-        val_dataset = self._prepare_pair_dataset(val_a, val_b, val_labels, self.max_length)
+        val_dataset = self._prepare_pair_dataset(val_a, val_b, self.max_length)
 
         batch_size = self._determine_batch_size(batch_size, len(train_dataset))
+        if batch_size < 2:
+            raise ValueError(f"batch_size must be at least 2, got {batch_size}.")
 
         self._train(
-            loss_function=PairCosineLoss(),
+            loss_function=loss_function,
             learning_rate=learning_rate,
             train_dataset=train_dataset,
             val_dataset=val_dataset,

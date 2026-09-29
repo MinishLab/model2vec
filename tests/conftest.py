@@ -246,9 +246,9 @@ def mock_trained_pair_similarity_pipeline() -> StaticModelForPairSimilarity:
     vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
     model = StaticModelForPairSimilarity(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
 
-    text_a = ["dog", "cat"]
-    text_b = ["puppy", "kitten"]
-    model.fit(text_a, text_b)
+    text_a = ["dog", "cat", "dog cat", "cat dog"]
+    text_b = ["puppy", "kitten", "puppy kitten", "kitten puppy"]
+    model.fit(text_a, text_b, test_size=0.5)
 
     return model
 

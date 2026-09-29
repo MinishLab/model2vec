@@ -100,24 +100,18 @@ The scores are competitive with the popular [roberta-base-go_emotions](https://h
 
 ## Pair similarity
 
-`StaticModelForPairSimilarity` trains a model to embed pairs of related texts (e.g. queries and their matching documents) close together, by encoding both sides with the same model and minimizing the cosine distance between them:
+`StaticModelForPairSimilarity` trains a model to embed pairs of related texts (e.g. queries and their matching documents) close together, by encoding both sides with the same model. It is trained with an InfoNCE loss with in-batch negatives: each `text_a` is pulled towards its paired `text_b` and pushed away from every other `text_b` in the batch:
 
 ```python
 from model2vec.train import StaticModelForPairSimilarity
 
 model = StaticModelForPairSimilarity.from_pretrained(model_name="minishlab/potion-base-32M")
-model.fit(text_a=["how tall is the eiffel tower?"], text_b=["the eiffel tower is 330 meters tall."])
+model.fit(text_a=queries, text_b=documents)
 ```
 
-Pairs can also be labeled: pairs labeled `1` are pushed together (cosine similarity towards 1), while pairs labeled `0` are pushed towards a cosine similarity of 0. If `labels` is omitted, every pair is treated as positive:
+Because the other pairs in a batch serve as negatives, the training and validation sets each need at least two pairs. Pairs with the same `text_a` are treated as alternative positives for that text, so they don't serve as negatives for each other.
 
-```python
-model.fit(
-    text_a=["how tall is the eiffel tower?", "how tall is the eiffel tower?"],
-    text_b=["the eiffel tower is 330 meters tall.", "paris is the capital of france."],
-    labels=[1, 0],
-)
-```
+The InfoNCE temperature can be set with `temperature` (default `0.05`). It must be positive.
 
 # Persistence
 
