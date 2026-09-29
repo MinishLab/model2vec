@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from collections import defaultdict
+from collections import defaultdict, deque
 from collections.abc import Callable
 
 import torch
@@ -12,6 +12,7 @@ from tqdm import tqdm
 MetricsFn = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], dict[str, float]]
 
 _UNBOUNDED_MAX_EPOCHS = 9999
+_TRAIN_METRICS_WINDOW = 50
 
 
 def default_metrics(head_out: torch.Tensor, y: torch.Tensor, loss: torch.Tensor) -> dict[str, float]:
@@ -149,6 +150,7 @@ def run_training_loop(  # noqa: C901
     current_epoch = 0
     global_step = 0
     postfix: dict[str, str] = {}
+    train_metric_windows: dict[str, deque[float]] = defaultdict(lambda: deque(maxlen=_TRAIN_METRICS_WINDOW))
     latest_val_loss: float | None = None
 
     def validate_and_checkpoint() -> bool:
@@ -179,7 +181,10 @@ def run_training_loop(  # noqa: C901
                 with torch.no_grad():
                     train_metrics = compute_metrics(head_out, y, loss)
                 for key, value in train_metrics.items():
-                    postfix[key.replace("val_", "train_", 1)] = f"{value:.4f}"
+                    window = train_metric_windows[key.replace("val_", "train_", 1)]
+                    window.append(value)
+                for key, window in train_metric_windows.items():
+                    postfix[key] = f"{sum(window) / len(window):.4f}"
                 pbar.set_postfix(postfix)
 
                 if val_check_interval is not None and global_step % val_check_interval == 0:
