@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from typing import Any
 
@@ -106,7 +107,7 @@ class ColumnRows:
         }
 
 
-class _Batches(Dataset):
+class _Batches(Dataset, ABC):
     def __init__(self, rows: ColumnRows, indices: np.ndarray | None, pad_id: int) -> None:
         """A dataset that fetches rows and turns them into items per batch.
 
@@ -130,13 +131,13 @@ class _Batches(Dataset):
         """Fetch and convert a batch of items at once."""
         return self._to_items(self.rows[self.indices[indices].tolist()])
 
+    @abstractmethod
     def _to_items(self, rows: Mapping[str, Any]) -> list[Any]:
         """Turn a batch of rows into items."""
-        raise NotImplementedError
 
+    @abstractmethod
     def collate_fn(self, batch: list[Any]) -> tuple[torch.Tensor, torch.Tensor]:
         """Collate a batch of items into model inputs and targets."""
-        raise NotImplementedError
 
     def _drop_last(self, batch_size: int) -> bool:
         """Whether to drop the last batch if it is smaller than `batch_size`."""

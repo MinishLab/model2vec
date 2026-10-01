@@ -459,7 +459,7 @@ class StaticModel:
         ids = self.tokenize(sentences=sentences)
         dtype = self.embedding.dtype
         if dtype == np.int8:
-            dtype = np.float32
+            dtype = np.dtype(np.float32)
         out = np.zeros((len(ids), self.dim), dtype=dtype)
 
         if self.token_mapping is None and self.weights is None:

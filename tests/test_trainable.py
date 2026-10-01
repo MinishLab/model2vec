@@ -1037,6 +1037,10 @@ def test_split_indices_stratified_respects_test_size() -> None:
     assert {labels[i] for i in test} == set(labels)
     assert sorted([*train, *test]) == list(range(len(labels)))
 
+    labels = ["a", "a", "b", "b"]
+    train, test = split_indices(len(labels), 3, stratify_by=labels)
+    assert sorted(labels[i] for i in train) == sorted(labels[i] for i in test) == ["a", "b"]
+
     labels = [str(i % 20) for i in range(1000)]
     assert len(split_indices(len(labels), 10, stratify_by=labels)[1]) == 10
 
@@ -1334,6 +1338,14 @@ def test_fit_rejects_missing_texts(mock_vectors: np.ndarray, mock_tokenizer: Tok
     pairs = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     with pytest.raises(ValueError, match="text_b must be strings"):
         pairs.fit(_TRAIN_TEXTS, texts)  # type: ignore[arg-type]
+
+
+def test_fit_rejects_non_string_column(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A column of non-string values is rejected as texts."""
+    model = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    dataset = Dataset.from_dict({"text": list(range(8)), "label": ["a", "b"] * 4})
+    with pytest.raises(ValueError, match="X must be strings"):
+        model.fit(dataset["text"], dataset["label"])
 
 
 def test_fit_names_mismatched_lengths(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
