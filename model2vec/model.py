@@ -173,7 +173,11 @@ class StaticModel:
         :param sentences: The sentences to tokenize.
         :return: A list of list of tokens.
         """
-        encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
+        return self._tokenize(sentences, self.tokenizer)
+
+    def _tokenize(self, sentences: Sequence[str], tokenizer: Tokenizer) -> list[list[int]]:
+        """使用本次编码的 tokenizer，避免请求间修改共享截断配置."""
+        encodings: list[Encoding] = tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
 
         encodings_ids = [encoding.ids for encoding in encodings]
 
@@ -275,22 +279,27 @@ class StaticModel:
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        self._set_max_length_in_tokenizer(max_length)
-        try:
-            if use_multiprocessing and len(sentences) > multiprocessing_threshold:
-                # Disable parallelism for tokenizers
-                os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-                results = ProgressParallel(
-                    n_jobs=-1, backend="threading", use_tqdm=show_progress_bar, total=total_batches
-                )(delayed(batch_fn)(batch, *batch_args) for batch in sentence_batches)
+        tokenizer = self.tokenizer
+        if max_length != self.max_length:
+            # 默认长度复用只读 tokenizer，仅显式覆盖时复制一次供所有批次使用。
+            tokenizer = copy.deepcopy(tokenizer)
+            if max_length is None:
+                tokenizer.no_truncation()
             else:
-                results = [
-                    batch_fn(batch, *batch_args)
-                    for batch in tqdm(sentence_batches, total=total_batches, disable=not show_progress_bar)
-                ]
-        finally:
-            self._set_max_length_in_tokenizer(self.max_length)
+                tokenizer.enable_truncation(max_length)
+
+        if use_multiprocessing and len(sentences) > multiprocessing_threshold:
+            # 禁用 tokenizer 内部并行，沿用外部线程池的批处理方式。
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            results = ProgressParallel(n_jobs=-1, backend="threading", use_tqdm=show_progress_bar, total=total_batches)(
+                delayed(batch_fn)(batch, *batch_args, tokenizer=tokenizer) for batch in sentence_batches
+            )
+        else:
+            results = [
+                batch_fn(batch, *batch_args, tokenizer=tokenizer)
+                for batch in tqdm(sentence_batches, total=total_batches, disable=not show_progress_bar)
+            ]
 
         return results, was_single
 
@@ -368,9 +377,11 @@ class StaticModel:
             return out_array[0]
         return out_array
 
-    def _encode_batch_as_sequence(self, sentences: Sequence[str]) -> list[np.ndarray]:
+    def _encode_batch_as_sequence(
+        self, sentences: Sequence[str], tokenizer: Tokenizer | None = None
+    ) -> list[np.ndarray]:
         """Encode a batch of sentences as a sequence."""
-        ids = self.tokenize(sentences=sentences)
+        ids = self._tokenize(sentences, self.tokenizer if tokenizer is None else tokenizer)
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
@@ -454,9 +465,11 @@ class StaticModel:
 
         return emb
 
-    def _encode_batch(self, sentences: Sequence[str], normalize: bool) -> np.ndarray:
+    def _encode_batch(
+        self, sentences: Sequence[str], normalize: bool, tokenizer: Tokenizer | None = None
+    ) -> np.ndarray:
         """Encode a batch of sentences."""
-        ids = self.tokenize(sentences=sentences)
+        ids = self._tokenize(sentences, self.tokenizer if tokenizer is None else tokenizer)
         dtype = self.embedding.dtype
         if dtype == np.int8:
             dtype = np.float32
