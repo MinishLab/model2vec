@@ -17,7 +17,7 @@ from torch import nn
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.inference.mlp import Activation, Layer, MLPHead
-from model2vec.train.dataset import column_type, read_column
+from model2vec.train.dataset import column_type, iter_column
 
 if TYPE_CHECKING:
     from model2vec.train.base import BaseFinetuneable
@@ -95,9 +95,13 @@ def _column_strata(labels: Column) -> list[np.ndarray] | None:
         pa.types.is_string(label_type) or pa.types.is_large_string(label_type) or pa.types.is_integer(label_type)
     ):
         return None
-    array = read_column(labels)
-    encoded = pc.dictionary_encode(array.combine_chunks(), null_encoding="encode")
-    codes = encoded.indices.to_numpy(zero_copy_only=False)
+    classes: dict[Any, int] = {}
+    batch_codes = []
+    for array in iter_column(labels):
+        encoded = pc.dictionary_encode(array.combine_chunks(), null_encoding="encode")
+        mapping = np.array([classes.setdefault(label, len(classes)) for label in encoded.dictionary.to_pylist()])
+        batch_codes.append(mapping[encoded.indices.to_numpy(zero_copy_only=False)])
+    codes = np.concatenate(batch_codes)
     return np.split(np.argsort(codes, kind="stable"), np.cumsum(np.bincount(codes))[:-1])
 
 

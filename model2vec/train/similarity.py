@@ -14,10 +14,36 @@ from torch import nn
 
 from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.dataset import read_column
+from model2vec.train.dataset import column_type, iter_column
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
 logger = logging.getLogger(__name__)
+
+
+def _column_vector_dims(vectors: Column, name: str) -> set[int]:
+    """Get the dimensions of the vectors in a column of a Hugging Face dataset, reading the column in batches.
+
+    :param vectors: A column of a Hugging Face dataset that holds lists of numbers.
+    :param name: The name of the vectors, used in error messages.
+    :return: The dimensions found, stopping as soon as more than one is found.
+    :raises ValueError: If a vector is missing, or if the column doesn't hold lists of numbers.
+    """
+    array_type = column_type(vectors)
+    is_list = pa.types.is_list(array_type) or pa.types.is_large_list(array_type)
+    if not (is_list or pa.types.is_fixed_size_list(array_type)):
+        raise ValueError(f"{name} must hold lists of numbers, got {array_type}.")
+    value_type = array_type.value_type
+    if not (pa.types.is_floating(value_type) or pa.types.is_integer(value_type)):
+        raise ValueError(f"{name} must hold lists of numbers, got {array_type}.")
+    dims: set[int] = set()
+    for array in iter_column(vectors):
+        if array.null_count or pc.list_flatten(array).null_count:
+            raise ValueError(f"Vectors in {name} must not be missing.")
+        bounds = pc.min_max(pc.list_value_length(array))
+        dims |= {bounds["min"].as_py(), bounds["max"].as_py()}
+        if len(dims) > 1:
+            break
+    return dims
 
 
 def _vector_dim(vectors: Any, name: str) -> int:
@@ -36,24 +62,14 @@ def _vector_dim(vectors: Any, name: str) -> int:
         return vectors.shape[1]
 
     if isinstance(vectors, Column):
-        array = read_column(vectors)
-        is_list = pa.types.is_list(array.type) or pa.types.is_large_list(array.type)
-        if not (is_list or pa.types.is_fixed_size_list(array.type)):
-            raise ValueError(f"{name} must hold lists of numbers, got {array.type}.")
-        value_type = array.type.value_type
-        if not (pa.types.is_floating(value_type) or pa.types.is_integer(value_type)):
-            raise ValueError(f"{name} must hold lists of numbers, got {array.type}.")
-        if array.null_count or pc.list_flatten(array).null_count:
-            raise ValueError(f"Vectors in {name} must not be missing.")
-        bounds = pc.min_max(pc.list_value_length(array))
-        dims = {bounds["min"].as_py(), bounds["max"].as_py()}
+        dims = _column_vector_dims(vectors, name)
     else:
         try:
             dims = {len(vector) for vector in vectors}
         except TypeError:
             raise ValueError(f"Vectors in {name} must be sequences of numbers.") from None
 
-    if dims == {None} or not dims:
+    if not dims:
         raise ValueError(f"{name} must not be empty.")
     if len(dims) > 1:
         raise ValueError(f"All vectors in {name} must have the same dimension, got {sorted(dims)}.")
@@ -125,7 +141,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
         token_dropout: float = 0.0,
-        num_workers: int = 0,
     ) -> T:
         """Fit a model.
 
@@ -160,8 +175,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param random_seed: The random seed to use. Defaults to 42.
         :param token_dropout: The fraction of tokens to randomly drop from each training sample.
             Has no effect during validation. Must be in the range [0, 1).
-        :param num_workers: The number of worker processes that read and tokenize batches. If 0, batches are read in
-            the main process.
         :return: The fitted model.
         :raises ValueError: If the vectors in `y_val` have a different dimension than those in `y`.
         """
@@ -187,7 +200,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
             device=device,
             validation_steps=validation_steps,
             token_dropout=token_dropout,
-            num_workers=num_workers,
         )
 
         return self

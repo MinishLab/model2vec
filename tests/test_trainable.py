@@ -1,5 +1,4 @@
 import logging
-import pickle
 from collections import Counter, UserList
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -20,18 +19,19 @@ from transformers import AutoTokenizer
 from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 from model2vec.train.base import BaseFinetuneable
+from model2vec.train.classifier import _read_labels
 from model2vec.train.dataset import (
-    ClassTargets,
     ColumnRows,
     PairDataset,
     TextDataset,
-    read_column,
+    iter_column,
 )
 from model2vec.train.pairs import PairInfoNCELoss, StaticModelForPairSimilarity
 from model2vec.train.regression import StaticModelForRegression
-from model2vec.train.similarity import StaticModelForSimilarity
+from model2vec.train.similarity import StaticModelForSimilarity, _vector_dim
 from model2vec.train.trainer import _resolve_max_epochs, resolve_device, run_training_loop
 from model2vec.train.utils import (
+    _column_strata,
     get_probable_pad_token_id,
     logit,
     seed_everything,
@@ -73,7 +73,7 @@ def test_trainable_tokenizer_does_not_pad(mock_trained_pair_similarity_pipeline:
     """The tokenizer of a trainable model keeps its pad token, but doesn't pad."""
     model = mock_trained_pair_similarity_pipeline
     assert model.tokenizer.padding is not None
-    assert model._batch_tokenizer(None)(["word1 word2", "word2"])[1] == model._batch_tokenizer(None)(["word2"])[0]
+    assert model._tokenize_ids(["word1 word2", "word2"])[1] == model._tokenize_ids(["word2"])[0]
 
 
 def test_empty_texts_have_finite_gradients(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -323,7 +323,7 @@ def test_unknown_tokens_are_dropped(mock_vectors: np.ndarray, mock_tokenizer: To
     expected = static.tokenize(texts)
 
     assert [row[row != s.pad_id].tolist() for row in s.tokenize(texts)] == expected
-    assert s._batch_tokenizer(None)(texts) == expected
+    assert s._tokenize_ids(texts) == expected
 
 
 def test_tokenize_without_unk_token(mock_vectors: np.ndarray) -> None:
@@ -341,7 +341,7 @@ def test_tokenize_without_unk_token(mock_vectors: np.ndarray) -> None:
     expected = static.tokenize(texts)
 
     assert [row[row != s.pad_id].tolist() for row in s.tokenize(texts)] == expected
-    assert s._batch_tokenizer(None)(texts) == expected
+    assert s._tokenize_ids(texts) == expected
 
 
 def test_max_length_is_not_capped_by_the_static_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -352,7 +352,7 @@ def test_max_length_is_not_capped_by_the_static_model(mock_vectors: np.ndarray, 
 
     s = StaticModelForClassification.from_static_model(model=static, max_length=4)
     assert s.tokenize(texts).shape[1] == 4
-    assert [len(row) for row in s._batch_tokenizer(None)(texts)] == [6]
+    assert [len(row) for row in s._tokenize_ids(texts)] == [4]
     assert len(s.to_static_model().tokenize(texts)[0]) == 4
 
     # The static model keeps its own setting, and the trainer keeps its own once the static model changes.
@@ -1080,9 +1080,29 @@ def test_split_indices_does_not_stratify_other_columns(labels: list[Any]) -> Non
 def test_split_indices_does_not_read_unstratifiable_columns(labels: list[Any]) -> None:
     """Columns that can't be stratified are not read."""
     column = Dataset.from_dict({"label": labels})["label"]
-    with patch("model2vec.train.utils.read_column") as read_column_mock:
+    with patch("model2vec.train.utils.iter_column") as iter_column_mock:
         split_indices(len(labels), 0.25, stratify_by=column)
-    read_column_mock.assert_not_called()
+    iter_column_mock.assert_not_called()
+
+
+def test_column_strata_match_list_strata_across_batches() -> None:
+    """Columns are grouped by label in batches, matching lists, in order of first occurrence."""
+    labels = ["b", "a", "c", "a", "b", "c", "b", "a", None, None]
+    column = Dataset.from_dict({"label": labels})["label"]
+    with patch("model2vec.train.utils.iter_column", lambda column: iter_column(column, batch_size=3)):
+        strata = _column_strata(column)
+    assert strata is not None
+    assert [indices.tolist() for indices in strata] == [[0, 4, 6], [1, 3, 7], [2, 5], [8, 9]]
+
+
+def test_classifier_counts_column_labels_across_batches() -> None:
+    """Labels in a column are counted and checked in batches."""
+    dataset = Dataset.from_dict({"label": ["a", "b", "a"] * 3, "labels": [["a", "b"], ["a"], []] * 3})
+    with patch("model2vec.train.classifier.iter_column", lambda column: iter_column(column, batch_size=2)):
+        assert _read_labels(dataset["label"], "y") == (False, Counter({"a": 6, "b": 3}))
+        assert _read_labels(dataset["labels"], "y") == (True, Counter({"a": 6, "b": 3}))
+        with pytest.raises(ValueError, match="must not be missing"):
+            _read_labels(Dataset.from_dict({"label": ["a"] * 5 + [None]})["label"], "y")
 
 
 def test_column_rows_reads_other_sequences() -> None:
@@ -1409,6 +1429,27 @@ def test_regressor_checks_vector_columns(
         model.fit(dataset["text"], dataset["vector"])
 
 
+def test_iter_column_follows_selection() -> None:
+    """A column is read in batches of the selected rows."""
+    dataset = Dataset.from_dict(
+        {"vector": [[float(i)] for i in range(10)], "meta": [{"vector": [float(i)]} for i in range(10)]}
+    )
+    selected = dataset.shuffle(seed=0).select(range(7))
+    for column in (selected["vector"], selected["meta"]["vector"]):
+        batches = list(iter_column(column, batch_size=3))
+        assert [len(batch) for batch in batches] == [3, 3, 1]
+        assert [row for batch in batches for row in batch.to_pylist()] == list(selected["vector"])
+
+
+def test_vector_dim_checks_every_batch() -> None:
+    """Vectors in a column are checked across batches."""
+    dataset = Dataset.from_dict({"vector": [[0.5, 1.0]] * 10_000 + [[0.5]]})
+    for column in (dataset["vector"], dataset.shuffle(seed=0)["vector"]):
+        with pytest.raises(ValueError, match="same dimension"):
+            _vector_dim(column, "y")
+    assert _vector_dim(dataset.select(range(10_000))["vector"], "y") == 2
+
+
 def test_regressor_fit_on_fixed_size_vector_column(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Vectors in a column with a fixed dimension can be used for training."""
     features = Features({"text": Value("string"), "vector": Sequence(Value("float32"), length=2)})
@@ -1456,14 +1497,6 @@ def test_classifier_accepts_array_labels(mock_vectors: np.ndarray, mock_tokenize
     assert model.classes_ == sorted(y.tolist()[:2])
 
 
-def test_read_column_follows_selection() -> None:
-    """A column is read in the order of the selected rows, also when nested."""
-    dataset = Dataset.from_dict({"label": list(range(10)), "meta": [{"label": i} for i in range(10)]})
-    selected = dataset.shuffle(seed=0).select(range(5))
-    assert read_column(selected["label"]).to_pylist() == list(selected["label"])
-    assert read_column(selected["meta"]["label"]).to_pylist() == list(selected["label"])
-
-
 def test_fit_rejects_transformed_columns(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Columns of a dataset with a transform are rejected, also when nested or after a selection."""
     dataset = Dataset.from_dict(
@@ -1483,66 +1516,16 @@ def test_fit_rejects_transformed_columns(mock_vectors: np.ndarray, mock_tokenize
     model.fit(dataset["text"], transformed.with_format(None)["label"], max_epochs=1)
 
 
-def test_class_targets() -> None:
+def test_classifier_to_targets(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Class labels become indices or multi-hot vectors, and unknown labels are rejected."""
-    assert ClassTargets(["a", "b"], multilabel=False)(["b", "a"]).tolist() == [1, 0]
-    assert ClassTargets([0, 1], multilabel=False)(torch.tensor([1, 0])).tolist() == [1, 0]
-    assert ClassTargets(["a", "b", "c"], multilabel=True)([["a", "c"], []]).tolist() == [[1, 0, 1], [0, 0, 0]]
-    assert ClassTargets([0, 1, 2], multilabel=True)([torch.tensor([0, 2]), np.array([1])]).tolist() == [
-        [1, 0, 1],
-        [0, 1, 0],
-    ]
-    with pytest.raises(ValueError):
-        ClassTargets(["a", "b"], multilabel=False)(["c"])
-
-
-def test_datasets_are_picklable_without_the_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
-    """Datasets can be sent to worker processes, and don't carry the model along."""
     model = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
-    model._initialize_on_labels(["a", "b"])
-    dataset = Dataset.from_dict({"text": _TRAIN_TEXTS, "label": ["a", "b"] * 4})
-    train, _ = model._create_datasets(dataset["text"], dataset["label"], None, None, 0.25)
-    restored = pickle.loads(pickle.dumps(train))
-    assert restored.__getitems__([0, 1])[0][0] == train.__getitems__([0, 1])[0][0]
-    assert not any(isinstance(value, nn.Module) for value in vars(train).values())
-    assert not any(isinstance(value, nn.Module) for value in vars(train.tokenize).values())
-
-
-@pytest.mark.parametrize("mock_tokenizer", ["wordpiece"], indirect=True)
-def test_dataloaders_with_workers_match_main_process(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
-    """Across epochs, worker processes load the same batches in the same order as the main process."""
-    dataset = Dataset.from_dict(
-        {"text": _TRAIN_TEXTS, "other": _TRAIN_TEXTS[::-1], "label": [[float(i)] for i in range(8)]}
-    )
-    regressor = StaticModelForRegression(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
-    text_dataset, _ = regressor._create_datasets(dataset["text"], dataset["label"], None, None, 1)
-    pairs = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
-    pair_dataset, _ = pairs._create_pair_datasets(dataset["text"], dataset["other"], None, None, 1)
-
-    for torch_dataset in (text_dataset, pair_dataset):
-        epochs = []
-        for num_workers in (0, 1):
-            torch.manual_seed(0)
-            loader = torch_dataset.to_dataloader(shuffle=True, batch_size=2, num_workers=num_workers)
-            batches: list[tuple[list, list]] = []
-            for _ in range(2):
-                batches.extend((x.tolist(), y.tolist()) for x, y in loader)
-                torch.rand(1)
-            epochs.append(batches)
-        assert epochs[0] == epochs[1]
-
-
-def test_fit_passes_num_workers(
-    monkeypatch: pytest.MonkeyPatch, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
-) -> None:
-    """num_workers is used for both the training and the validation loader."""
-    captured: list[tuple[int, int]] = []
-
-    def fake_run_training_loop(**kwargs: Any) -> dict[str, torch.Tensor]:
-        captured.append((kwargs["train_loader"].num_workers, kwargs["val_loader"].num_workers))
-        return kwargs["model"].state_dict()
-
-    monkeypatch.setattr("model2vec.train.base.run_training_loop", fake_run_training_loop)
-    model = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
-    model.fit(_TRAIN_TEXTS, _TRAIN_TEXTS, test_size=2, num_workers=3)
-    assert captured == [(3, 3)]
+    model.classes_, model.multilabel = ["a", "b"], False
+    assert model._to_targets(["b", "a"]).tolist() == [1, 0]
+    with pytest.raises(ValueError):
+        model._to_targets(["c"])
+    model.classes_, model.multilabel = [0, 1], False  # type: ignore[list-item]
+    assert model._to_targets(torch.tensor([1, 0])).tolist() == [1, 0]
+    model.classes_, model.multilabel = ["a", "b", "c"], True
+    assert model._to_targets([["a", "c"], []]).tolist() == [[1, 0, 1], [0, 0, 0]]
+    model.classes_, model.multilabel = [0, 1, 2], True  # type: ignore[list-item]
+    assert model._to_targets([torch.tensor([0, 2]), np.array([1])]).tolist() == [[1, 0, 1], [0, 1, 0]]

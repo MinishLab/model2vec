@@ -122,12 +122,12 @@ Training data is read and tokenized per batch, so `fit` also accepts the columns
 from datasets import load_dataset
 
 dataset = load_dataset("sentence-transformers/gooaq", split="train")
-model.fit(text_a=dataset["question"], text_b=dataset["answer"], num_workers=4)
+model.fit(text_a=dataset["question"], text_b=dataset["answer"])
 ```
 
-Without an explicit validation set, `fit` holds out `test_size` of the data for validation, capped at 10,000 rows; pass an int to hold out an exact number of rows. For single-label classification, the split is stratified by class. Use `num_workers` to read and tokenize batches in separate processes.
+Without an explicit validation set, `fit` holds out `test_size` of the data for validation, capped at 10,000 rows; pass an int to hold out an exact number of rows. For single-label classification, the split is stratified by class.
 
-Because batches are shuffled, training reads the rows of a dataset in random order. If the dataset is stored on disk and does not fit in memory, this can be slow, especially on a network file system. Setting `num_workers` hides some of this latency.
+Because batches are shuffled, training reads the rows of a dataset in random order. If the dataset is stored on disk and does not fit in memory, this can be slow, especially on a network file system.
 
 Columns of a dataset with a transform, set with `with_transform`, are not accepted. Apply the transform first with `dataset.map(transform, batched=True)`. For a dataset loaded from disk or the Hub, this writes the result to the cache on disk, so it is still not loaded into memory.
 

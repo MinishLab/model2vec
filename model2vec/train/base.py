@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import logging
-from collections.abc import Callable, Sequence, Sized
+from collections.abc import Sequence, Sized
 from typing import Any, TypeVar
 
 import numpy as np
@@ -16,16 +16,7 @@ from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _disable_padding, _get_unk_token_id
-from model2vec.train.dataset import (
-    BatchTokenizer,
-    ColumnRows,
-    PairDataset,
-    TextDataset,
-    float_targets,
-    has_only_strings,
-    has_transform,
-    remove_unk,
-)
+from model2vec.train.dataset import ColumnRows, PairDataset, TextDataset, has_only_strings, has_transform
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
     MAX_VALIDATION_SIZE,
@@ -109,17 +100,24 @@ class BaseFinetuneable(nn.Module):
         _disable_padding(self.tokenizer)
         self.unk_token_id = _get_unk_token_id(self.tokenizer)
 
-    def _remove_unk(self, token_ids: list[int]) -> list[int]:
-        """Drop unknown tokens, mirroring `StaticModel.tokenize`."""
-        return remove_unk(token_ids, self.unk_token_id)
+    def _tokenize_ids(self, texts: Sequence[str]) -> list[list[int]]:
+        """Tokenize texts into lists of token ids, dropping unknown tokens and truncating to `max_length` tokens.
 
-    def _batch_tokenizer(self, max_length: int | None) -> BatchTokenizer:
-        """Create a picklable tokenizer for batches of texts, truncating them to `max_length` tokens."""
-        return BatchTokenizer(self.tokenizer, self.unk_token_id, max_length)
+        :param texts: The texts to tokenize.
+        :return: The token ids of each text.
+        """
+        if self.max_length is not None:
+            truncate_length = self.max_length * 10
+            texts = [text[:truncate_length] for text in texts]
+        encoded: list[Encoding] = self.tokenizer.encode_batch_fast(texts, add_special_tokens=False)
+        ids = [encoding.ids for encoding in encoded]
+        if self.unk_token_id is not None:
+            ids = [[token_id for token_id in token_ids if token_id != self.unk_token_id] for token_ids in ids]
+        return [token_ids[: self.max_length] for token_ids in ids]
 
-    def _target_encoder(self) -> Callable[[list[Any]], torch.Tensor]:
-        """Create a picklable function that turns a batch of labels into targets."""
-        return float_targets
+    def _to_targets(self, labels: Any) -> torch.Tensor:
+        """Turn a batch of labels, such as vectors, into a float tensor of targets."""
+        return torch.as_tensor(labels, dtype=torch.float32)
 
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""
@@ -293,11 +291,7 @@ class BaseFinetuneable(nn.Module):
         :param texts: The texts to tokenize.
         :return: A 2D padded tensor
         """
-        max_length = self.max_length
-        encoded: list[Encoding] = self.tokenizer.encode_batch_fast(texts, add_special_tokens=False)
-        encoded_ids: list[torch.Tensor] = [
-            torch.Tensor(self._remove_unk(encoding.ids)[:max_length]).long() for encoding in encoded
-        ]
+        encoded_ids: list[torch.Tensor] = [torch.LongTensor(token_ids) for token_ids in self._tokenize_ids(texts)]
         return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
 
     @property
@@ -359,7 +353,6 @@ class BaseFinetuneable(nn.Module):
         validation_steps: int | None,
         compute_metrics: MetricsFn = default_metrics,
         token_dropout: float = 0.0,
-        num_workers: int = 0,
     ) -> None:
         if not 0.0 <= token_dropout < 1.0:
             raise ValueError("token_dropout must be in the range [0, 1).")
@@ -375,8 +368,8 @@ class BaseFinetuneable(nn.Module):
             learning_rate=learning_rate,
             val_metric=self.val_metric,
             early_stopping_direction=self.early_stopping_direction,
-            train_loader=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size, num_workers=num_workers),
-            val_loader=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size, num_workers=num_workers),
+            train_loader=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size),
+            val_loader=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size),
             early_stopping_patience=early_stopping_patience,
             min_epochs=min_epochs,
             max_epochs=max_epochs,
@@ -482,9 +475,7 @@ class BaseFinetuneable(nn.Module):
         :param indices: The indices of the rows that belong to the dataset. If None, all rows belong to it.
         :return: The dataset.
         """
-        return TextDataset(
-            rows, self._batch_tokenizer(self.max_length), self._target_encoder(), indices, pad_id=self.pad_id
-        )
+        return TextDataset(rows, self._tokenize_ids, self._to_targets, indices, pad_id=self.pad_id)
 
     def _create_datasets(
         self,

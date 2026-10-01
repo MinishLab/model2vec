@@ -141,7 +141,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param indices: The indices of the rows that belong to the dataset. If None, all rows belong to it.
         :return: The dataset.
         """
-        return PairDataset(rows, self._batch_tokenizer(self.max_length), indices, pad_id=self.pad_id)
+        return PairDataset(rows, self._tokenize_ids, indices, pad_id=self.pad_id)
 
     def _create_pair_datasets(
         self,
@@ -192,7 +192,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
         temperature: float = 0.05,
-        num_workers: int = 0,
     ) -> T:
         """Fit a model that embeds paired texts close together.
 
@@ -227,8 +226,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
         :param temperature: The temperature of the InfoNCE loss.
-        :param num_workers: The number of worker processes that read and tokenize batches. If 0, batches are read in
-            the main process.
         :return: The fitted model.
         :raises ValueError: If `batch_size` is smaller than 2.
         """
@@ -255,7 +252,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             max_epochs=max_epochs,
             device=device,
             validation_steps=validation_steps,
-            num_workers=num_workers,
         )
 
         return self

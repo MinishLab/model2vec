@@ -64,8 +64,7 @@ def evaluate_single_or_multi_label(
     overall accuracy, macro average, and weighted average.
 
     :param predictions: The predictions.
-    :param y: The ground truth labels. Any sequence works, such as a column of a Hugging Face dataset. Arrays,
-        tensors, and their scalars are converted to Python objects.
+    :param y: The ground truth labels as a sequence.
     :return: A classification report, as a dictionary.
     """
     y = [label.tolist() if hasattr(label, "tolist") else label for label in y]

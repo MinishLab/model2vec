@@ -18,7 +18,7 @@ from tqdm import trange
 from model2vec.inference import evaluate_single_or_multi_label
 from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.dataset import ClassTargets, read_column
+from model2vec.train.dataset import column_type, iter_column
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
 logger = logging.getLogger(__name__)
@@ -51,13 +51,13 @@ def _read_labels(y: LabelType, name: str) -> tuple[bool, Counter]:
     """Determine whether labels are multi-label, and count the number of times each class occurs.
 
     :param y: The labels. If the first label is a list, multi-label classification is assumed. A column of a
-        Hugging Face dataset is read as a whole, without converting it to Python objects.
+        Hugging Face dataset is read in batches, without converting it to Python objects.
     :param name: The name of the labels, used in error messages.
     :return: Whether the labels are multi-label, and the number of times each class occurs.
     :raises ValueError: If the labels are inconsistent, or are not strings, integers, or lists of those.
     """
     if isinstance(y, Column):
-        return _read_label_array(read_column(y), name)
+        return _read_label_column(y, name)
     if isinstance(y, (np.ndarray, torch.Tensor)):
         y = y.tolist()
 
@@ -73,28 +73,29 @@ def _read_labels(y: LabelType, name: str) -> tuple[bool, Counter]:
     return True, Counter(classes)
 
 
-def _read_label_array(labels: pa.ChunkedArray, name: str) -> tuple[bool, Counter]:
-    """Determine whether an Arrow column of labels is multi-label, and count the number of times each class occurs.
+def _read_label_column(labels: Column, name: str) -> tuple[bool, Counter]:
+    """Determine whether a column of labels is multi-label, and count the number of times each class occurs.
 
-    :param labels: The labels. If they are lists, multi-label classification is assumed.
+    :param labels: A column of a Hugging Face dataset. If it holds lists, multi-label classification is assumed.
     :param name: The name of the labels, used in error messages.
     :return: Whether the labels are multi-label, and the number of times each class occurs.
     :raises ValueError: If the labels are not strings, integers, or lists of those, or if a label is missing.
     """
+    label_type = column_type(labels)
     multilabel = (
-        pa.types.is_list(labels.type) or pa.types.is_large_list(labels.type) or pa.types.is_fixed_size_list(labels.type)
+        pa.types.is_list(label_type) or pa.types.is_large_list(label_type) or pa.types.is_fixed_size_list(label_type)
     )
-    values = pc.list_flatten(labels) if multilabel else labels
-    if not (
-        pa.types.is_string(values.type) or pa.types.is_large_string(values.type) or pa.types.is_integer(values.type)
-    ):
-        raise ValueError(f"Labels in {name} must be strings, integers, or lists of those, got {labels.type}.")
-    if labels.null_count or values.null_count:
-        raise ValueError(f"Labels in {name} must not be missing.")
-    value_counts = pc.value_counts(values)
-    return multilabel, Counter(
-        dict(zip(value_counts.field("values").to_pylist(), value_counts.field("counts").to_pylist()))
-    )
+    value_type = label_type.value_type if multilabel else label_type
+    if not (pa.types.is_string(value_type) or pa.types.is_large_string(value_type) or pa.types.is_integer(value_type)):
+        raise ValueError(f"Labels in {name} must be strings, integers, or lists of those, got {label_type}.")
+    counts: Counter = Counter()
+    for array in iter_column(labels):
+        values = pc.list_flatten(array) if multilabel else array
+        if array.null_count or values.null_count:
+            raise ValueError(f"Labels in {name} must not be missing.")
+        value_counts = pc.value_counts(values)
+        counts.update(dict(zip(value_counts.field("values").to_pylist(), value_counts.field("counts").to_pylist())))
+    return multilabel, counts
 
 
 class StaticModelForClassification(BaseFinetuneable):
@@ -212,7 +213,6 @@ class StaticModelForClassification(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
         token_dropout: float = 0.0,
-        num_workers: int = 0,
     ) -> StaticModelForClassification:
         """Fit a model.
 
@@ -251,8 +251,6 @@ class StaticModelForClassification(BaseFinetuneable):
         :param random_seed: The random seed to use. Defaults to 42.
         :param token_dropout: The fraction of tokens to randomly drop from each training sample.
             Has no effect during validation. Must be in the range [0, 1).
-        :param num_workers: The number of worker processes that read and tokenize batches. If 0, batches are read in
-            the main process.
         :return: The fitted model.
         """
         seed_everything(random_seed)
@@ -286,7 +284,6 @@ class StaticModelForClassification(BaseFinetuneable):
             validation_steps=validation_steps,
             compute_metrics=compute_metrics,
             token_dropout=token_dropout,
-            num_workers=num_workers,
         )
 
         return self
@@ -343,7 +340,7 @@ class StaticModelForClassification(BaseFinetuneable):
     def _initialize_on_labels(self, y: LabelType) -> Mapping[Any, int]:
         """Sets the output dimensionality and the classes from the labels.
 
-        :param y: The labels. A column of a Hugging Face dataset is read as a whole, without converting it to
+        :param y: The labels. A column of a Hugging Face dataset is read in batches, without converting it to
             Python objects.
         :return: The number of times each class occurs.
         """
@@ -366,6 +363,24 @@ class StaticModelForClassification(BaseFinetuneable):
         if unknown:
             raise ValueError(f"y_val contains classes that are not in y: {sorted(unknown, key=str)}.")
 
-    def _target_encoder(self) -> ClassTargets:
-        """Create a picklable function that turns a batch of labels into targets."""
-        return ClassTargets(self.classes_, self.multilabel)
+    def _to_targets(self, labels: Any) -> torch.Tensor:
+        """Turn a batch of labels into targets.
+
+        :param labels: The labels. A tensor or an array is converted to a list first.
+        :return: The class indices, or the multi-hot vectors if the task is multilabel.
+        :raises ValueError: If a label is not one of the classes.
+        """
+        if isinstance(labels, (torch.Tensor, np.ndarray)):
+            labels = labels.tolist()
+        index = {label: i for i, label in enumerate(self.classes_)}
+        try:
+            if not self.multilabel:
+                return torch.tensor([index[label] for label in labels], dtype=torch.long)
+            targets = torch.zeros(len(labels), len(index), dtype=torch.float)
+            for row, sample_labels in enumerate(labels):
+                if isinstance(sample_labels, (torch.Tensor, np.ndarray)):
+                    sample_labels = sample_labels.tolist()
+                targets[row, [index[label] for label in sample_labels]] = 1.0
+            return targets
+        except KeyError as error:
+            raise ValueError(f"Label {error.args[0]!r} is not one of the classes {self.classes_}.") from None

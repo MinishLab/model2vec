@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Hashable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -9,7 +9,6 @@ import pyarrow.compute as pc
 import torch
 from datasets import Column
 from datasets import Dataset as HFDataset
-from tokenizers import Tokenizer
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import BatchSampler, DataLoader, Dataset, RandomSampler, SequentialSampler
 
@@ -17,78 +16,6 @@ LABEL_COLUMN = "label"
 TEXT_COLUMN = "text"
 TEXT_A_COLUMN = "text_a"
 TEXT_B_COLUMN = "text_b"
-
-
-def _loader_generators() -> tuple[torch.Generator, torch.Generator]:
-    """Create a generator for a sampler and one for its DataLoader, both seeded from the global torch RNG."""
-    sampler_seed, loader_seed = torch.randint(2**62, (2,)).tolist()
-    return torch.Generator().manual_seed(sampler_seed), torch.Generator().manual_seed(loader_seed)
-
-
-def remove_unk(token_ids: list[int], unk_token_id: int | None) -> list[int]:
-    """Drop unknown tokens, mirroring `StaticModel.tokenize`."""
-    if unk_token_id is None:
-        return token_ids
-    return [token_id for token_id in token_ids if token_id != unk_token_id]
-
-
-class BatchTokenizer:
-    def __init__(self, tokenizer: Tokenizer, unk_token_id: int | None, max_length: int | None) -> None:
-        """Tokenizes batches of texts into lists of token ids. Can be pickled, e.g. to be sent to DataLoader workers.
-
-        :param tokenizer: The tokenizer. It should not pad.
-        :param unk_token_id: The id of the unknown token, which is dropped. If None, no tokens are dropped.
-        :param max_length: The maximum length of the input in tokens. If this is None, no truncation is done.
-        """
-        self.tokenizer = tokenizer
-        self.unk_token_id = unk_token_id
-        self.max_length = max_length
-
-    def __call__(self, texts: list[str]) -> list[list[int]]:
-        """Tokenize a batch of texts."""
-        if self.max_length is not None:
-            truncate_length = self.max_length * 10
-            texts = [text[:truncate_length] for text in texts]
-        encoded = self.tokenizer.encode_batch_fast(texts, add_special_tokens=False)
-        return [remove_unk(encoding.ids, self.unk_token_id)[: self.max_length] for encoding in encoded]
-
-
-def float_targets(labels: list[Any]) -> torch.Tensor:
-    """Turn a batch of numeric labels, such as vectors, into a float tensor."""
-    return torch.as_tensor(labels, dtype=torch.float32)
-
-
-class ClassTargets:
-    def __init__(self, classes: Sequence[Hashable], multilabel: bool) -> None:
-        """Turns a batch of class labels into a tensor of targets. Can be pickled, e.g. to be sent to DataLoader workers.
-
-        :param classes: The classes, in order.
-        :param multilabel: Whether each label is a list of classes, turned into a multi-hot vector. Otherwise, each
-            label is a single class, turned into its index.
-        """
-        self.index = {label: index for index, label in enumerate(classes)}
-        self.multilabel = multilabel
-
-    def __call__(self, labels: list[Any]) -> torch.Tensor:
-        """Turn a batch of labels into targets.
-
-        :param labels: The labels. A tensor or an array is converted to a list first.
-        :return: The class indices, or the multi-hot vectors if the task is multilabel.
-        :raises ValueError: If a label is not one of the classes.
-        """
-        if isinstance(labels, (torch.Tensor, np.ndarray)):
-            labels = labels.tolist()
-        try:
-            if not self.multilabel:
-                return torch.tensor([self.index[label] for label in labels], dtype=torch.long)
-            targets = torch.zeros(len(labels), len(self.index), dtype=torch.float)
-            for row, sample_labels in enumerate(labels):
-                if isinstance(sample_labels, (torch.Tensor, np.ndarray)):
-                    sample_labels = sample_labels.tolist()
-                targets[row, [self.index[label] for label in sample_labels]] = 1.0
-            return targets
-        except KeyError as error:
-            raise ValueError(f"Label {error.args[0]!r} is not one of the classes {list(self.index)}.") from None
 
 
 def _column_path(column: Column) -> tuple[HFDataset, str, list[str]]:
@@ -115,15 +42,17 @@ def has_transform(column: Column) -> bool:
     return dataset.format["type"] == "custom"
 
 
-def read_column(column: Column) -> pa.ChunkedArray:
-    """Read a whole column of a Hugging Face dataset as an Arrow array, without converting it to Python objects.
+def iter_column(column: Column, batch_size: int = 10_000) -> Iterator[pa.ChunkedArray]:
+    """Read a column of a Hugging Face dataset in batches of Arrow arrays, without converting it to Python objects.
 
     :param column: The column, which can be nested, such as `dataset["metadata"]["label"]`. Its dataset must not
         have a transform.
-    :return: The values of the column.
+    :param batch_size: The number of rows in each batch.
+    :return: The values of the column, one batch at a time.
     """
     dataset, name, fields = _column_path(column)
-    return _struct_fields(dataset.select_columns([name]).with_format("arrow")[:].column(name), fields)
+    batches = dataset.select_columns([name]).with_format("arrow").iter(batch_size=batch_size)
+    return (_struct_fields(batch.column(name), fields) for batch in batches)
 
 
 def column_type(column: Column) -> pa.DataType:
@@ -147,7 +76,7 @@ def has_only_strings(column: Column) -> bool:
     array = _struct_fields(dataset.data.column(name), fields)
     if not (pa.types.is_string(array.type) or pa.types.is_large_string(array.type)):
         return False
-    return array.null_count == 0 or read_column(column).null_count == 0
+    return array.null_count == 0 or not any(batch.null_count for batch in iter_column(column))
 
 
 class ColumnRows:
@@ -213,20 +142,13 @@ class _Batches(Dataset):
         """Whether to drop the last batch if it is smaller than `batch_size`."""
         return False
 
-    def to_dataloader(self, shuffle: bool, batch_size: int = 32, num_workers: int = 0) -> DataLoader:
-        """Convert the dataset to a DataLoader, which loads batches in `num_workers` worker processes.
-
-        The order of the batches does not depend on `num_workers`.
-        """
-        sampler_generator, loader_generator = _loader_generators()
-        sampler = RandomSampler(self, generator=sampler_generator) if shuffle else SequentialSampler(self)
+    def to_dataloader(self, shuffle: bool, batch_size: int = 32) -> DataLoader:
+        """Convert the dataset to a DataLoader."""
+        sampler = RandomSampler(self) if shuffle else SequentialSampler(self)
         return DataLoader(
             self,
             collate_fn=self.collate_fn,
             batch_sampler=BatchSampler(sampler, batch_size=batch_size, drop_last=self._drop_last(batch_size)),
-            num_workers=num_workers,
-            persistent_workers=num_workers > 0,
-            generator=loader_generator,
         )
 
 
