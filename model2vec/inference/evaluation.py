@@ -56,7 +56,7 @@ def _precision_recall_f1_support(
 
 def evaluate_single_or_multi_label(
     predictions: np.ndarray,
-    y: list[int] | list[str] | list[list[int]] | list[list[str]],
+    y: Sequence[Any],
 ) -> dict[str, dict[str, float]]:
     """Evaluate the classifier on a given dataset using a classification report.
 
@@ -64,9 +64,11 @@ def evaluate_single_or_multi_label(
     overall accuracy, macro average, and weighted average.
 
     :param predictions: The predictions.
-    :param y: The ground truth labels.
+    :param y: The ground truth labels. Any sequence works, such as a column of a Hugging Face dataset. Arrays,
+        tensors, and their scalars are converted to Python objects.
     :return: A classification report, as a dictionary.
     """
+    y = [label.tolist() if hasattr(label, "tolist") else label for label in y]
     if _is_multi_label_shaped(y):
         y = cast(list[list[str]] | list[list[int]], y)
         predictions = cast(np.ndarray, predictions)

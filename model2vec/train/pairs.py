@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import TypeVar
 
+import numpy as np
 import torch
 from tokenizers import Tokenizer
 from torch import nn
 
 from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.dataset import PairDataset
-from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything, train_test_split
+from model2vec.train.dataset import ColumnRows, PairDataset
+from model2vec.train.utils import DEFAULT_RANDOM_SEED, MAX_VALIDATION_SIZE, seed_everything, split_indices
 
 logger = logging.getLogger(__name__)
 
@@ -117,30 +119,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         ids_b = torch.unique(input_ids[1], dim=0, return_inverse=True)[1]
         return out_a, out_b, ids_a, ids_b
 
-    def _check_pair_val_split(
-        self,
-        text_a: list[str],
-        text_b: list[str],
-        text_a_val: list[str] | None,
-        text_b_val: list[str] | None,
-        test_size: float,
-    ) -> tuple[list[str], list[str], list[str], list[str]]:
-        if len(text_a) != len(text_b):
-            raise ValueError("text_a and text_b must have the same length.")
-        if (text_a_val is not None) != (text_b_val is not None):
-            raise ValueError("Both text_a_val and text_b_val must be provided together, or neither.")
-
-        if text_a_val is not None and text_b_val is not None:
-            if len(text_a_val) != len(text_b_val):
-                raise ValueError("text_a_val and text_b_val must have the same length.")
-            return text_a, text_a_val, text_b, text_b_val
-
-        pairs = list(zip(text_a, text_b))
-        train_pairs, val_pairs, _, _ = train_test_split(pairs, pairs, test_size=test_size)
-        train_a, train_b = map(list, zip(*train_pairs)) if train_pairs else ([], [])
-        val_a, val_b = map(list, zip(*val_pairs)) if val_pairs else ([], [])
-        return train_a, val_a, train_b, val_b
-
     @staticmethod
     def _check_pair_splits(n_train: int, n_val: int) -> None:
         """Check that the training and validation sets each have at least two pairs.
@@ -156,36 +134,65 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
                     "a different test_size, or an explicit validation set."
                 )
 
-    def _prepare_pair_dataset(self, text_a: list[str], text_b: list[str], max_length: int | None) -> PairDataset:
-        """Tokenize both halves of a pair dataset.
+    def _pair_dataset(self, rows: ColumnRows, indices: np.ndarray | None = None) -> PairDataset:
+        """Create a dataset of pairs that are tokenized per batch.
 
-        :param text_a: The first half of each pair.
-        :param text_b: The second half of each pair.
-        :param max_length: The maximum length of the input in tokens. If this is None, no truncation is done.
-        :return: A PairDataset.
+        :param rows: The pairs, in a `text_a` and a `text_b` column.
+        :param indices: The indices of the rows that belong to the dataset. If None, all rows belong to it.
+        :return: The dataset.
         """
-        return PairDataset(
-            self._tokenize_texts(text_a, max_length),
-            self._tokenize_texts(text_b, max_length),
-            pad_id=self.pad_id,
-        )
+        return PairDataset(rows, self._batch_tokenizer(self.max_length), indices, pad_id=self.pad_id)
+
+    def _create_pair_datasets(
+        self,
+        text_a: Sequence[str],
+        text_b: Sequence[str],
+        text_a_val: Sequence[str] | None,
+        text_b_val: Sequence[str] | None,
+        test_size: float | int,
+    ) -> tuple[PairDataset, PairDataset]:
+        """Create the training and validation datasets of pairs.
+
+        :param text_a: The first half of each training pair.
+        :param text_b: The second half of each training pair.
+        :param text_a_val: The first half of each validation pair. If None, the validation pairs are split off
+            from the training pairs.
+        :param text_b_val: The second half of each validation pair.
+        :param test_size: The size of the validation split if `text_a_val` is None: a fraction of the pairs,
+            capped at `MAX_VALIDATION_SIZE` rows, or a number of pairs if it is an int.
+        :return: The train and validation datasets.
+        :raises ValueError: If only one of `text_a_val` and `text_b_val` is given, or if the halves of the pairs have
+            different lengths.
+        """
+        if (text_a_val is None) != (text_b_val is None):
+            raise ValueError("Both text_a_val and text_b_val must be provided together, or neither.")
+        self._check_aligned(text_a=text_a, text_b=text_b)
+        self._check_texts(text_a=text_a, text_b=text_b, text_a_val=text_a_val, text_b_val=text_b_val)
+        rows = ColumnRows(text_a=text_a, text_b=text_b)
+        if text_a_val is not None and text_b_val is not None:
+            self._check_aligned(text_a_val=text_a_val, text_b_val=text_b_val)
+            return self._pair_dataset(rows), self._pair_dataset(ColumnRows(text_a=text_a_val, text_b=text_b_val))
+
+        train_indices, val_indices = split_indices(len(rows), test_size, max_test_size=MAX_VALIDATION_SIZE)
+        return self._pair_dataset(rows, train_indices), self._pair_dataset(rows, val_indices)
 
     def fit(
         self: T,
-        text_a: list[str],
-        text_b: list[str],
+        text_a: Sequence[str],
+        text_b: Sequence[str],
         learning_rate: float = 1e-3,
         batch_size: int | None = None,
         min_epochs: int | None = None,
         max_epochs: int | None = -1,
         early_stopping_patience: int | None = 5,
-        test_size: float = 0.1,
+        test_size: float | int = 0.1,
         device: str = "auto",
-        text_a_val: list[str] | None = None,
-        text_b_val: list[str] | None = None,
+        text_a_val: Sequence[str] | None = None,
+        text_b_val: Sequence[str] | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
         temperature: float = 0.05,
+        num_workers: int = 0,
     ) -> T:
         """Fit a model that embeds paired texts close together.
 
@@ -200,6 +207,9 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         If `text_a_val` and `text_b_val` are not provided, the function will automatically
         split the training data into a train and validation set using `test_size`.
 
+        The pairs are read and tokenized per batch. The halves can be lists, or columns of a Hugging Face dataset,
+        such as `dataset["query"]`, which are not loaded into memory. The dataset must not have a transform.
+
         :param text_a: The first half of each training pair.
         :param text_b: The second half of each training pair.
         :param learning_rate: The learning rate.
@@ -209,33 +219,31 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             If this is -1, the model trains until early stopping is triggered.
         :param early_stopping_patience: The patience for early stopping.
             If this is None, early stopping is disabled.
-        :param test_size: The test size for the train-test split.
+        :param test_size: The size of the validation split if `text_a_val` is None: a fraction of the pairs, capped
+            at 10,000 pairs, or a number of pairs if it is an int.
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :param text_a_val: The first half of each validation pair.
         :param text_b_val: The second half of each validation pair.
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
         :param temperature: The temperature of the InfoNCE loss.
+        :param num_workers: The number of worker processes that read and tokenize batches. If 0, batches are read in
+            the main process.
         :return: The fitted model.
         :raises ValueError: If `batch_size` is smaller than 2.
         """
         seed_everything(random_seed)
         logger.info("Re-initializing model.")
+        self._check_inputs(text_a=text_a, text_b=text_b, text_a_val=text_a_val, text_b_val=text_b_val)
         loss_function = PairInfoNCELoss(temperature=temperature)
 
-        train_a, val_a, train_b, val_b = self._check_pair_val_split(text_a, text_b, text_a_val, text_b_val, test_size)
-        self._check_pair_splits(len(train_a), len(val_a))
-        self._initialize()
-
-        logger.info("Preparing train dataset.")
-        train_dataset = self._prepare_pair_dataset(train_a, train_b, self.max_length)
-        logger.info("Preparing validation dataset.")
-        val_dataset = self._prepare_pair_dataset(val_a, val_b, self.max_length)
-
+        train_dataset, val_dataset = self._create_pair_datasets(text_a, text_b, text_a_val, text_b_val, test_size)
+        self._check_pair_splits(len(train_dataset), len(val_dataset))
         batch_size = self._determine_batch_size(batch_size, len(train_dataset))
         if batch_size < 2:
             raise ValueError(f"batch_size must be at least 2, got {batch_size}.")
 
+        self._initialize()
         self._train(
             loss_function=loss_function,
             learning_rate=learning_rate,
@@ -247,6 +255,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             max_epochs=max_epochs,
             device=device,
             validation_steps=validation_steps,
+            num_workers=num_workers,
         )
 
         return self

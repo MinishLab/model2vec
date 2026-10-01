@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import copy
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence, Sized
 from typing import Any, TypeVar
 
 import numpy as np
 import torch
+from datasets import Column, DatasetDict, IterableColumn, IterableDataset, IterableDatasetDict
+from datasets import Dataset as HFDataset
 from tokenizers import Encoding, Tokenizer
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
@@ -14,12 +16,22 @@ from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _disable_padding, _get_unk_token_id
-from model2vec.train.dataset import PairDataset, TextDataset
+from model2vec.train.dataset import (
+    BatchTokenizer,
+    ColumnRows,
+    PairDataset,
+    TextDataset,
+    float_targets,
+    has_only_strings,
+    has_transform,
+    remove_unk,
+)
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
+    MAX_VALIDATION_SIZE,
     get_probable_pad_token_id,
+    split_indices,
     to_pipeline,
-    train_test_split,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,9 +111,15 @@ class BaseFinetuneable(nn.Module):
 
     def _remove_unk(self, token_ids: list[int]) -> list[int]:
         """Drop unknown tokens, mirroring `StaticModel.tokenize`."""
-        if self.unk_token_id is None:
-            return token_ids
-        return [token_id for token_id in token_ids if token_id != self.unk_token_id]
+        return remove_unk(token_ids, self.unk_token_id)
+
+    def _batch_tokenizer(self, max_length: int | None) -> BatchTokenizer:
+        """Create a picklable tokenizer for batches of texts, truncating them to `max_length` tokens."""
+        return BatchTokenizer(self.tokenizer, self.unk_token_id, max_length)
+
+    def _target_encoder(self) -> Callable[[list[Any]], torch.Tensor]:
+        """Create a picklable function that turns a batch of labels into targets."""
+        return float_targets
 
     def construct_weights(self) -> nn.Parameter:
         """Construct the weights for the model."""
@@ -327,31 +345,6 @@ class BaseFinetuneable(nn.Module):
 
         return batch_size
 
-    def _check_val_split(
-        self,
-        X: list[str],
-        y: list,
-        X_val: list[str] | None,
-        y_val: list | None,
-        test_size: float,
-    ) -> tuple[list[str], list[str], Sequence, Sequence]:
-        if (X_val is not None) != (y_val is not None):
-            raise ValueError("Both X_val and y_val must be provided together, or neither.")
-
-        if X_val is not None and y_val is not None:
-            # Additional check to ensure y_val is of the same type as y
-            if type(y_val[0]) != type(y[0]):
-                raise ValueError("X_val and y_val must be of the same type as X and y.")
-
-            train_texts = X
-            train_labels = y
-            validation_texts = X_val
-            validation_labels = y_val
-        else:
-            train_texts, validation_texts, train_labels, validation_labels = train_test_split(X, y, test_size=test_size)
-
-        return train_texts, validation_texts, train_labels, validation_labels
-
     def _train(
         self,
         loss_function: nn.Module,
@@ -366,6 +359,7 @@ class BaseFinetuneable(nn.Module):
         validation_steps: int | None,
         compute_metrics: MetricsFn = default_metrics,
         token_dropout: float = 0.0,
+        num_workers: int = 0,
     ) -> None:
         if not 0.0 <= token_dropout < 1.0:
             raise ValueError("token_dropout must be in the range [0, 1).")
@@ -381,8 +375,8 @@ class BaseFinetuneable(nn.Module):
             learning_rate=learning_rate,
             val_metric=self.val_metric,
             early_stopping_direction=self.early_stopping_direction,
-            train_loader=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size),
-            val_loader=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size),
+            train_loader=train_dataset.to_dataloader(shuffle=True, batch_size=batch_size, num_workers=num_workers),
+            val_loader=val_dataset.to_dataloader(shuffle=False, batch_size=batch_size, num_workers=num_workers),
             early_stopping_patience=early_stopping_patience,
             min_epochs=min_epochs,
             max_epochs=max_epochs,
@@ -420,59 +414,111 @@ class BaseFinetuneable(nn.Module):
 
         return val_check_interval, check_val_every_epoch
 
-    def _tokenize_texts(self, X: list[str], max_length: int | None) -> list[list[int]]:
-        """Tokenize a list of texts into lists of token ids.
+    @staticmethod
+    def _check_inputs(**arguments: object) -> None:
+        """Check that every argument of `fit` is a sequence, an array, a tensor, or a column of a Hugging Face dataset.
 
-        :param X: The texts to tokenize.
-        :param max_length: The maximum length of the input in tokens. If this is None, no truncation is done.
-        :return: The tokenized texts.
+        :param **arguments: The arguments, by name. None is skipped.
+        :raises ValueError: If an argument is a Hugging Face `Dataset` or `DatasetDict`, an iterable dataset or one of
+            its columns, a column of a dataset with a transform, a single string, or any other object that is not a
+            sequence, an array, or a tensor.
         """
-        batch_size = 1024
-        tokenized: list[list[int]] = []
-        for batch_idx in trange(0, len(X), batch_size, desc="Tokenizing data"):
-            batch = X[batch_idx : batch_idx + batch_size]
-            if max_length is not None:
-                truncate_length = max_length * 10
-                batch = [x[:truncate_length] for x in batch]
-            encoded = self.tokenizer.encode_batch_fast(batch, add_special_tokens=False)
-            tokenized.extend([self._remove_unk(encoding.ids)[:max_length] for encoding in encoded])
+        for name, value in arguments.items():
+            if isinstance(value, (IterableDataset, IterableDatasetDict, IterableColumn)):
+                raise ValueError(
+                    f"{name} comes from an iterable Hugging Face dataset, which has no length. Pass a column of a "
+                    "regular dataset instead, such as one loaded without `streaming=True`."
+                )
+            if isinstance(value, (HFDataset, DatasetDict)):
+                raise ValueError(
+                    f"{name} is a Hugging Face dataset. Pass one of its columns instead, such as `dataset['text']`."
+                )
+            if isinstance(value, Column) and has_transform(value):
+                raise ValueError(
+                    f"{name} is a column of a Hugging Face dataset with a transform. Apply the transform first with "
+                    "`dataset.map(transform, batched=True)`, or pass a list."
+                )
+            if isinstance(value, str) or (
+                value is not None and not isinstance(value, (Sequence, np.ndarray, torch.Tensor))
+            ):
+                raise ValueError(
+                    f"{name} must be a list, a tuple, an array, a tensor, or a column of a Hugging Face dataset, got "
+                    f"{type(value).__name__}."
+                )
 
-        return tokenized
+    @staticmethod
+    def _check_aligned(**columns: Sized) -> None:
+        """Check that the columns of the training or validation data have the same length.
 
-    def _prepare_dataset(self, X: list[str], y: torch.Tensor, max_length: int | None) -> TextDataset:
-        """Prepare a dataset.
-
-        :param X: The texts.
-        :param y: The labels.
-        :param max_length: The maximum length of the input in tokens. If this is None, no truncation is done.
-        :return: A TextDataset.
+        :param **columns: The columns, by name.
+        :raises ValueError: If the columns don't all have the same length.
         """
-        return TextDataset(self._tokenize_texts(X, max_length), y, pad_id=self.pad_id)
+        lengths = {name: len(column) for name, column in columns.items()}
+        if len(set(lengths.values())) > 1:
+            raise ValueError(f"{' and '.join(lengths)} must have the same length, got {lengths}.")
 
-    def _labels_to_tensor(self, labels: Any) -> torch.Tensor:
-        """Turn the labels into a tensor."""
-        return labels
+    @staticmethod
+    def _check_texts(**texts: Sequence[str] | None) -> None:
+        """Check that all texts are strings.
+
+        :param **texts: The texts, by name. None is skipped.
+        :raises ValueError: If a text is missing or is not a string.
+        """
+        for name, values in texts.items():
+            if values is None:
+                continue
+            is_valid = (
+                has_only_strings(values)
+                if isinstance(values, Column)
+                else all(isinstance(text, str) for text in values)
+            )
+            if not is_valid:
+                raise ValueError(f"All texts in {name} must be strings.")
+
+    def _text_dataset(self, rows: ColumnRows, indices: np.ndarray | None = None) -> TextDataset:
+        """Create a dataset of labeled texts that are tokenized per batch.
+
+        :param rows: The labeled texts, in a `text` and a `label` column.
+        :param indices: The indices of the rows that belong to the dataset. If None, all rows belong to it.
+        :return: The dataset.
+        """
+        return TextDataset(
+            rows, self._batch_tokenizer(self.max_length), self._target_encoder(), indices, pad_id=self.pad_id
+        )
 
     def _create_datasets(
         self,
-        X: list[str],
+        X: Sequence[str],
         y: Any,
-        X_val: list[str] | None,
+        X_val: Sequence[str] | None,
         y_val: Any | None,
-        test_size: float,
+        test_size: float | int,
     ) -> tuple[TextDataset, TextDataset]:
-        train_texts, validation_texts, train_labels, validation_labels = self._check_val_split(
-            X, y, X_val, y_val, test_size
+        """Create the training and validation datasets.
+
+        :param X: The training texts.
+        :param y: The training labels.
+        :param X_val: The validation texts. If None, the validation data is split off from `X` and `y`.
+        :param y_val: The validation labels.
+        :param test_size: The size of the validation split if `X_val` is None: a fraction of the data, capped at
+            `MAX_VALIDATION_SIZE` rows, or a number of rows if it is an int.
+        :return: The train and validation datasets.
+        :raises ValueError: If only one of `X_val` and `y_val` is given, or if the texts and labels have different
+            lengths.
+        """
+        if (X_val is None) != (y_val is None):
+            raise ValueError("Both X_val and y_val must be provided together, or neither.")
+        self._check_aligned(X=X, y=y)
+        self._check_texts(X=X, X_val=X_val)
+        rows = ColumnRows(text=X, label=y)
+        if X_val is not None and y_val is not None:
+            self._check_aligned(X_val=X_val, y_val=y_val)
+            return self._text_dataset(rows), self._text_dataset(ColumnRows(text=X_val, label=y_val))
+
+        train_indices, val_indices = split_indices(
+            len(rows), test_size, max_test_size=MAX_VALIDATION_SIZE, stratify_by=y
         )
-        y_tensor = self._labels_to_tensor(train_labels)
-        y_val_tensor = self._labels_to_tensor(validation_labels)
-
-        logger.info("Preparing train dataset.")
-        train_dataset = self._prepare_dataset(train_texts, y_tensor, self.max_length)
-        logger.info("Preparing validation dataset.")
-        val_dataset = self._prepare_dataset(validation_texts, y_val_tensor, self.max_length)
-
-        return train_dataset, val_dataset
+        return self._text_dataset(rows, train_indices), self._text_dataset(rows, val_indices)
 
 
 T = TypeVar("T", bound=BaseFinetuneable)

@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import logging
+import numbers
 import random
-from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Any, TypeVar
+from collections import defaultdict
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import pyarrow as pa
+import pyarrow.compute as pc
 import torch
+from datasets import Column
 from tokenizers import Tokenizer
 from torch import nn
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.inference.mlp import Activation, Layer, MLPHead
+from model2vec.train.dataset import column_type, read_column
 
 if TYPE_CHECKING:
     from model2vec.train.base import BaseFinetuneable
@@ -21,6 +27,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_RANDOM_SEED = 42
+MAX_VALIDATION_SIZE = 10_000
 _KNOWN_PAD_TOKENS = ("[PAD]", "<pad>")
 
 
@@ -62,66 +69,126 @@ def to_pipeline(model: "BaseFinetuneable | StaticModelForClassification") -> Sta
     return StaticModelPipeline(static_model, head)
 
 
-def _index(sequence: Any, indices: list[int]) -> Any:
-    """Index a sequence with a list of indices, preserving the container type."""
-    if isinstance(sequence, list):
-        return [sequence[index] for index in indices]
-    return sequence[indices]
+def _list_strata(labels: list[Any]) -> list[np.ndarray]:
+    """Group the indices of a list of labels by label, in order of first occurrence."""
+    indices_by_label: dict[Any, list[int]] = defaultdict(list)
+    for index, label in enumerate(labels):
+        indices_by_label[label].append(index)
+    return [np.asarray(indices) for indices in indices_by_label.values()]
 
 
-X_co = TypeVar("X_co")
+def _array_strata(labels: np.ndarray) -> list[np.ndarray]:
+    """Group the indices of an array of labels by label, in order of first occurrence."""
+    _, first, codes = np.unique(labels, return_index=True, return_inverse=True)
+    codes = np.argsort(np.argsort(first))[codes]
+    return np.split(np.argsort(codes, kind="stable"), np.cumsum(np.bincount(codes))[:-1])
 
 
-def train_test_split(
-    X: list[X_co],
-    y: list,
-    test_size: float,
-) -> tuple[list[X_co], list[X_co], list, list]:
-    """Split the data.
+def _column_strata(labels: Column) -> list[np.ndarray] | None:
+    """Group the indices of a Hugging Face column of single labels by label, in order of first occurrence.
 
-    For single-label classification, stratification is attempted (if possible).
-    For multilabel classification, a random split is performed.
+    :param labels: The labels.
+    :return: The indices of each label, or None if the column is empty or doesn't hold strings or integers.
     """
-    rng = random.Random(DEFAULT_RANDOM_SEED)
-    n = len(X)
+    label_type = column_type(labels)
+    if not len(labels) or not (
+        pa.types.is_string(label_type) or pa.types.is_large_string(label_type) or pa.types.is_integer(label_type)
+    ):
+        return None
+    array = read_column(labels)
+    encoded = pc.dictionary_encode(array.combine_chunks(), null_encoding="encode")
+    codes = encoded.indices.to_numpy(zero_copy_only=False)
+    return np.split(np.argsort(codes, kind="stable"), np.cumsum(np.bincount(codes))[:-1])
 
-    stratify = isinstance(y, list) and len(y) > 0 and isinstance(y[0], (str, int))
-    if stratify:
-        label_counts = Counter(y)
-        if min(label_counts.values()) < 2:
-            logger.info("Some classes have fewer than 2 samples. Stratification is disabled.")
-            stratify = False
 
-    train_indices: list[int]
-    test_indices: list[int]
-    if stratify:
-        indices_by_label: dict[Any, list[int]] = defaultdict(list)
-        for index, label in enumerate(y):
-            indices_by_label[label].append(index)
-
-        train_indices = []
-        test_indices = []
-        for indices in indices_by_label.values():
-            indices = indices[:]
-            rng.shuffle(indices)
-            n_test = min(max(1, round(len(indices) * test_size)), len(indices) - 1)
-            test_indices.extend(indices[:n_test])
-            train_indices.extend(indices[n_test:])
-        rng.shuffle(train_indices)
-        rng.shuffle(test_indices)
+def _strata(labels: Sequence[Any] | None) -> list[np.ndarray] | None:
+    """Group the indices of single-label classes, or return None if the labels can't be used to stratify."""
+    if isinstance(labels, Column):
+        strata = _column_strata(labels)
+    elif isinstance(labels, torch.Tensor) and labels.ndim == 1 and len(labels):
+        strata = _array_strata(labels.cpu().numpy())
+    elif isinstance(labels, np.ndarray) and labels.ndim == 1 and len(labels):
+        strata = _array_strata(labels)
+    elif isinstance(labels, list) and labels and isinstance(labels[0], (str, int)):
+        strata = _list_strata(labels)
     else:
-        indices = list(range(n))
-        rng.shuffle(indices)
-        n_test = min(max(1, round(n * test_size)), max(n - 1, 0))
-        test_indices = indices[:n_test]
-        train_indices = indices[n_test:]
+        return None
+    if strata is None:
+        return None
+    if min(len(indices) for indices in strata) < 2:
+        logger.info("Some classes have fewer than 2 samples. Stratification is disabled.")
+        return None
+    return strata
 
-    X_train = _index(X, train_indices)
-    X_test = _index(X, test_indices)
-    y_train = _index(y, train_indices)
-    y_test = _index(y, test_indices)
 
-    return X_train, X_test, y_train, y_test
+def _stratum_test_sizes(sizes: np.ndarray, n_test: int) -> np.ndarray:
+    """Divide `n_test` test items over strata in proportion to their sizes.
+
+    Every stratum gets at least one test item and keeps at least one train item. The total only differs from
+    `n_test` if this can't be met otherwise.
+
+    :param sizes: The number of items in each stratum. Each stratum has at least two items.
+    :param n_test: The total number of test items.
+    :return: The number of test items in each stratum.
+    """
+    quotas = sizes * n_test / sizes.sum()
+    counts = np.clip(np.round(quotas), 1, sizes - 1).astype(int)
+    while (excess := int(counts.sum()) - n_test) != 0:
+        step = 1 if excess > 0 else -1
+        candidates = np.flatnonzero(counts > 1 if excess > 0 else counts < sizes - 1)
+        if not len(candidates):
+            break
+        index = candidates[np.argmax((counts - quotas)[candidates] * step)]
+        counts[index] -= step
+    return counts
+
+
+def split_indices(
+    n: int,
+    test_size: float | int,
+    max_test_size: int | None = None,
+    stratify_by: Sequence[Any] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Randomly split the indices `0..n-1` into sorted train and test indices.
+
+    :param n: The number of items.
+    :param test_size: The size of the test split: a fraction of the items if it is a float, or a number of items
+        if it is an int. At least one item goes into the test split, and at least one into the train split if
+        `n > 1`.
+    :param max_test_size: The maximum number of items in the test split if `test_size` is a fraction.
+        If None, the test split is not capped.
+    :param stratify_by: The label of each item. If this is a list or a Hugging Face column of single labels in which
+        every label occurs at least twice, each label is split separately, in the same proportion.
+    :return: The train indices and the test indices.
+    :raises ValueError: If `test_size` is a bool.
+    """
+    if isinstance(test_size, bool):
+        raise ValueError("test_size must be a float or an int, not a bool.")
+    rng = np.random.default_rng(DEFAULT_RANDOM_SEED)
+    if isinstance(test_size, numbers.Integral):
+        n_test = int(test_size)
+    else:
+        n_test = round(n * test_size)
+        if max_test_size is not None:
+            n_test = min(n_test, max_test_size)
+    n_test = min(max(1, n_test), max(n - 1, 0))
+
+    strata = _strata(stratify_by)
+    if strata is not None and len(strata) > n_test:
+        logger.info("There are more classes than validation samples. Stratification is disabled.")
+        strata = None
+    if strata is None:
+        indices = rng.permutation(n)
+        return np.sort(indices[n_test:]), np.sort(indices[:n_test])
+
+    train: list[np.ndarray] = []
+    test: list[np.ndarray] = []
+    test_sizes = _stratum_test_sizes(np.array([len(members) for members in strata]), n_test)
+    for members, n_members_test in zip(strata, test_sizes):
+        members = rng.permutation(members)
+        test.append(members[:n_members_test])
+        train.append(members[n_members_test:])
+    return np.sort(np.concatenate(train)), np.sort(np.concatenate(test))
 
 
 def seed_everything(seed: int) -> None:
