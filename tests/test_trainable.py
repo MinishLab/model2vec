@@ -33,7 +33,6 @@ from model2vec.train.trainer import _resolve_max_epochs, resolve_device, run_tra
 from model2vec.train.utils import (
     _column_strata,
     get_probable_pad_token_id,
-    logit,
     seed_everything,
     split_indices,
 )
@@ -873,12 +872,6 @@ def test_determine_interval() -> None:
     )
     assert val_check_interval == 100
     assert check_val_every_epoch is None
-
-
-def test_logit() -> None:
-    """Test on random data."""
-    x = torch.arange(10).float() / 10
-    assert torch.allclose(logit(torch.sigmoid(x)), x, atol=1e-6)
 
 
 def test_seed_everything_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
