@@ -484,6 +484,7 @@ class BaseFinetuneable(nn.Module):
         X_val: Sequence[str] | None,
         y_val: Any | None,
         test_size: float | int,
+        stratify_by: Sequence[Any] | None = None,
     ) -> tuple[TextDataset, TextDataset]:
         """Create the training and validation datasets.
 
@@ -493,6 +494,8 @@ class BaseFinetuneable(nn.Module):
         :param y_val: The validation labels.
         :param test_size: The size of the validation split if `X_val` is None: a fraction of the data, capped at
             `MAX_VALIDATION_SIZE` rows, or a number of rows if it is an int.
+        :param stratify_by: Validated single labels to stratify the validation split by. If None, the split is not
+            stratified.
         :return: The train and validation datasets.
         :raises ValueError: If only one of `X_val` and `y_val` is given, or if the texts and labels have different
             lengths.
@@ -507,7 +510,7 @@ class BaseFinetuneable(nn.Module):
             return self._text_dataset(rows), self._text_dataset(ColumnRows(text=X_val, label=y_val))
 
         train_indices, val_indices = split_indices(
-            len(rows), test_size, max_test_size=MAX_VALIDATION_SIZE, stratify_by=y
+            len(rows), test_size, max_test_size=MAX_VALIDATION_SIZE, stratify_by=stratify_by
         )
         return self._text_dataset(rows, train_indices), self._text_dataset(rows, val_indices)
 

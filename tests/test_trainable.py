@@ -24,6 +24,7 @@ from model2vec.train.dataset import (
     ColumnRows,
     PairDataset,
     TextDataset,
+    _column_strata,
     iter_column,
 )
 from model2vec.train.pairs import PairInfoNCELoss, StaticModelForPairSimilarity
@@ -31,7 +32,6 @@ from model2vec.train.regression import StaticModelForRegression
 from model2vec.train.similarity import StaticModelForSimilarity, _vector_dim
 from model2vec.train.trainer import _resolve_max_epochs, resolve_device, run_training_loop
 from model2vec.train.utils import (
-    _column_strata,
     get_probable_pad_token_id,
     seed_everything,
     split_indices,
@@ -1063,39 +1063,58 @@ def test_split_indices_stratifies_arrays_like_lists(labels: list[Any]) -> None:
         assert all(np.array_equal(a, b) for a, b in zip(actual, expected))
 
 
-@pytest.mark.parametrize(
-    "labels", [[["a"], ["b"]] * 10, ["a"] * 19 + ["b"], [[0.5, 1.0]] * 20], ids=["multilabel", "singleton", "vectors"]
-)
-def test_split_indices_does_not_stratify_other_columns(labels: list[Any]) -> None:
-    """Columns of multi-labels or vectors, or with a class that occurs once, are split at random."""
+def test_split_indices_does_not_stratify_singleton_classes() -> None:
+    """Labels with a class that occurs once are split at random."""
+    labels = ["a"] * 19 + ["b"]
     column = Dataset.from_dict({"label": labels})["label"]
     expected = split_indices(len(labels), 0.25)
-    assert all(np.array_equal(a, b) for a, b in zip(split_indices(len(labels), 0.25, stratify_by=column), expected))
+    for stratify_by in (labels, column):
+        actual = split_indices(len(labels), 0.25, stratify_by=stratify_by)
+        assert all(np.array_equal(a, b) for a, b in zip(actual, expected))
 
 
-@pytest.mark.parametrize("labels", [[["a"], ["b"]] * 10, [[0.5, 1.0]] * 20], ids=["multilabel", "vectors"])
-def test_split_indices_does_not_read_unstratifiable_columns(labels: list[Any]) -> None:
-    """Columns that can't be stratified are not read."""
-    column = Dataset.from_dict({"label": labels})["label"]
-    with patch("model2vec.train.utils.iter_column") as iter_column_mock:
-        split_indices(len(labels), 0.25, stratify_by=column)
-    iter_column_mock.assert_not_called()
+@pytest.mark.parametrize(
+    ("model_class", "labels", "stratified"),
+    [
+        (StaticModelForClassification, ["a", "b"] * 4, True),
+        (StaticModelForClassification, [["a"], ["b"]] * 4, False),
+        (StaticModelForRegression, [[0.5, 1.0]] * 8, False),
+        (StaticModelForSimilarity, [[0.5, 1.0]] * 8, False),
+    ],
+    ids=["single-label", "multilabel", "regression", "similarity"],
+)
+def test_fit_only_stratifies_single_labels(
+    model_class: type[BaseFinetuneable],
+    labels: list[Any],
+    stratified: bool,
+    mock_vectors: np.ndarray,
+    mock_tokenizer: Tokenizer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only single-label classifiers stratify the validation split."""
+    monkeypatch.setattr("model2vec.train.base.run_training_loop", lambda **kwargs: kwargs["model"].state_dict())
+    dataset = Dataset.from_dict({"text": _TRAIN_TEXTS, "label": labels})
+    y = dataset["label"]
+    model = model_class(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    with patch("model2vec.train.base.split_indices", wraps=split_indices) as split_mock:
+        model.fit(dataset["text"], y, test_size=0.5)  # type: ignore[attr-defined]
+    stratify_by = split_mock.call_args.kwargs["stratify_by"]
+    assert (stratify_by is y) if stratified else (stratify_by is None)
 
 
 def test_column_strata_match_list_strata_across_batches() -> None:
     """Columns are grouped by label in batches, matching lists, in order of first occurrence."""
-    labels = ["b", "a", "c", "a", "b", "c", "b", "a", None, None]
+    labels = ["b", "a", "c", "a", "b", "c", "b", "a", "d", "d"]
     column = Dataset.from_dict({"label": labels})["label"]
-    with patch("model2vec.train.utils.iter_column", lambda column: iter_column(column, batch_size=3)):
+    with patch("model2vec.train.dataset.iter_column", lambda column: iter_column(column, batch_size=3)):
         strata = _column_strata(column)
-    assert strata is not None
     assert [indices.tolist() for indices in strata] == [[0, 4, 6], [1, 3, 7], [2, 5], [8, 9]]
 
 
 def test_classifier_counts_column_labels_across_batches() -> None:
     """Labels in a column are counted and checked in batches."""
     dataset = Dataset.from_dict({"label": ["a", "b", "a"] * 3, "labels": [["a", "b"], ["a"], []] * 3})
-    with patch("model2vec.train.classifier.iter_column", lambda column: iter_column(column, batch_size=2)):
+    with patch("model2vec.train.dataset.iter_column", lambda column: iter_column(column, batch_size=2)):
         assert _read_labels(dataset["label"], "y") == (False, Counter({"a": 6, "b": 3}))
         assert _read_labels(dataset["labels"], "y") == (True, Counter({"a": 6, "b": 3}))
         with pytest.raises(ValueError, match="must not be missing"):

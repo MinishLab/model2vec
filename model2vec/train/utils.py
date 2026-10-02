@@ -3,21 +3,17 @@ from __future__ import annotations
 import logging
 import numbers
 import random
-from collections import defaultdict
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pyarrow as pa
-import pyarrow.compute as pc
 import torch
-from datasets import Column
 from tokenizers import Tokenizer
 from torch import nn
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.inference.mlp import Activation, Layer, MLPHead
-from model2vec.train.dataset import column_type, iter_column
+from model2vec.train.dataset import stratify_indices
 
 if TYPE_CHECKING:
     from model2vec.train.base import BaseFinetuneable
@@ -69,62 +65,6 @@ def to_pipeline(model: "BaseFinetuneable | StaticModelForClassification") -> Sta
     return StaticModelPipeline(static_model, head)
 
 
-def _list_strata(labels: list[Any]) -> list[np.ndarray]:
-    """Group the indices of a list of labels by label, in order of first occurrence."""
-    indices_by_label: dict[Any, list[int]] = defaultdict(list)
-    for index, label in enumerate(labels):
-        indices_by_label[label].append(index)
-    return [np.asarray(indices) for indices in indices_by_label.values()]
-
-
-def _array_strata(labels: np.ndarray) -> list[np.ndarray]:
-    """Group the indices of an array of labels by label, in order of first occurrence."""
-    _, first, codes = np.unique(labels, return_index=True, return_inverse=True)
-    codes = np.argsort(np.argsort(first))[codes]
-    return np.split(np.argsort(codes, kind="stable"), np.cumsum(np.bincount(codes))[:-1])
-
-
-def _column_strata(labels: Column) -> list[np.ndarray] | None:
-    """Group the indices of a Hugging Face column of single labels by label, in order of first occurrence.
-
-    :param labels: The labels.
-    :return: The indices of each label, or None if the column is empty or doesn't hold strings or integers.
-    """
-    label_type = column_type(labels)
-    if not len(labels) or not (
-        pa.types.is_string(label_type) or pa.types.is_large_string(label_type) or pa.types.is_integer(label_type)
-    ):
-        return None
-    classes: dict[Any, int] = {}
-    batch_codes = []
-    for array in iter_column(labels):
-        encoded = pc.dictionary_encode(array.combine_chunks(), null_encoding="encode")
-        mapping = np.array([classes.setdefault(label, len(classes)) for label in encoded.dictionary.to_pylist()])
-        batch_codes.append(mapping[encoded.indices.to_numpy(zero_copy_only=False)])
-    codes = np.concatenate(batch_codes)
-    return np.split(np.argsort(codes, kind="stable"), np.cumsum(np.bincount(codes))[:-1])
-
-
-def _strata(labels: Sequence[Any] | None) -> list[np.ndarray] | None:
-    """Group the indices of single-label classes, or return None if the labels can't be used to stratify."""
-    if isinstance(labels, Column):
-        strata = _column_strata(labels)
-    elif isinstance(labels, torch.Tensor) and labels.ndim == 1 and len(labels):
-        strata = _array_strata(labels.cpu().numpy())
-    elif isinstance(labels, np.ndarray) and labels.ndim == 1 and len(labels):
-        strata = _array_strata(labels)
-    elif isinstance(labels, list) and labels and isinstance(labels[0], (str, int)):
-        strata = _list_strata(labels)
-    else:
-        return None
-    if strata is None:
-        return None
-    if min(len(indices) for indices in strata) < 2:
-        logger.info("Some classes have fewer than 2 samples. Stratification is disabled.")
-        return None
-    return strata
-
-
 def _stratum_test_sizes(sizes: np.ndarray, n_test: int) -> np.ndarray:
     """Divide `n_test` test items over strata in proportion to their sizes.
 
@@ -161,8 +101,9 @@ def split_indices(
         `n > 1`.
     :param max_test_size: The maximum number of items in the test split if `test_size` is a fraction.
         If None, the test split is not capped.
-    :param stratify_by: The label of each item. If this is a list or a Hugging Face column of single labels in which
-        every label occurs at least twice, each label is split separately, in the same proportion.
+    :param stratify_by: The single label of each item, as strings or integers that have been validated. If every
+        label occurs at least twice, each label is split separately, in the same proportion. If None, the split is
+        not stratified.
     :return: The train indices and the test indices.
     :raises ValueError: If `test_size` is a bool.
     """
@@ -177,7 +118,7 @@ def split_indices(
             n_test = min(n_test, max_test_size)
     n_test = min(max(1, n_test), max(n - 1, 0))
 
-    strata = _strata(stratify_by)
+    strata = None if stratify_by is None else stratify_indices(stratify_by)
     if strata is not None and len(strata) > n_test:
         logger.info("There are more classes than validation samples. Stratification is disabled.")
         strata = None

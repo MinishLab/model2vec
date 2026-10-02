@@ -7,8 +7,6 @@ from itertools import chain
 from typing import Any, Literal, cast
 
 import numpy as np
-import pyarrow as pa
-import pyarrow.compute as pc
 import torch
 from datasets import Column
 from tokenizers import Tokenizer
@@ -18,7 +16,7 @@ from tqdm import trange
 from model2vec.inference import evaluate_single_or_multi_label
 from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.dataset import column_type, iter_column
+from model2vec.train.dataset import read_label_column
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
 logger = logging.getLogger(__name__)
@@ -57,7 +55,7 @@ def _read_labels(y: LabelType, name: str) -> tuple[bool, Counter]:
     :raises ValueError: If the labels are inconsistent, or are not strings, integers, or lists of those.
     """
     if isinstance(y, Column):
-        return _read_label_column(y, name)
+        return read_label_column(y, name)
     if isinstance(y, (np.ndarray, torch.Tensor)):
         y = y.tolist()
 
@@ -71,31 +69,6 @@ def _read_labels(y: LabelType, name: str) -> tuple[bool, Counter]:
     if not all(isinstance(label, (str, int)) for label in classes):
         raise ValueError(f"Inconsistent label types in {name}. All classes must be strings or integers.")
     return True, Counter(classes)
-
-
-def _read_label_column(labels: Column, name: str) -> tuple[bool, Counter]:
-    """Determine whether a column of labels is multi-label, and count the number of times each class occurs.
-
-    :param labels: A column of a Hugging Face dataset. If it holds lists, multi-label classification is assumed.
-    :param name: The name of the labels, used in error messages.
-    :return: Whether the labels are multi-label, and the number of times each class occurs.
-    :raises ValueError: If the labels are not strings, integers, or lists of those, or if a label is missing.
-    """
-    label_type = column_type(labels)
-    multilabel = (
-        pa.types.is_list(label_type) or pa.types.is_large_list(label_type) or pa.types.is_fixed_size_list(label_type)
-    )
-    value_type = label_type.value_type if multilabel else label_type
-    if not (pa.types.is_string(value_type) or pa.types.is_large_string(value_type) or pa.types.is_integer(value_type)):
-        raise ValueError(f"Labels in {name} must be strings, integers, or lists of those, got {label_type}.")
-    counts: Counter = Counter()
-    for array in iter_column(labels):
-        values = pc.list_flatten(array) if multilabel else array
-        if array.null_count or values.null_count:
-            raise ValueError(f"Labels in {name} must not be missing.")
-        value_counts = pc.value_counts(values)
-        counts.update(dict(zip(value_counts.field("values").to_pylist(), value_counts.field("counts").to_pylist())))
-    return multilabel, counts
 
 
 class StaticModelForClassification(BaseFinetuneable):
@@ -262,7 +235,9 @@ class StaticModelForClassification(BaseFinetuneable):
             self._check_validation_labels(y_val)
         self._initialize()
         resolved_class_weight = self._resolve_class_weight(class_weight, label_counts)
-        train_dataset, val_dataset = self._create_datasets(X, y, X_val, y_val, test_size)
+        train_dataset, val_dataset = self._create_datasets(
+            X, y, X_val, y_val, test_size, stratify_by=None if self.multilabel else y
+        )
 
         if self.multilabel:
             loss_function: nn.Module = nn.BCEWithLogitsLoss(pos_weight=resolved_class_weight)

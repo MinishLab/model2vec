@@ -5,8 +5,6 @@ from collections.abc import Sequence
 from typing import Any, TypeVar
 
 import numpy as np
-import pyarrow as pa
-import pyarrow.compute as pc
 import torch
 from datasets import Column
 from tokenizers import Tokenizer
@@ -14,36 +12,10 @@ from torch import nn
 
 from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.dataset import column_type, iter_column
+from model2vec.train.dataset import get_vector_dims_from_column
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
 logger = logging.getLogger(__name__)
-
-
-def _column_vector_dims(vectors: Column, name: str) -> set[int]:
-    """Get the dimensions of the vectors in a column of a Hugging Face dataset, reading the column in batches.
-
-    :param vectors: A column of a Hugging Face dataset that holds lists of numbers.
-    :param name: The name of the vectors, used in error messages.
-    :return: The dimensions found, stopping as soon as more than one is found.
-    :raises ValueError: If a vector is missing, or if the column doesn't hold lists of numbers.
-    """
-    array_type = column_type(vectors)
-    is_list = pa.types.is_list(array_type) or pa.types.is_large_list(array_type)
-    if not (is_list or pa.types.is_fixed_size_list(array_type)):
-        raise ValueError(f"{name} must hold lists of numbers, got {array_type}.")
-    value_type = array_type.value_type
-    if not (pa.types.is_floating(value_type) or pa.types.is_integer(value_type)):
-        raise ValueError(f"{name} must hold lists of numbers, got {array_type}.")
-    dims: set[int] = set()
-    for array in iter_column(vectors):
-        if array.null_count or pc.list_flatten(array).null_count:
-            raise ValueError(f"Vectors in {name} must not be missing.")
-        bounds = pc.min_max(pc.list_value_length(array))
-        dims |= {bounds["min"].as_py(), bounds["max"].as_py()}
-        if len(dims) > 1:
-            break
-    return dims
 
 
 def _vector_dim(vectors: Any, name: str) -> int:
@@ -62,7 +34,7 @@ def _vector_dim(vectors: Any, name: str) -> int:
         return vectors.shape[1]
 
     if isinstance(vectors, Column):
-        dims = _column_vector_dims(vectors, name)
+        dims = get_vector_dims_from_column(vectors, name)
     else:
         try:
             dims = {len(vector) for vector in vectors}
