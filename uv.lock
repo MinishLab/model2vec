@@ -1284,11 +1284,13 @@ tests = [
     { name = "skops" },
 ]
 train = [
+    { name = "datasets" },
     { name = "torch" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "datasets", marker = "extra == 'train'", specifier = ">=4.0.0" },
     { name = "huggingface-hub", specifier = ">=1.0.0" },
     { name = "ipython", marker = "extra == 'dev'" },
     { name = "jinja2" },

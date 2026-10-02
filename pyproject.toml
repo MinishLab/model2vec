@@ -61,7 +61,7 @@ dev = [
 
 distill = ["torch", "transformers<5.4.0", "skeletoken>=0.6.0,<0.7.0"]
 onnx = ["onnx", "torch", "onnxruntime", "onnxscript", "skeletoken>=0.6.0,<0.7.0"]
-train = ["torch"]
+train = ["torch", "datasets>=4.0.0"]
 quantization = ["scikit-learn"]
 integration = ["mteb"]
 tests = ["scikit-learn", "skops"]

@@ -7,14 +7,34 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 import skops.io
+from datasets import Dataset
 from huggingface_hub.errors import EntryNotFoundError
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from model2vec.inference.evaluation import evaluate_single_or_multi_label
 from model2vec.inference.mlp import Activation, Layer, MLPHead
 from model2vec.inference.model import StaticModelPipeline, convert_legacy_pipeline
 from model2vec.model import StaticModel
+
+
+@pytest.mark.parametrize(
+    ("labels", "predictions"),
+    [
+        ([["a"], ["a", "b"]], np.array([np.array(["a"]), np.array(["b"])], dtype=object)),
+        (["a", "b"], np.array(["a", "a"])),
+        ([[0], [0, 1]], np.array([np.array([0]), np.array([1])], dtype=object)),
+        ([0, 1], np.array([0, 0])),
+    ],
+)
+def test_evaluate_on_dataset_column(labels: list, predictions: np.ndarray) -> None:
+    """Labels in a column of a Hugging Face dataset are evaluated like a list, also with a numpy or torch format."""
+    dataset = Dataset.from_dict({"labels": labels})
+    expected = evaluate_single_or_multi_label(predictions, labels)
+    assert evaluate_single_or_multi_label(predictions, dataset["labels"]) == expected
+    assert evaluate_single_or_multi_label(predictions, dataset.with_format("numpy")["labels"]) == expected
+    assert evaluate_single_or_multi_label(predictions, dataset.with_format("torch")["labels"]) == expected
 
 
 def test_init_predict(mock_inference_pipeline: StaticModelPipeline) -> None:
