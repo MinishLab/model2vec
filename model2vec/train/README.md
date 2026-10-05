@@ -106,7 +106,7 @@ The scores are competitive with the popular [roberta-base-go_emotions](https://h
 ```python
 from model2vec.train import StaticModelForPairSimilarity
 
-model = StaticModelForPairSimilarity.from_pretrained(model_name="minishlab/potion-base-32M")
+model = StaticModelForPairSimilarity.from_pretrained(path="minishlab/potion-base-32M")
 model.fit(text_a=queries, text_b=documents)
 ```
 
