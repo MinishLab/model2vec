@@ -173,14 +173,44 @@ class BaseFinetuneable(nn.Module):
         path: PathLike = "minishlab/potion-base-32m",
         *,
         token: str | None = None,
-        **kwargs: Any,
+        model_name: PathLike | None = None,
+        pad_token: str | None = None,
+        max_length: int | None = None,
+        n_layers: int = 0,
+        hidden_dim: int = 256,
+        out_dim: int = 2,
+        freeze: bool = False,
+        normalize: bool = True,
+        freeze_weights: bool = False,
     ) -> T:
-        """Load the model from a pretrained model2vec model."""
-        if model_name := kwargs.pop("model_name", None):
-            logger.warning("The 'model_name' argument is deprecated. Use 'path' instead.")
-            path = model_name
-        model = StaticModel.from_pretrained(path, token=token)
-        return cls.from_static_model(model=model, **kwargs)
+        """Load the model from a pretrained model2vec model.
+
+        :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
+        :param token: The token to use to download the model from the hub.
+        :param model_name: Deprecated alias for `path`.
+        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
+        :param max_length: The default maximum sequence length to use for tokenization. If None, the
+            static model's `max_length` is used.
+        :param n_layers: The number of layers in the head.
+        :param hidden_dim: The hidden dimension of the head.
+        :param out_dim: The output dimension of the head.
+        :param freeze: Whether to freeze the embeddings.
+        :param normalize: Whether to normalize the embeddings.
+        :param freeze_weights: Whether to freeze the learned token weights.
+        :return: The initialized model.
+        """
+        model = _load_static_model(path, token=token, model_name=model_name)
+        return cls.from_static_model(
+            model=model,
+            pad_token=pad_token,
+            max_length=max_length,
+            n_layers=n_layers,
+            hidden_dim=hidden_dim,
+            out_dim=out_dim,
+            freeze=freeze,
+            normalize=normalize,
+            freeze_weights=freeze_weights,
+        )
 
     @classmethod
     def from_static_model(
@@ -189,7 +219,12 @@ class BaseFinetuneable(nn.Module):
         model: StaticModel,
         pad_token: str | None = None,
         max_length: int | None = None,
-        **kwargs: Any,
+        n_layers: int = 0,
+        hidden_dim: int = 256,
+        out_dim: int = 2,
+        freeze: bool = False,
+        normalize: bool = True,
+        freeze_weights: bool = False,
     ) -> T:
         """Load the model from a static model.
 
@@ -197,30 +232,22 @@ class BaseFinetuneable(nn.Module):
         :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
         :param max_length: The default maximum sequence length to use for tokenization. If None, the
             static model's `max_length` is used.
-        :param **kwargs: Any additional keyword arguments to pass to the constructor.
+        :param n_layers: The number of layers in the head.
+        :param hidden_dim: The hidden dimension of the head.
+        :param out_dim: The output dimension of the head.
+        :param freeze: Whether to freeze the embeddings.
+        :param normalize: Whether to normalize the embeddings.
+        :param freeze_weights: Whether to freeze the learned token weights.
         :return: The initialized model.
         """
-        model.embedding = np.nan_to_num(model.embedding)
-        weights = torch.from_numpy(model.weights) if model.weights is not None else None
-        embeddings_converted = torch.from_numpy(model.embedding)
-        if model.token_mapping is not None:
-            token_mapping = model.token_mapping.tolist()
-        else:
-            token_mapping = None
-        if pad_token is not None:
-            pad_id = model.tokenizer.get_vocab()[pad_token]
-        else:
-            pad_id = get_probable_pad_token_id(model.tokenizer)
-        if max_length is None:
-            max_length = model.max_length
         return cls(
-            vectors=embeddings_converted,
-            pad_id=pad_id,
-            tokenizer=model.tokenizer,
-            token_mapping=token_mapping,
-            weights=weights,
-            max_length=max_length,
-            **kwargs,
+            **_static_model_arguments(model, pad_token=pad_token, max_length=max_length),
+            n_layers=n_layers,
+            hidden_dim=hidden_dim,
+            out_dim=out_dim,
+            freeze=freeze,
+            normalize=normalize,
+            freeze_weights=freeze_weights,
         )
 
     def _apply_token_dropout(self, keep_mask: torch.Tensor) -> torch.Tensor:
@@ -516,3 +543,43 @@ class BaseFinetuneable(nn.Module):
 
 
 T = TypeVar("T", bound=BaseFinetuneable)
+
+
+def _load_static_model(path: PathLike, *, token: str | None, model_name: PathLike | None) -> StaticModel:
+    """Load a static model, resolving the deprecated `model_name` argument.
+
+    :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
+    :param token: The token to use to download the model from the hub.
+    :param model_name: Deprecated alias for `path`. If given, it overrides `path`.
+    :return: The loaded static model.
+    """
+    if model_name is not None:
+        logger.warning("The 'model_name' argument is deprecated. Use 'path' instead.")
+        path = model_name
+    return StaticModel.from_pretrained(path, token=token)
+
+
+def _static_model_arguments(model: StaticModel, *, pad_token: str | None, max_length: int | None) -> dict[str, Any]:
+    """Derive the constructor arguments of a finetuneable model from a static model.
+
+    :param model: The static model to derive the arguments from.
+    :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
+    :param max_length: The default maximum sequence length to use for tokenization. If None, the
+        static model's `max_length` is used.
+    :return: The constructor arguments.
+    """
+    model.embedding = np.nan_to_num(model.embedding)
+    weights = torch.from_numpy(model.weights) if model.weights is not None else None
+    token_mapping = model.token_mapping.tolist() if model.token_mapping is not None else None
+    if pad_token is not None:
+        pad_id = model.tokenizer.get_vocab()[pad_token]
+    else:
+        pad_id = get_probable_pad_token_id(model.tokenizer)
+    return {
+        "vectors": torch.from_numpy(model.embedding),
+        "pad_id": pad_id,
+        "tokenizer": model.tokenizer,
+        "token_mapping": token_mapping,
+        "weights": weights,
+        "max_length": model.max_length if max_length is None else max_length,
+    }

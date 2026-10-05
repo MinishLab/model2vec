@@ -1,3 +1,4 @@
+import inspect
 import logging
 from collections import Counter, UserList
 from tempfile import TemporaryDirectory
@@ -98,7 +99,7 @@ def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenize
 
     with TemporaryDirectory() as temp_dir:
         model.save_pretrained(temp_dir)
-        s = BaseFinetuneable.from_pretrained(model_name=temp_dir)
+        s = BaseFinetuneable.from_pretrained(path=temp_dir)
         assert s.vectors.shape == mock_vectors.shape
         assert s.w.shape[0] == mock_vectors.shape[0]
 
@@ -112,9 +113,101 @@ def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: To
 
     with TemporaryDirectory() as temp_dir:
         model.save_pretrained(temp_dir)
-        s = StaticModelForClassification.from_pretrained(model_name=temp_dir)
+        s = StaticModelForClassification.from_pretrained(path=temp_dir)
         assert s.vectors.shape == mock_vectors.shape
         assert s.w.shape[0] == mock_vectors.shape[0]
+
+
+FINETUNEABLE_CLASSES = [
+    BaseFinetuneable,
+    StaticModelForClassification,
+    StaticModelForSimilarity,
+    StaticModelForRegression,
+    StaticModelForPairSimilarity,
+]
+NON_HEAD_PARAMETERS = {
+    "self",
+    "cls",
+    "path",
+    "token",
+    "model_name",
+    "model",
+    "pad_token",
+    "vectors",
+    "tokenizer",
+    "pad_id",
+    "token_mapping",
+    "weights",
+    "max_length",
+}
+
+
+@pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
+@pytest.mark.parametrize("loader_name", ["from_pretrained", "from_static_model"])
+def test_loader_signature_matches_init(cls: type[BaseFinetuneable], loader_name: str) -> None:
+    """Test that the loaders expose every constructor argument explicitly, with the constructor's defaults."""
+    loader_parameters = inspect.signature(getattr(cls, loader_name)).parameters
+    assert not any(p.kind is inspect.Parameter.VAR_KEYWORD for p in loader_parameters.values())
+
+    init_parameters = inspect.signature(cls.__init__).parameters
+    expected = {name: p.default for name, p in init_parameters.items() if name not in NON_HEAD_PARAMETERS}
+    actual = {name: p.default for name, p in loader_parameters.items() if name not in NON_HEAD_PARAMETERS}
+    assert actual == expected
+
+
+@pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
+def test_from_pretrained_explicit_arguments(
+    cls: type[BaseFinetuneable], mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Test that from_pretrained passes each argument on to the model."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with TemporaryDirectory() as temp_dir:
+        model.save_pretrained(temp_dir)
+        s = cls.from_pretrained(
+            temp_dir,
+            max_length=7,
+            n_layers=2,
+            hidden_dim=3,
+            out_dim=4,
+            freeze=True,
+            normalize=False,
+            freeze_weights=True,
+        )
+    assert s.max_length == 7
+    assert s.n_layers == 2
+    assert s.hidden_dim == 3
+    assert s.out_dim == 4
+    assert s.freeze
+    assert not s.embeddings.weight.requires_grad
+    assert not s.normalize
+    assert s.freeze_weights
+    assert not s.w.requires_grad
+
+
+@pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
+def test_from_pretrained_forwards_token_and_path(
+    cls: type[BaseFinetuneable], mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Test that from_pretrained loads the static model from the given path with the given token."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with patch("model2vec.train.base.StaticModel.from_pretrained", return_value=model) as mock_from_pretrained:
+        cls.from_pretrained("fake/repo-id", token="secret")
+    mock_from_pretrained.assert_called_once_with("fake/repo-id", token="secret")
+
+
+@pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
+def test_from_pretrained_model_name_deprecated(
+    cls: type[BaseFinetuneable], mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Test that the deprecated model_name argument overrides path and warns."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with (
+        patch("model2vec.train.base.StaticModel.from_pretrained", return_value=model) as mock_from_pretrained,
+        caplog.at_level(logging.WARNING, logger="model2vec.train.base"),
+    ):
+        cls.from_pretrained(model_name="fake/repo-id")
+    mock_from_pretrained.assert_called_once_with("fake/repo-id", token=None)
+    assert "The 'model_name' argument is deprecated" in caplog.text
 
 
 def test_init_classifier_from_model_w(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:

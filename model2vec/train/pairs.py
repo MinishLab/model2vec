@@ -9,8 +9,8 @@ import torch
 from tokenizers import Tokenizer
 from torch import nn
 
-from model2vec.model import DEFAULT_MAX_LENGTH
-from model2vec.train.base import BaseFinetuneable
+from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel
+from model2vec.train.base import BaseFinetuneable, _load_static_model, _static_model_arguments
 from model2vec.train.dataset import ColumnRows, PairDataset
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, MAX_VALIDATION_SIZE, seed_everything, split_indices
 
@@ -102,6 +102,91 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             normalize=normalize,
             freeze_weights=freeze_weights,
             max_length=max_length,
+        )
+
+    @classmethod
+    def from_pretrained(
+        cls: type[T],
+        path: PathLike = "minishlab/potion-base-32m",
+        *,
+        token: str | None = None,
+        model_name: PathLike | None = None,
+        pad_token: str | None = None,
+        max_length: int | None = None,
+        n_layers: int = 1,
+        hidden_dim: int = 512,
+        out_dim: int | None = None,
+        freeze: bool = False,
+        normalize: bool = True,
+        freeze_weights: bool = False,
+    ) -> T:
+        """Load the model from a pretrained model2vec model.
+
+        :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
+        :param token: The token to use to download the model from the hub.
+        :param model_name: Deprecated alias for `path`.
+        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
+        :param max_length: The default maximum sequence length to use for tokenization. If None, the
+            static model's `max_length` is used.
+        :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
+            dimension, the model has no head, and the embeddings are used as is.
+        :param hidden_dim: The hidden dimension of the head.
+        :param out_dim: The output embedding dimension. If None, defaults to the input embedding dimension.
+        :param freeze: Whether to freeze the embeddings.
+        :param normalize: Whether to normalize the embeddings.
+        :param freeze_weights: Whether to freeze the learned token weights.
+        :return: The initialized model.
+        """
+        model = _load_static_model(path, token=token, model_name=model_name)
+        return cls.from_static_model(
+            model=model,
+            pad_token=pad_token,
+            max_length=max_length,
+            n_layers=n_layers,
+            hidden_dim=hidden_dim,
+            out_dim=out_dim,
+            freeze=freeze,
+            normalize=normalize,
+            freeze_weights=freeze_weights,
+        )
+
+    @classmethod
+    def from_static_model(
+        cls: type[T],
+        *,
+        model: StaticModel,
+        pad_token: str | None = None,
+        max_length: int | None = None,
+        n_layers: int = 1,
+        hidden_dim: int = 512,
+        out_dim: int | None = None,
+        freeze: bool = False,
+        normalize: bool = True,
+        freeze_weights: bool = False,
+    ) -> T:
+        """Load the model from a static model.
+
+        :param model: The static model to load from.
+        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
+        :param max_length: The default maximum sequence length to use for tokenization. If None, the
+            static model's `max_length` is used.
+        :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
+            dimension, the model has no head, and the embeddings are used as is.
+        :param hidden_dim: The hidden dimension of the head.
+        :param out_dim: The output embedding dimension. If None, defaults to the input embedding dimension.
+        :param freeze: Whether to freeze the embeddings.
+        :param normalize: Whether to normalize the embeddings.
+        :param freeze_weights: Whether to freeze the learned token weights.
+        :return: The initialized model.
+        """
+        return cls(
+            **_static_model_arguments(model, pad_token=pad_token, max_length=max_length),
+            n_layers=n_layers,
+            hidden_dim=hidden_dim,
+            out_dim=out_dim,
+            freeze=freeze,
+            normalize=normalize,
+            freeze_weights=freeze_weights,
         )
 
     def forward(  # type: ignore[override]
