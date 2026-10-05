@@ -493,6 +493,17 @@ def test_max_length_is_not_capped_by_the_static_model(mock_vectors: np.ndarray, 
     assert s.tokenize(texts).shape[1] == 4
 
 
+@pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
+def test_from_static_model_max_length_resolution(
+    cls: type[BaseFinetuneable], mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Unset inherits the static model's `max_length`, None disables truncation, and an int is used as is."""
+    static = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, max_length=2)
+    assert cls.from_static_model(model=static).max_length == 2
+    assert cls.from_static_model(model=static, max_length=None).max_length is None
+    assert cls.from_static_model(model=static, max_length=5).max_length == 5
+
+
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the predict function."""
     result = mock_trained_pipeline.predict(["dog cat", "dog"]).tolist()

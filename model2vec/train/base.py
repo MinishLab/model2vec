@@ -24,6 +24,7 @@ from model2vec.train.utils import (
     split_indices,
     to_pipeline,
 )
+from model2vec.types import _UNSET, _UnsetType
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +176,7 @@ class BaseFinetuneable(nn.Module):
         token: str | None = None,
         model_name: PathLike | None = None,
         pad_token: str | None = None,
-        max_length: int | None = None,
+        max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 0,
         hidden_dim: int = 256,
         out_dim: int = 2,
@@ -190,8 +191,8 @@ class BaseFinetuneable(nn.Module):
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
         :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
-        :param max_length: The default maximum sequence length to use for tokenization. If None, the
-            static model's `max_length` is used.
+        :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
+            static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head.
         :param hidden_dim: The hidden dimension of the head.
         :param out_dim: The output dimension of the head.
@@ -221,7 +222,7 @@ class BaseFinetuneable(nn.Module):
         *,
         model: StaticModel,
         pad_token: str | None = None,
-        max_length: int | None = None,
+        max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 0,
         hidden_dim: int = 256,
         out_dim: int = 2,
@@ -234,8 +235,8 @@ class BaseFinetuneable(nn.Module):
 
         :param model: The static model to load from.
         :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
-        :param max_length: The default maximum sequence length to use for tokenization. If None, the
-            static model's `max_length` is used.
+        :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
+            static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head.
         :param hidden_dim: The hidden dimension of the head.
         :param out_dim: The output dimension of the head.
@@ -565,13 +566,15 @@ def _load_static_model(path: PathLike, *, token: str | None, model_name: PathLik
     return StaticModel.from_pretrained(path, token=token)
 
 
-def _static_model_arguments(model: StaticModel, *, pad_token: str | None, max_length: int | None) -> dict[str, Any]:
+def _static_model_arguments(
+    model: StaticModel, *, pad_token: str | None, max_length: int | None | _UnsetType
+) -> dict[str, Any]:
     """Derive the constructor arguments of a finetuneable model from a static model.
 
     :param model: The static model to derive the arguments from.
     :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
-    :param max_length: The default maximum sequence length to use for tokenization. If None, the
-        static model's `max_length` is used.
+    :param max_length: The default maximum sequence length to use for tokenization. If unset, the
+        static model's `max_length` is used. If None, no truncation is done.
     :return: The constructor arguments.
     """
     model.embedding = np.nan_to_num(model.embedding)
@@ -587,5 +590,5 @@ def _static_model_arguments(model: StaticModel, *, pad_token: str | None, max_le
         "tokenizer": model.tokenizer,
         "token_mapping": token_mapping,
         "weights": weights,
-        "max_length": model.max_length if max_length is None else max_length,
+        "max_length": model.max_length if isinstance(max_length, _UnsetType) else max_length,
     }
