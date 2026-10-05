@@ -1,17 +1,51 @@
 from __future__ import annotations
 
 import logging
-from typing import TypeVar
+from collections.abc import Sequence
+from typing import Any, TypeVar
 
+import numpy as np
 import torch
+from datasets import Column
 from tokenizers import Tokenizer
 from torch import nn
 
 from model2vec.model import DEFAULT_MAX_LENGTH
 from model2vec.train.base import BaseFinetuneable
+from model2vec.train.dataset import get_vector_dims_from_column
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
 
 logger = logging.getLogger(__name__)
+
+
+def _vector_dim(vectors: Any, name: str) -> int:
+    """Get the dimension of a set of vectors, checking that every vector is present and has the same dimension.
+
+    :param vectors: The vectors: a 2D tensor or array, a sequence of sequences of numbers, or a column of a Hugging
+        Face dataset that holds lists of numbers.
+    :param name: The name of the vectors, used in error messages.
+    :return: The dimension of the vectors.
+    :raises ValueError: If there are no vectors, if a vector is missing, if the vectors have different dimensions,
+        or if a column doesn't hold lists of numbers.
+    """
+    if isinstance(vectors, (torch.Tensor, np.ndarray)):
+        if vectors.ndim != 2:
+            raise ValueError(f"{name} must be 2-dimensional, got {vectors.ndim} dimensions.")
+        return vectors.shape[1]
+
+    if isinstance(vectors, Column):
+        dims = get_vector_dims_from_column(vectors, name)
+    else:
+        try:
+            dims = {len(vector) for vector in vectors}
+        except TypeError:
+            raise ValueError(f"Vectors in {name} must be sequences of numbers.") from None
+
+    if not dims:
+        raise ValueError(f"{name} must not be empty.")
+    if len(dims) > 1:
+        raise ValueError(f"All vectors in {name} must have the same dimension, got {sorted(dims)}.")
+    return dims.pop()
 
 
 class CosineLoss(nn.Module):
@@ -65,17 +99,17 @@ class StaticModelForSimilarity(BaseFinetuneable):
 
     def fit(
         self: T,
-        X: list[str],
-        y: torch.Tensor,
+        X: Sequence[str],
+        y: torch.Tensor | Sequence[Sequence[float]],
         learning_rate: float = 1e-3,
         batch_size: int | None = None,
         min_epochs: int | None = None,
         max_epochs: int | None = -1,
         early_stopping_patience: int | None = 5,
-        test_size: float = 0.1,
+        test_size: float | int = 0.1,
         device: str = "auto",
-        X_val: list[str] | None = None,
-        y_val: torch.Tensor | None = None,
+        X_val: Sequence[str] | None = None,
+        y_val: torch.Tensor | Sequence[Sequence[float]] | None = None,
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
         token_dropout: float = 0.0,
@@ -91,6 +125,10 @@ class StaticModelForSimilarity(BaseFinetuneable):
         If `X_val` and `y_val` are not provided, the function will automatically
         split the training data into a train and validation set using `test_size`.
 
+        The texts and vectors are read and tokenized per batch. They can be lists or tensors, or columns of a
+        Hugging Face dataset, such as `dataset["text"]`, which are not loaded into memory. The dataset must not have a
+        transform.
+
         :param X: The texts to train on.
         :param y: The vectors to train on.
         :param learning_rate: The learning rate.
@@ -100,7 +138,8 @@ class StaticModelForSimilarity(BaseFinetuneable):
             If this is -1, the model trains until early stopping is triggered.
         :param early_stopping_patience: The patience for early stopping.
             If this is None, early stopping is disabled.
-        :param test_size: The test size for the train-test split.
+        :param test_size: The size of the validation split if `X_val` is None: a fraction of the data, capped at
+            10,000 rows, or a number of rows if it is an int.
         :param device: The device to train on. If this is "auto", the device is chosen automatically.
         :param X_val: The texts to be used for validation.
         :param y_val: The vectors to be used for validation.
@@ -109,22 +148,24 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param token_dropout: The fraction of tokens to randomly drop from each training sample.
             Has no effect during validation. Must be in the range [0, 1).
         :return: The fitted model.
+        :raises ValueError: If the vectors in `y_val` have a different dimension than those in `y`.
         """
         seed_everything(random_seed)
         logger.info("Re-initializing model.")
+        self._check_inputs(X=X, y=y, X_val=X_val, y_val=y_val)
+        out_dim = _vector_dim(y, "y")
+        if y_val is not None and (val_dim := _vector_dim(y_val, "y_val")) != out_dim:
+            raise ValueError(f"The vectors in y_val have dimension {val_dim}, but those in y have dimension {out_dim}.")
 
         train_dataset, val_dataset = self._create_datasets(X, y, X_val, y_val, test_size)
-        batch_size = self._determine_batch_size(batch_size, len(train_dataset))
-
-        self.out_dim = train_dataset.targets.shape[1]
+        self.out_dim = out_dim
         self._initialize()
-
         self._train(
             loss_function=self._build_loss_function(),
             learning_rate=learning_rate,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=batch_size,
+            batch_size=self._determine_batch_size(batch_size, len(train_dataset)),
             early_stopping_patience=early_stopping_patience,
             min_epochs=min_epochs,
             max_epochs=max_epochs,

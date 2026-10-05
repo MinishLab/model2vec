@@ -25,7 +25,7 @@ distilled_model = distill("baai/bge-base-en-v1.5")
 classifier = StaticModelForClassification.from_static_model(model=distilled_model)
 
 # From a pre-trained model: potion is the default
-classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32m")
+classifier = StaticModelForClassification.from_pretrained(path="minishlab/potion-base-32m")
 ```
 
 This creates a very simple classifier: a StaticModel with a single 512-unit hidden layer on top. You can adjust the number of hidden layers and the number units through some parameters on both functions. Note that the default for `from_pretrained` is [potion-base-32m](https://huggingface.co/minishlab/potion-base-32M), our best model to date. This is our recommended path if you're working with general English data.
@@ -35,6 +35,7 @@ Now that you have created the classifier, let's just train a model. The example 
 ```python
 import numpy as np
 from datasets import load_dataset
+from time import perf_counter
 
 # Load the subj dataset
 ds = load_dataset("setfit/subj")
@@ -45,13 +46,13 @@ s = perf_counter()
 classifier = classifier.fit(train["text"], train["label"])
 
 print(f"Training took {int(perf_counter() - s)} seconds.")
-# Training took 81 seconds
+# Training took 31 seconds
 classification_report = classifier.evaluate(ds["test"]["text"], ds["test"]["label"])
 print(classification_report)
-# Achieved 91.0 test accuracy
+# Achieved 92.0 test accuracy
 ```
 
-As you can see, we got a pretty nice 91% accuracy, with only 81 seconds of training.
+As you can see, we got a pretty nice 92% accuracy, with only 31 seconds of training.
 
 The training loop is a plain PyTorch loop (see [`model2vec/train/trainer.py`](trainer.py)). By default the training loop splits the data into a train and validation split, with 90% of the data being used for training and 10% for validation. By default, it runs with early stopping on the validation set accuracy, with a patience of 5.
 
@@ -63,7 +64,7 @@ from time import perf_counter
 s = perf_counter()
 classifier.predict(test["text"])
 print(f"Took {int((perf_counter() - s) * 1000)} milliseconds for {len(test)} instances on CPU.")
-# Took 67 milliseconds for 2000 instances on CPU.
+# Took 66 milliseconds for 2000 instances on CPU.
 ```
 
 ## Multi-label classification
@@ -75,7 +76,7 @@ from datasets import load_dataset
 from model2vec.train import StaticModelForClassification
 
 # Initialize a classifier from a pre-trained model
-classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32M")
+classifier = StaticModelForClassification.from_pretrained(path="minishlab/potion-base-32M")
 
 # Load a multi-label dataset
 ds = load_dataset("google-research-datasets/go_emotions")
@@ -113,6 +114,25 @@ Because the other pairs in a batch serve as negatives, the training and validati
 
 The InfoNCE temperature can be set with `temperature` (default `0.05`). It must be positive.
 
+## Large datasets
+
+Training data is read and tokenized per batch, so `fit` also accepts the columns of a Hugging Face dataset. These are not loaded into memory:
+
+```python
+from datasets import load_dataset
+
+dataset = load_dataset("sentence-transformers/gooaq", split="train")
+model.fit(text_a=dataset["question"], text_b=dataset["answer"])
+```
+
+Without an explicit validation set, `fit` holds out `test_size` of the data for validation, capped at 10,000 rows; pass an int to hold out an exact number of rows. For single-label classification, the split is stratified by class.
+
+Because batches are shuffled, training reads the rows of a dataset in random order. If the dataset is stored on disk and does not fit in memory, this can be slow, especially on a network file system.
+
+Columns of a dataset with a transform, set with `with_transform`, are not accepted. Apply the transform first with `dataset.map(transform, batched=True)`. For a dataset loaded from disk or the Hub, this writes the result to the cache on disk, so it is still not loaded into memory.
+
+Columns of an iterable dataset, such as one loaded with `streaming=True`, are not accepted.
+
 # Persistence
 
 You can turn a classifier into a lightweight inference pipeline, as follows:
@@ -148,12 +168,11 @@ Our training architecture is set up to be extensible, with each task having a sp
 The core functionality of the `StaticModelForClassification` is contained in a couple of functions:
 
 * `construct_head`: This function constructs the classifier on top of the staticmodel. For example, if you want to create a model that has LayerNorm, just subclass, and replace this function. This should be the main function to update if you want to change model behavior.
-* `train_test_split`: governs the train test split before classification.
-* `prepare_dataset`: Selects the `torch.Dataset` that will be used in the `Dataloader` during training.
+* `_create_datasets`: splits off the validation data, and creates the `torch.Dataset`s that will be used in the `Dataloader` during training.
 * `_encode`: The encoding function used in the model.
 * `fit`: contains all the fitting logic.
 
-The training loop itself lives in `model2vec.train.trainer.run_training_loop`, a plain torch loop that is fairly basic and easy to modify. Each task passes in its own loss function (and, for classification, a small function that computes extra validation metrics like accuracy).
+The training loop itself is defined in `model2vec.train.trainer.run_training_loop`, a plain torch loop that is fairly basic and easy to modify. Each task passes in its own loss function (and, for classification, a small function that computes extra validation metrics like accuracy).
 
 # Results
 
