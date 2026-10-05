@@ -18,6 +18,7 @@ from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel
 from model2vec.train.base import BaseFinetuneable, _load_static_model, _static_model_arguments
 from model2vec.train.dataset import read_label_column
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, seed_everything
+from model2vec.types import _UNSET, _UnsetType
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ class StaticModelForClassification(BaseFinetuneable):
         token: str | None = None,
         model_name: PathLike | None = None,
         pad_token: str | None = None,
-        max_length: int | None = None,
+        max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int = 2,
@@ -134,8 +135,8 @@ class StaticModelForClassification(BaseFinetuneable):
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
         :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
-        :param max_length: The default maximum sequence length to use for tokenization. If None, the
-            static model's `max_length` is used.
+        :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
+            static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
         :param hidden_dim: The hidden dimension of the head.
         :param out_dim: The number of classes. This is reset when calling `fit`.
@@ -165,7 +166,7 @@ class StaticModelForClassification(BaseFinetuneable):
         *,
         model: StaticModel,
         pad_token: str | None = None,
-        max_length: int | None = None,
+        max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int = 2,
@@ -178,8 +179,8 @@ class StaticModelForClassification(BaseFinetuneable):
 
         :param model: The static model to load from.
         :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
-        :param max_length: The default maximum sequence length to use for tokenization. If None, the
-            static model's `max_length` is used.
+        :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
+            static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
         :param hidden_dim: The hidden dimension of the head.
         :param out_dim: The number of classes. This is reset when calling `fit`.

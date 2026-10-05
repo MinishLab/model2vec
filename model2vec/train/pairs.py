@@ -13,6 +13,7 @@ from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel
 from model2vec.train.base import BaseFinetuneable, _load_static_model, _static_model_arguments
 from model2vec.train.dataset import ColumnRows, PairDataset
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, MAX_VALIDATION_SIZE, seed_everything, split_indices
+from model2vec.types import _UNSET, _UnsetType
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         token: str | None = None,
         model_name: PathLike | None = None,
         pad_token: str | None = None,
-        max_length: int | None = None,
+        max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int | None = None,
@@ -127,8 +128,8 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
         :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
-        :param max_length: The default maximum sequence length to use for tokenization. If None, the
-            static model's `max_length` is used.
+        :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
+            static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
             dimension, the model has no head, and the embeddings are used as is.
         :param hidden_dim: The hidden dimension of the head.
@@ -159,7 +160,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         *,
         model: StaticModel,
         pad_token: str | None = None,
-        max_length: int | None = None,
+        max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int | None = None,
@@ -172,8 +173,8 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
 
         :param model: The static model to load from.
         :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
-        :param max_length: The default maximum sequence length to use for tokenization. If None, the
-            static model's `max_length` is used.
+        :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
+            static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
             dimension, the model has no head, and the embeddings are used as is.
         :param hidden_dim: The hidden dimension of the head.
