@@ -112,6 +112,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        **kwargs: Any,
     ) -> T:
         """Load the model from a pretrained model2vec model.
 
@@ -127,6 +128,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
         model = _load_static_model(path, token=token, model_name=model_name)
@@ -140,6 +142,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            **kwargs,
         )
 
     @classmethod
@@ -155,6 +158,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        **kwargs: Any,
     ) -> T:
         """Load the model from a static model.
 
@@ -168,6 +172,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
         return cls(
@@ -178,6 +183,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            **kwargs,
         )
 
     def fit(

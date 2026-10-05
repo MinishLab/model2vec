@@ -139,6 +139,7 @@ NON_HEAD_PARAMETERS = {
     "token_mapping",
     "weights",
     "max_length",
+    "kwargs",
 }
 
 
@@ -147,7 +148,6 @@ NON_HEAD_PARAMETERS = {
 def test_loader_signature_matches_init(cls: type[BaseFinetuneable], loader_name: str) -> None:
     """Test that the loaders expose every constructor argument explicitly, with the constructor's defaults."""
     loader_parameters = inspect.signature(getattr(cls, loader_name)).parameters
-    assert not any(p.kind is inspect.Parameter.VAR_KEYWORD for p in loader_parameters.values())
 
     init_parameters = inspect.signature(cls.__init__).parameters
     expected = {name: p.default for name, p in init_parameters.items() if name not in NON_HEAD_PARAMETERS}
@@ -208,6 +208,46 @@ def test_from_pretrained_model_name_deprecated(
         cls.from_pretrained(model_name="fake/repo-id")
     mock_from_pretrained.assert_called_once_with("fake/repo-id", token=None)
     assert "The 'model_name' argument is deprecated" in caplog.text
+
+
+class _CustomClassifier(StaticModelForClassification):
+    def __init__(self, *, extra: str = "default", **kwargs: Any) -> None:
+        """Initialize a classifier with an extra constructor argument."""
+        self.extra = extra
+        super().__init__(**kwargs)
+
+
+@pytest.mark.parametrize("loader_name", ["from_pretrained", "from_static_model"])
+def test_loader_forwards_extra_arguments_to_constructor(
+    loader_name: str, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Test that the loaders pass arguments they do not know on to a subclass constructor."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with patch("model2vec.train.base.StaticModel.from_pretrained", return_value=model):
+        if loader_name == "from_pretrained":
+            s = _CustomClassifier.from_pretrained("fake/repo-id", extra="custom", hidden_dim=3)
+        else:
+            s = _CustomClassifier.from_static_model(model=model, extra="custom", hidden_dim=3)
+    assert s.extra == "custom"
+    assert s.hidden_dim == 3
+
+
+@pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
+def test_loader_rejects_unknown_arguments(
+    cls: type[BaseFinetuneable], mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Test that an argument the constructor does not know is rejected."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with pytest.raises(TypeError, match="n_hidden"):
+        cls.from_static_model(model=model, n_hidden=3)
+
+
+def test_from_pretrained_empty_model_name_ignored(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test that an empty model_name does not override path."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with patch("model2vec.train.base.StaticModel.from_pretrained", return_value=model) as mock_from_pretrained:
+        StaticModelForClassification.from_pretrained(model_name="")
+    mock_from_pretrained.assert_called_once_with("minishlab/potion-base-32m", token=None)
 
 
 def test_init_classifier_from_model_w(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:

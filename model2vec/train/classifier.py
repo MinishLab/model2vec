@@ -126,6 +126,7 @@ class StaticModelForClassification(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        **kwargs: Any,
     ) -> T:
         """Load a classifier from a pretrained model2vec model.
 
@@ -141,6 +142,7 @@ class StaticModelForClassification(BaseFinetuneable):
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized classifier.
         """
         model = _load_static_model(path, token=token, model_name=model_name)
@@ -154,6 +156,7 @@ class StaticModelForClassification(BaseFinetuneable):
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            **kwargs,
         )
 
     @classmethod
@@ -169,6 +172,7 @@ class StaticModelForClassification(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        **kwargs: Any,
     ) -> T:
         """Load a classifier from a static model.
 
@@ -182,6 +186,7 @@ class StaticModelForClassification(BaseFinetuneable):
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized classifier.
         """
         return cls(
@@ -192,6 +197,7 @@ class StaticModelForClassification(BaseFinetuneable):
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            **kwargs,
         )
 
     @property

@@ -182,6 +182,7 @@ class BaseFinetuneable(nn.Module):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        **kwargs: Any,
     ) -> T:
         """Load the model from a pretrained model2vec model.
 
@@ -197,6 +198,7 @@ class BaseFinetuneable(nn.Module):
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
         model = _load_static_model(path, token=token, model_name=model_name)
@@ -210,6 +212,7 @@ class BaseFinetuneable(nn.Module):
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            **kwargs,
         )
 
     @classmethod
@@ -225,6 +228,7 @@ class BaseFinetuneable(nn.Module):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        **kwargs: Any,
     ) -> T:
         """Load the model from a static model.
 
@@ -238,6 +242,7 @@ class BaseFinetuneable(nn.Module):
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
         return cls(
@@ -248,6 +253,7 @@ class BaseFinetuneable(nn.Module):
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            **kwargs,
         )
 
     def _apply_token_dropout(self, keep_mask: torch.Tensor) -> torch.Tensor:
@@ -553,7 +559,7 @@ def _load_static_model(path: PathLike, *, token: str | None, model_name: PathLik
     :param model_name: Deprecated alias for `path`. If given, it overrides `path`.
     :return: The loaded static model.
     """
-    if model_name is not None:
+    if model_name:
         logger.warning("The 'model_name' argument is deprecated. Use 'path' instead.")
         path = model_name
     return StaticModel.from_pretrained(path, token=token)

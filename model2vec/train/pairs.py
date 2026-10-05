@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import numpy as np
 import torch
@@ -119,6 +119,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        **kwargs: Any,
     ) -> T:
         """Load the model from a pretrained model2vec model.
 
@@ -135,6 +136,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
         model = _load_static_model(path, token=token, model_name=model_name)
@@ -148,6 +150,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            **kwargs,
         )
 
     @classmethod
@@ -163,6 +166,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool = False,
+        **kwargs: Any,
     ) -> T:
         """Load the model from a static model.
 
@@ -177,6 +181,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the learned token weights.
+        :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
         return cls(
@@ -187,6 +192,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
+            **kwargs,
         )
 
     def forward(  # type: ignore[override]
