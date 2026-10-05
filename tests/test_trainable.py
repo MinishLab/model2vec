@@ -494,14 +494,25 @@ def test_max_length_is_not_capped_by_the_static_model(mock_vectors: np.ndarray, 
 
 
 @pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
+@pytest.mark.parametrize(
+    "kwargs, expected_max_length, expected_tokens",
+    [({}, 2, 2), ({"max_length": None}, None, 6), ({"max_length": 5}, 5, 5)],
+)
 def test_from_static_model_max_length_resolution(
-    cls: type[BaseFinetuneable], mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+    cls: type[BaseFinetuneable],
+    kwargs: dict[str, Any],
+    expected_max_length: int | None,
+    expected_tokens: int,
+    mock_vectors: np.ndarray,
+    mock_tokenizer: Tokenizer,
 ) -> None:
     """Unset inherits the static model's `max_length`, None disables truncation, and an int is used as is."""
     static = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, max_length=2)
-    assert cls.from_static_model(model=static).max_length == 2
-    assert cls.from_static_model(model=static, max_length=None).max_length is None
-    assert cls.from_static_model(model=static, max_length=5).max_length == 5
+    texts = ["word1 word2 word3 word1 word2 word3"]
+    s = cls.from_static_model(model=static, **kwargs)
+    assert s.max_length == expected_max_length
+    assert [len(row) for row in s._tokenize_ids(texts)] == [expected_tokens]
+    assert len(s.to_static_model().tokenize(texts)[0]) == expected_tokens
 
 
 def test_predict(mock_trained_pipeline: StaticModelForClassification) -> None:
