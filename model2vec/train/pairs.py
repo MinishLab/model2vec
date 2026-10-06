@@ -66,7 +66,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int | None = None,
-        pad_id: int | None = None,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
@@ -82,7 +81,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             dimension, the model has no head, and the embeddings are used as is.
         :param hidden_dim: The hidden dimension of the head.
         :param out_dim: The output embedding dimension. If None, defaults to the input embedding dimension.
-        :param pad_id: Deprecated and ignored.
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
         :param weights: The token weights of the model. If None and `freeze_weights` is not False, the model has
             no token weights and takes the unweighted mean of the token embeddings. If None and `freeze_weights`
@@ -96,7 +94,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         super().__init__(
             vectors=vectors,
             out_dim=out_dim if out_dim is not None else vectors.shape[1],
-            pad_id=pad_id,
             tokenizer=tokenizer,
             token_mapping=token_mapping,
             weights=weights,
@@ -115,7 +112,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         *,
         token: str | None = None,
         model_name: PathLike | None = None,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
@@ -130,7 +126,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
-        :param pad_token: Deprecated and ignored.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
@@ -147,7 +142,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         model = _load_static_model(path, token=token, model_name=model_name)
         return cls.from_static_model(
             model=model,
-            pad_token=pad_token,
             max_length=max_length,
             n_layers=n_layers,
             hidden_dim=hidden_dim,
@@ -163,7 +157,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         cls: type[T],
         *,
         model: StaticModel,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
@@ -176,7 +169,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         """Load the model from a static model.
 
         :param model: The static model to load from.
-        :param pad_token: Deprecated and ignored.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
@@ -191,7 +183,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :return: The initialized model.
         """
         return cls(
-            **_static_model_arguments(model, pad_token=pad_token, max_length=max_length),
+            **_static_model_arguments(model, max_length=max_length),
             n_layers=n_layers,
             hidden_dim=hidden_dim,
             out_dim=out_dim,

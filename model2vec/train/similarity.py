@@ -74,7 +74,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int = 2,
-        pad_id: int | None = None,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
@@ -86,7 +85,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         super().__init__(
             vectors=vectors,
             out_dim=out_dim,
-            pad_id=pad_id,
             tokenizer=tokenizer,
             token_mapping=token_mapping,
             weights=weights,
@@ -105,7 +103,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         *,
         token: str | None = None,
         model_name: PathLike | None = None,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
@@ -120,7 +117,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
-        :param pad_token: Deprecated and ignored.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
@@ -136,7 +132,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         model = _load_static_model(path, token=token, model_name=model_name)
         return cls.from_static_model(
             model=model,
-            pad_token=pad_token,
             max_length=max_length,
             n_layers=n_layers,
             hidden_dim=hidden_dim,
@@ -152,7 +147,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         cls: type[T],
         *,
         model: StaticModel,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
@@ -165,7 +159,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         """Load the model from a static model.
 
         :param model: The static model to load from.
-        :param pad_token: Deprecated and ignored.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
@@ -179,7 +172,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :return: The initialized model.
         """
         return cls(
-            **_static_model_arguments(model, pad_token=pad_token, max_length=max_length),
+            **_static_model_arguments(model, max_length=max_length),
             n_layers=n_layers,
             hidden_dim=hidden_dim,
             out_dim=out_dim,

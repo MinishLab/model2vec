@@ -129,10 +129,8 @@ NON_HEAD_PARAMETERS = {
     "token",
     "model_name",
     "model",
-    "pad_token",
     "vectors",
     "tokenizer",
-    "pad_id",
     "token_mapping",
     "weights",
     "max_length",
@@ -273,31 +271,6 @@ def test_unfrozen_weights_start_at_one(mock_vectors: np.ndarray, mock_tokenizer:
     batch = TokenBatch.from_token_ids([[1, 2, 3], [4], []])
     with torch.no_grad():
         assert torch.allclose(weighted._encode(batch), unweighted._encode(batch))
-
-
-@pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
-def test_pad_arguments_are_deprecated(
-    cls: type[BaseFinetuneable],
-    mock_vectors: np.ndarray,
-    mock_tokenizer: Tokenizer,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Passing `pad_token` or `pad_id` logs a deprecation warning and has no effect."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
-    with caplog.at_level(logging.WARNING, logger="model2vec.train.base"):
-        s = cls.from_static_model(model=model, pad_token="[BRR]")
-    assert "The 'pad_token' argument is deprecated and ignored." in caplog.text
-    assert not hasattr(s, "pad_id")
-
-    caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="model2vec.train.base"):
-        cls(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, pad_id=5)
-    assert "The 'pad_id' argument is deprecated and ignored." in caplog.text
-
-    caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="model2vec.train.base"):
-        cls.from_static_model(model=model)
-    assert "deprecated" not in caplog.text
 
 
 def _sequences(batch: TokenBatch) -> list[list[int]]:

@@ -46,7 +46,6 @@ class BaseFinetuneable(nn.Module):
         hidden_dim: int = 256,
         n_layers: int = 0,
         out_dim: int = 2,
-        pad_id: int | None = None,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
@@ -62,7 +61,6 @@ class BaseFinetuneable(nn.Module):
         :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
             dimension, the model has no head and the embeddings are used as is.
         :param out_dim: The output dimension of the head.
-        :param pad_id: Deprecated and ignored.
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
         :param weights: The token weights of the model. If None and `freeze_weights` is not False, the model has
             no token weights and takes the unweighted mean of the token embeddings. If None and `freeze_weights`
@@ -75,8 +73,6 @@ class BaseFinetuneable(nn.Module):
             Matches `StaticModel.max_length`, defaulting to 512.
         """
         super().__init__()
-        if pad_id is not None:
-            logger.warning("The 'pad_id' argument is deprecated and ignored.")
         self.out_dim = out_dim
         self.embed_dim = vectors.shape[1]
         self.hidden_dim = hidden_dim
@@ -193,7 +189,6 @@ class BaseFinetuneable(nn.Module):
         *,
         token: str | None = None,
         model_name: PathLike | None = None,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 0,
         hidden_dim: int = 256,
@@ -208,7 +203,6 @@ class BaseFinetuneable(nn.Module):
         :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
-        :param pad_token: Deprecated and ignored.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head.
@@ -224,7 +218,6 @@ class BaseFinetuneable(nn.Module):
         model = _load_static_model(path, token=token, model_name=model_name)
         return cls.from_static_model(
             model=model,
-            pad_token=pad_token,
             max_length=max_length,
             n_layers=n_layers,
             hidden_dim=hidden_dim,
@@ -240,7 +233,6 @@ class BaseFinetuneable(nn.Module):
         cls: type[T],
         *,
         model: StaticModel,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 0,
         hidden_dim: int = 256,
@@ -253,7 +245,6 @@ class BaseFinetuneable(nn.Module):
         """Load the model from a static model.
 
         :param model: The static model to load from.
-        :param pad_token: Deprecated and ignored.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head.
@@ -267,7 +258,7 @@ class BaseFinetuneable(nn.Module):
         :return: The initialized model.
         """
         return cls(
-            **_static_model_arguments(model, pad_token=pad_token, max_length=max_length),
+            **_static_model_arguments(model, max_length=max_length),
             n_layers=n_layers,
             hidden_dim=hidden_dim,
             out_dim=out_dim,
@@ -580,19 +571,14 @@ def _load_static_model(path: PathLike, *, token: str | None, model_name: PathLik
     return StaticModel.from_pretrained(path, token=token)
 
 
-def _static_model_arguments(
-    model: StaticModel, *, pad_token: str | None, max_length: int | None | _UnsetType
-) -> dict[str, Any]:
+def _static_model_arguments(model: StaticModel, *, max_length: int | None | _UnsetType) -> dict[str, Any]:
     """Derive the constructor arguments of a finetuneable model from a static model.
 
     :param model: The static model to derive the arguments from.
-    :param pad_token: Deprecated and ignored.
     :param max_length: The default maximum sequence length to use for tokenization. If unset, the
         static model's `max_length` is used. If None, no truncation is done.
     :return: The constructor arguments.
     """
-    if pad_token is not None:
-        logger.warning("The 'pad_token' argument is deprecated and ignored.")
     model.embedding = np.nan_to_num(model.embedding)
     weights = torch.from_numpy(model.weights) if model.weights is not None else None
     token_mapping = model.token_mapping.tolist() if model.token_mapping is not None else None
