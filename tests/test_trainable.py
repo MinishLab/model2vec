@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 import torch
 from datasets import Dataset, DatasetDict, Features, Sequence, Value
-from skeletoken import TokenizerModel
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import Whitespace
@@ -34,7 +33,6 @@ from model2vec.train.regression import StaticModelForRegression
 from model2vec.train.similarity import StaticModelForSimilarity, _vector_dim
 from model2vec.train.trainer import _resolve_max_epochs, resolve_device, run_training_loop
 from model2vec.train.utils import (
-    get_probable_pad_token_id,
     seed_everything,
     split_indices,
 )
@@ -60,9 +58,7 @@ def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: T
 def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test successful initialization of the base class."""
     vectors_torched = torch.from_numpy(mock_vectors)
-    s = BaseFinetuneable(
-        vectors=vectors_torched, tokenizer=mock_tokenizer, hidden_dim=256, out_dim=3, n_layers=0, pad_id=0
-    )
+    s = BaseFinetuneable(vectors=vectors_torched, tokenizer=mock_tokenizer, hidden_dim=256, out_dim=3, n_layers=0)
     assert s.vectors.shape == mock_vectors.shape
     assert s.w is None
 
@@ -279,19 +275,29 @@ def test_unfrozen_weights_start_at_one(mock_vectors: np.ndarray, mock_tokenizer:
         assert torch.allclose(weighted._encode(batch), unweighted._encode(batch))
 
 
-def test_pad_token(mock_tokenizer: Tokenizer) -> None:
-    """Test initializion from a static model."""
-    tokenizer_model = TokenizerModel.from_tokenizer(mock_tokenizer)
-    tokenizer_model.pad_token = "[HELLO]"
-    tokenizer = tokenizer_model.to_tokenizer()
-    vectors = np.random.RandomState().randn(6, 10)
-    model = StaticModel(vectors=vectors, tokenizer=tokenizer)
-    s = StaticModelForClassification.from_static_model(model=model, pad_token="[HELLO]")
-    assert s.w is None
-    assert s.pad_id == 5
+@pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
+def test_pad_arguments_are_deprecated(
+    cls: type[BaseFinetuneable],
+    mock_vectors: np.ndarray,
+    mock_tokenizer: Tokenizer,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Passing `pad_token` or `pad_id` logs a deprecation warning and has no effect."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with caplog.at_level(logging.WARNING, logger="model2vec.train.base"):
+        s = cls.from_static_model(model=model, pad_token="[BRR]")
+    assert "The 'pad_token' argument is deprecated and ignored." in caplog.text
+    assert not hasattr(s, "pad_id")
 
-    with pytest.raises(KeyError):
-        StaticModelForClassification.from_static_model(model=model, pad_token="[BRR]")
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="model2vec.train.base"):
+        cls(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, pad_id=5)
+    assert "The 'pad_id' argument is deprecated and ignored." in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="model2vec.train.base"):
+        cls.from_static_model(model=model)
+    assert "deprecated" not in caplog.text
 
 
 def _sequences(batch: TokenBatch) -> list[list[int]]:
@@ -971,52 +977,6 @@ def test_evaluate(mock_trained_pipeline: StaticModelForClassification) -> None:
         else:
             # Ignore the type error since we don't support int labels in our typing, but the code does
             mock_trained_pipeline.evaluate(["dog cat", "dog"], [1, 1])  # type: ignore
-
-
-def test_get_probable_pad_token_id(mock_tokenizer: Tokenizer, caplog: pytest.LogCaptureFixture) -> None:
-    """Test loading from a static model with a pad token."""
-    tokenizer_model = TokenizerModel.from_tokenizer(mock_tokenizer)
-    t = tokenizer_model.to_tokenizer()
-    token_id = get_probable_pad_token_id(t)
-    assert token_id == 0
-
-    # Adds new token
-    tokenizer_model.pad_token = "haha"
-    t = tokenizer_model.to_tokenizer()
-    token_id = get_probable_pad_token_id(t)
-    assert token_id == 5
-
-    tokenizer_model.pad_token = "word1"
-    t = tokenizer_model.to_tokenizer()
-    token_id = get_probable_pad_token_id(t)
-    assert token_id == 1
-
-    # Remove padding token
-    tokenizer_model.pad_token = None
-    t = tokenizer_model.to_tokenizer()
-    token_id = get_probable_pad_token_id(t)
-    assert token_id == tokenizer_model.vocabulary["[PAD]"]
-
-    tokenizer_model = tokenizer_model.remove_token_from_vocabulary("[PAD]")
-    t = tokenizer_model.to_tokenizer()
-    with caplog.at_level(logging.WARNING, logger="model2vec.train.utils"):
-        token_id = get_probable_pad_token_id(t)
-    assert token_id == 0
-    assert "No known pad token found, using 0 as default" in caplog.text
-
-
-def test_get_probable_pad_token_id_through_static_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
-    """Test that a non-standard pad token survives StaticModel construction."""
-    tokenizer_model = TokenizerModel.from_tokenizer(mock_tokenizer)
-    tokenizer_model.pad_token = "word1"
-    pad_id = tokenizer_model.pad_token_id
-    assert pad_id != 0
-
-    t = tokenizer_model.to_tokenizer()
-    model = StaticModel(vectors=mock_vectors, tokenizer=t)
-
-    assert model.tokenizer.padding is not None
-    assert get_probable_pad_token_id(model.tokenizer) == pad_id
 
 
 def test_resolve_class_weight(mock_trained_pipeline: StaticModelForClassification) -> None:

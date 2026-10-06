@@ -84,7 +84,7 @@ class StaticModelForClassification(BaseFinetuneable):
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int = 2,
-        pad_id: int = 0,
+        pad_id: int | None = None,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
@@ -134,7 +134,7 @@ class StaticModelForClassification(BaseFinetuneable):
         :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
-        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
+        :param pad_token: Deprecated and ignored.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
@@ -179,7 +179,7 @@ class StaticModelForClassification(BaseFinetuneable):
         """Load a classifier from a static model.
 
         :param model: The static model to load from.
-        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
+        :param pad_token: Deprecated and ignored.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
