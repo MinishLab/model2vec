@@ -79,7 +79,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a standard similarity model."""
@@ -112,7 +112,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         **kwargs: Any,
     ) -> T:
         """Load the model from a pretrained model2vec model.
@@ -128,7 +128,8 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param out_dim: The output dimension of the head. This is reset when calling `fit`.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
@@ -158,7 +159,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         **kwargs: Any,
     ) -> T:
         """Load the model from a static model.
@@ -172,7 +173,8 @@ class StaticModelForSimilarity(BaseFinetuneable):
         :param out_dim: The output dimension of the head. This is reset when calling `fit`.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """

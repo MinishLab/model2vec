@@ -25,6 +25,7 @@ from model2vec.train.dataset import (
     ColumnRows,
     PairDataset,
     TextDataset,
+    TokenBatch,
     _column_strata,
     iter_column,
 )
@@ -45,7 +46,7 @@ def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: T
     vectors_torched = torch.from_numpy(mock_vectors)
     s = StaticModelForClassification(vectors=vectors_torched, tokenizer=mock_tokenizer, n_layers=n_layers)
     assert s.vectors.shape == mock_vectors.shape
-    assert s.w.shape[0] == mock_vectors.shape[0]
+    assert s.w is None
     assert list(s.classes) == s.classes_
     assert list(s.classes) == ["0", "1"]
 
@@ -63,7 +64,7 @@ def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) ->
         vectors=vectors_torched, tokenizer=mock_tokenizer, hidden_dim=256, out_dim=3, n_layers=0, pad_id=0
     )
     assert s.vectors.shape == mock_vectors.shape
-    assert s.w.shape[0] == mock_vectors.shape[0]
+    assert s.w is None
 
     head = s.construct_head()
     assert head[0].in_features == mock_vectors.shape[1]
@@ -95,13 +96,13 @@ def test_init_base_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenize
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
     s = BaseFinetuneable.from_static_model(model=model)
     assert s.vectors.shape == mock_vectors.shape
-    assert s.w.shape[0] == mock_vectors.shape[0]
+    assert s.w is None
 
     with TemporaryDirectory() as temp_dir:
         model.save_pretrained(temp_dir)
         s = BaseFinetuneable.from_pretrained(path=temp_dir)
         assert s.vectors.shape == mock_vectors.shape
-        assert s.w.shape[0] == mock_vectors.shape[0]
+        assert s.w is None
 
 
 def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -109,13 +110,13 @@ def test_init_classifier_from_model(mock_vectors: np.ndarray, mock_tokenizer: To
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
     s = StaticModelForClassification.from_static_model(model=model)
     assert s.vectors.shape == mock_vectors.shape
-    assert s.w.shape[0] == mock_vectors.shape[0]
+    assert s.w is None
 
     with TemporaryDirectory() as temp_dir:
         model.save_pretrained(temp_dir)
         s = StaticModelForClassification.from_pretrained(path=temp_dir)
         assert s.vectors.shape == mock_vectors.shape
-        assert s.w.shape[0] == mock_vectors.shape[0]
+        assert s.w is None
 
 
 FINETUNEABLE_CLASSES = [
@@ -160,7 +161,7 @@ def test_from_pretrained_explicit_arguments(
     cls: type[BaseFinetuneable], mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
 ) -> None:
     """Test that from_pretrained passes each argument on to the model."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, weights=np.ones(len(mock_vectors)))
     with TemporaryDirectory() as temp_dir:
         model.save_pretrained(temp_dir)
         s = cls.from_pretrained(
@@ -256,9 +257,26 @@ def test_init_classifier_from_model_w(mock_vectors: np.ndarray, mock_tokenizer: 
     s = StaticModelForClassification.from_static_model(model=model)
     assert s._weights is not None
     assert torch.all(s._weights == torch.ones(len(mock_vectors)))
+    assert s.freeze_weights is None
+    assert s.w is not None and s.w.requires_grad
     w = s.construct_weights()
     assert w.shape[0] == mock_vectors.shape[0]
     assert torch.all(w == torch.ones(len(mock_vectors)))
+
+
+def test_unfrozen_weights_start_at_one(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Without given weights, unfrozen token weights are initialized to 1, which encodes like the plain mean."""
+    vectors = torch.from_numpy(mock_vectors).float()
+    unweighted = StaticModelForClassification(vectors=vectors, tokenizer=mock_tokenizer)
+    weighted = StaticModelForClassification(vectors=vectors, tokenizer=mock_tokenizer, freeze_weights=False)
+    assert unweighted.w is None
+    assert weighted.w is not None
+    assert weighted.w.requires_grad
+    assert torch.equal(weighted.w, torch.ones(len(mock_vectors)))
+
+    batch = TokenBatch.from_token_ids([[1, 2, 3], [4], []])
+    with torch.no_grad():
+        assert torch.allclose(weighted._encode(batch), unweighted._encode(batch))
 
 
 def test_pad_token(mock_tokenizer: Tokenizer) -> None:
@@ -269,42 +287,65 @@ def test_pad_token(mock_tokenizer: Tokenizer) -> None:
     vectors = np.random.RandomState().randn(6, 10)
     model = StaticModel(vectors=vectors, tokenizer=tokenizer)
     s = StaticModelForClassification.from_static_model(model=model, pad_token="[HELLO]")
-    assert s.w.shape[0] == vectors.shape[0]
+    assert s.w is None
     assert s.pad_id == 5
 
     with pytest.raises(KeyError):
         StaticModelForClassification.from_static_model(model=model, pad_token="[BRR]")
 
 
+def _sequences(batch: TokenBatch) -> list[list[int]]:
+    return [ids.tolist() for ids in batch.ids.split(batch.lengths.tolist())]
+
+
 def test_encode(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the encode function."""
-    result = mock_trained_pipeline._encode(torch.tensor([[0, 1], [1, 0]]).long())
+    result = mock_trained_pipeline._encode(TokenBatch.from_token_ids([[0, 1], [1, 0]]))
     assert result.shape == (2, 12)
     assert torch.allclose(result[0], result[1])
+
+
+def test_encode_with_weights(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """With token weights, a text is encoded as the weighted sum of its tokens divided by its length."""
+    weights = torch.rand(len(mock_vectors))
+    vectors = torch.from_numpy(mock_vectors).float()
+    s = StaticModelForClassification(vectors=vectors, tokenizer=mock_tokenizer, weights=weights, normalize=False)
+    assert s.w is not None
+    with torch.no_grad():
+        result = s._encode(TokenBatch.from_token_ids([[1, 2], [3], []]))
+    expected_first = (vectors[1] * weights[1] + vectors[2] * weights[2]) / 2
+    assert torch.allclose(result[0], expected_first)
+    assert torch.allclose(result[1], vectors[3] * weights[3])
+    assert torch.equal(result[2], torch.zeros(vectors.shape[1]))
 
 
 def test_tokenize(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Test the encode function."""
     result = mock_trained_pipeline.tokenize(["dog dog", "cat"])
-    assert result.shape == torch.Size([2, 2])
-    assert result[1, 1] == 0
+    assert len(result) == 2
+    assert result.lengths.tolist() == [2, 1]
 
 
 def test_device(mock_trained_pipeline: StaticModelForClassification) -> None:
     """Get the device."""
     assert mock_trained_pipeline.device == torch.device(type="cpu")  # type: ignore  # False positive
-    assert mock_trained_pipeline.device == mock_trained_pipeline.w.device
+    assert mock_trained_pipeline.device == mock_trained_pipeline.token_mapping.device
 
 
-def test_conversion(mock_trained_pipeline: StaticModelForClassification) -> None:
-    """Test the conversion to numpy."""
-    staticmodel = mock_trained_pipeline.to_static_model()
+@pytest.mark.parametrize("with_weights", [False, True])
+def test_conversion(with_weights: bool, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test the conversion to a static model, with and without token weights."""
+    weights = torch.rand(len(mock_vectors)) if with_weights else None
+    s = StaticModelForClassification(
+        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, weights=weights
+    )
+    staticmodel = s.to_static_model()
     with torch.no_grad():
-        result_1 = mock_trained_pipeline._encode(torch.tensor([[1, 2], [2, 1]]).long()).numpy()
+        result_1 = s._encode(TokenBatch.from_token_ids([[1, 2], [2, 1]])).numpy()
     result_2 = staticmodel.embedding[[[1, 2], [2, 1]]].mean(0)
     result_2 /= np.linalg.norm(result_2, axis=1, keepdims=True)
 
-    assert np.allclose(result_1, result_2)
+    assert np.allclose(result_1, result_2, atol=1e-6)
 
 
 def test_token_dropout_default_is_zero(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -318,8 +359,8 @@ def test_apply_token_dropout_noop_in_eval(mock_vectors: np.ndarray, mock_tokeniz
     s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     s.token_dropout = 0.9
     s.eval()
-    mask = torch.ones(4, 5)
-    assert torch.equal(s._apply_token_dropout(mask), mask)
+    batch = TokenBatch.from_token_ids([[1, 2, 3, 4, 5]] * 4)
+    assert s._apply_token_dropout(batch) is batch
 
 
 def test_apply_token_dropout_noop_when_rate_is_zero(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -327,8 +368,8 @@ def test_apply_token_dropout_noop_when_rate_is_zero(mock_vectors: np.ndarray, mo
     s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     s.train()
     s.token_dropout = 0.0
-    mask = torch.ones(4, 5)
-    assert torch.equal(s._apply_token_dropout(mask), mask)
+    batch = TokenBatch.from_token_ids([[1, 2, 3, 4, 5]] * 4)
+    assert s._apply_token_dropout(batch) is batch
 
 
 def test_apply_token_dropout_never_empties_a_nonempty_row(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -336,12 +377,14 @@ def test_apply_token_dropout_never_empties_a_nonempty_row(mock_vectors: np.ndarr
     s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     s.train()
     s.token_dropout = 0.99
-    mask = torch.tensor([[1.0, 1.0, 1.0, 1.0], [1.0, 0.0, 0.0, 0.0]])
+    batch = TokenBatch.from_token_ids([[1, 2, 3, 4], [], [5]])
 
     torch.manual_seed(0)
     for _ in range(20):
-        out = s._apply_token_dropout(mask)
-        assert (out.sum(dim=1) >= 1).all()
+        out = s._apply_token_dropout(batch)
+        sequences = _sequences(out)
+        assert len(sequences[0]) == 1 and sequences[0][0] in [1, 2, 3, 4]
+        assert sequences[1:] == [[], [5]]
 
 
 def test_apply_token_dropout_leaves_fully_padded_rows_untouched(
@@ -351,12 +394,12 @@ def test_apply_token_dropout_leaves_fully_padded_rows_untouched(
     s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     s.train()
     s.token_dropout = 0.99
-    mask = torch.zeros(1, 4)
+    batch = TokenBatch.from_token_ids([[], []])
 
     torch.manual_seed(0)
     for _ in range(20):
-        out = s._apply_token_dropout(mask)
-        assert out.sum() == 0
+        out = s._apply_token_dropout(batch)
+        assert _sequences(out) == [[], []]
 
 
 def test_apply_token_dropout_drops_some_tokens(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -364,11 +407,12 @@ def test_apply_token_dropout_drops_some_tokens(mock_vectors: np.ndarray, mock_to
     s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     s.train()
     s.token_dropout = 0.5
-    mask = torch.ones(1, 1000)
+    batch = TokenBatch.from_token_ids([list(range(1000))])
 
     torch.manual_seed(0)
-    out = s._apply_token_dropout(mask)
-    assert 0 < out.sum().item() < mask.sum().item()
+    out = s._apply_token_dropout(batch)
+    assert 0 < len(out.ids) < len(batch.ids)
+    assert out.offsets.tolist() == [0]
 
 
 def test_fit_invalid_token_dropout_raises() -> None:
@@ -434,15 +478,15 @@ def test_column_rows() -> None:
         ColumnRows(text=["a"], label=torch.arange(2))
 
 
-def test_training_batch_padding_is_masked(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
-    """Training batches should pad with the model's pad id, so padding stays masked and out of the mean."""
-    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, pad_id=1)
+def test_training_batch_matches_tokenize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Training batches hold the same tokens as `tokenize`, and a text encodes the same regardless of its batch."""
+    s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     texts = ["word2", "word2 word3"]
 
     dataset = s._text_dataset(ColumnRows(text=texts, label=["0", "1"]))
     batch, _ = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
 
-    assert torch.equal(batch, s.tokenize(texts))
+    assert _sequences(batch) == _sequences(s.tokenize(texts))
     with torch.no_grad():
         assert torch.allclose(s._encode(batch)[0], s._encode(s.tokenize(texts[:1]))[0])
 
@@ -454,7 +498,7 @@ def test_unknown_tokens_are_dropped(mock_vectors: np.ndarray, mock_tokenizer: To
     texts = ["word1 unknownword", "unknownword word2 otherunknown"]
     expected = static.tokenize(texts)
 
-    assert [row[row != s.pad_id].tolist() for row in s.tokenize(texts)] == expected
+    assert _sequences(s.tokenize(texts)) == expected
     assert s._tokenize_ids(texts) == expected
 
 
@@ -472,7 +516,7 @@ def test_tokenize_without_unk_token(mock_vectors: np.ndarray) -> None:
     texts = ["word1 word2", "word3 word1 word2"]
     expected = static.tokenize(texts)
 
-    assert [row[row != s.pad_id].tolist() for row in s.tokenize(texts)] == expected
+    assert _sequences(s.tokenize(texts)) == expected
     assert s._tokenize_ids(texts) == expected
 
 
@@ -483,14 +527,14 @@ def test_max_length_is_not_capped_by_the_static_model(mock_vectors: np.ndarray, 
     assert len(static.tokenize(texts)[0]) == 2
 
     s = StaticModelForClassification.from_static_model(model=static, max_length=4)
-    assert s.tokenize(texts).shape[1] == 4
+    assert s.tokenize(texts).lengths.tolist() == [4]
     assert [len(row) for row in s._tokenize_ids(texts)] == [4]
     assert len(s.to_static_model().tokenize(texts)[0]) == 4
 
     # The static model keeps its own setting, and the trainer keeps its own once the static model changes.
     assert len(static.tokenize(texts)[0]) == 2
     static.max_length = None
-    assert s.tokenize(texts).shape[1] == 4
+    assert s.tokenize(texts).lengths.tolist() == [4]
 
 
 @pytest.mark.parametrize("cls", FINETUNEABLE_CLASSES)
@@ -596,13 +640,12 @@ def test_pairdataset_init_incorrect() -> None:
 
 
 def test_pairdataset_collate() -> None:
-    """Batches should stack the two padded halves into a single (2, batch, seq_len) tensor."""
-    dataset = PairDataset(ColumnRows(text_a=[[1], [1, 2]], text_b=[[1, 2, 3], [1]]), _pretokenized, pad_id=0)
+    """Batches hold the first texts followed by the second texts, with a shared id for identical texts."""
+    dataset = PairDataset(ColumnRows(text_a=[[1], [1, 2]], text_b=[[1, 2, 3], [1]]), _pretokenized)
     batch, y = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
-    assert batch.shape == (2, 2, 3)
     assert torch.equal(y, torch.tensor([0, 1]))
-    assert torch.equal(batch[0], torch.tensor([[1, 0, 0], [1, 2, 0]]))
-    assert torch.equal(batch[1], torch.tensor([[1, 2, 3], [1, 0, 0]]))
+    assert _sequences(batch.tokens) == [[1], [1, 2], [1, 2, 3], [1]]
+    assert batch.text_ids.tolist() == [0, 1, 2, 0]
 
 
 def _distinct(n: int) -> torch.Tensor:

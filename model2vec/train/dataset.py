@@ -4,6 +4,8 @@ import logging
 from abc import ABC, abstractmethod
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from itertools import chain
 from typing import Any
 
 import numpy as np
@@ -12,7 +14,6 @@ import pyarrow.compute as pc
 import torch
 from datasets import Column
 from datasets import Dataset as HFDataset
-from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import BatchSampler, DataLoader, Dataset, RandomSampler, SequentialSampler
 
 logger = logging.getLogger(__name__)
@@ -215,17 +216,56 @@ class ColumnRows:
         }
 
 
+@dataclass(frozen=True)
+class TokenBatch:
+    """A batch of token id sequences, stored as one flat tensor of ids with the offset and length of each sequence."""
+
+    ids: torch.Tensor
+    offsets: torch.Tensor
+    lengths: torch.Tensor
+
+    @classmethod
+    def from_lengths(cls, ids: torch.Tensor, lengths: torch.Tensor) -> TokenBatch:
+        """Create a batch from a flat tensor of ids and the length of each sequence."""
+        return cls(ids, lengths.cumsum(0) - lengths, lengths)
+
+    @classmethod
+    def from_token_ids(cls, token_ids: Sequence[Sequence[int]]) -> TokenBatch:
+        """Flatten lists of token ids into a batch."""
+        lengths = np.fromiter(map(len, token_ids), dtype=np.int64, count=len(token_ids))
+        ids = np.fromiter(chain.from_iterable(token_ids), dtype=np.int64, count=int(lengths.sum()))
+        return cls.from_lengths(torch.from_numpy(ids), torch.from_numpy(lengths))
+
+    def __len__(self) -> int:
+        """Return the number of sequences."""
+        return len(self.lengths)
+
+    def to(self, device: torch.device | str) -> TokenBatch:
+        """Move the batch to a device."""
+        return TokenBatch(self.ids.to(device), self.offsets.to(device), self.lengths.to(device))
+
+
+@dataclass(frozen=True)
+class PairBatch:
+    """A batch of pairs: the first texts followed by the second texts, and an id per text that is shared by identical texts."""
+
+    tokens: TokenBatch
+    text_ids: torch.Tensor
+
+    def to(self, device: torch.device | str) -> PairBatch:
+        """Move the batch to a device."""
+        return PairBatch(self.tokens.to(device), self.text_ids.to(device))
+
+
 class _Batches(Dataset, ABC):
-    def __init__(self, rows: ColumnRows, indices: np.ndarray | None, pad_id: int) -> None:
+    def __init__(self, rows: ColumnRows, indices: np.ndarray | None) -> None:
         """A dataset that fetches rows and turns them into items per batch.
 
         :param rows: The rows to draw items from.
         :param indices: The indices of the rows that belong to this dataset. If None, all rows belong to it.
-        :param pad_id: The id used to pad batches. Must match the `pad_id` of the model being trained.
         """
         self.rows = rows
         self.indices = np.arange(len(rows)) if indices is None else indices
-        self.pad_id = pad_id
 
     def __len__(self) -> int:
         """Return the length of the dataset."""
@@ -244,7 +284,7 @@ class _Batches(Dataset, ABC):
         """Turn a batch of rows into items."""
 
     @abstractmethod
-    def collate_fn(self, batch: list[Any]) -> tuple[torch.Tensor, torch.Tensor]:
+    def collate_fn(self, batch: list[Any]) -> tuple[TokenBatch | PairBatch, torch.Tensor]:
         """Collate a batch of items into model inputs and targets."""
 
     def _drop_last(self, batch_size: int) -> bool:
@@ -268,7 +308,6 @@ class TextDataset(_Batches):
         tokenize: Callable[[list[str]], list[list[int]]],
         to_targets: Callable[[Any], torch.Tensor],
         indices: np.ndarray | None = None,
-        pad_id: int = 0,
     ) -> None:
         """A dataset of labeled texts, which are tokenized per batch.
 
@@ -276,9 +315,8 @@ class TextDataset(_Batches):
         :param tokenize: Turns a batch of texts into lists of token ids.
         :param to_targets: Turns a batch of labels into a tensor of targets.
         :param indices: The indices of the rows that belong to this dataset. If None, all rows belong to it.
-        :param pad_id: The id used to pad batches. Must match the `pad_id` of the model being trained.
         """
-        super().__init__(rows, indices, pad_id)
+        super().__init__(rows, indices)
         self.tokenize = tokenize
         self.to_targets = to_targets
 
@@ -286,14 +324,10 @@ class TextDataset(_Batches):
         """Tokenize the texts and turn the labels into targets."""
         return list(zip(self.tokenize(rows[TEXT_COLUMN]), self.to_targets(rows[LABEL_COLUMN])))
 
-    def collate_fn(self, batch: list[tuple[list[int], torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
+    def collate_fn(self, batch: list[tuple[list[int], torch.Tensor]]) -> tuple[TokenBatch, torch.Tensor]:
         """Collate function."""
         texts, targets = zip(*batch)
-
-        tensors: list[torch.Tensor] = [torch.LongTensor(x) for x in texts]
-        padded = pad_sequence(tensors, batch_first=True, padding_value=self.pad_id)
-
-        return padded, torch.stack(targets)
+        return TokenBatch.from_token_ids(texts), torch.stack(targets)
 
 
 class PairDataset(_Batches):
@@ -302,36 +336,33 @@ class PairDataset(_Batches):
         rows: ColumnRows,
         tokenize: Callable[[list[str]], list[list[int]]],
         indices: np.ndarray | None = None,
-        pad_id: int = 0,
     ) -> None:
         """A dataset of aligned text pairs, which are tokenized per batch.
 
         :param rows: The pairs, in a `text_a` and a `text_b` column.
         :param tokenize: Turns a batch of texts into lists of token ids.
         :param indices: The indices of the rows that belong to this dataset. If None, all rows belong to it.
-        :param pad_id: The id used to pad batches. Must match the `pad_id` of the model being trained.
         """
-        super().__init__(rows, indices, pad_id)
+        super().__init__(rows, indices)
         self.tokenize = tokenize
 
     def _to_items(self, rows: Mapping[str, Any]) -> list[tuple[list[int], list[int]]]:
         """Tokenize both halves of each pair."""
         return list(zip(self.tokenize(rows[TEXT_A_COLUMN]), self.tokenize(rows[TEXT_B_COLUMN])))
 
-    def collate_fn(self, batch: list[tuple[list[int], list[int]]]) -> tuple[torch.Tensor, torch.Tensor]:
+    def collate_fn(self, batch: list[tuple[list[int], list[int]]]) -> tuple[PairBatch, torch.Tensor]:
         """Collate function.
 
-        Both halves are padded together so they end up with the same sequence length, then
-        stacked into a single (2, batch_size, seq_len) tensor. The targets are the index of each
-        pair's second text within the batch.
+        The first texts and the second texts are put into a single batch, first texts first. The targets
+        are the index of each pair's second text within the batch.
         """
         texts_a, texts_b = zip(*batch)
+        texts = (*texts_a, *texts_b)
+        ids_by_text: dict[tuple[int, ...], int] = {}
+        text_ids = [ids_by_text.setdefault(tuple(text), len(ids_by_text)) for text in texts]
 
-        tensors: list[torch.Tensor] = [torch.LongTensor(x) for x in (*texts_a, *texts_b)]
-        padded = pad_sequence(tensors, batch_first=True, padding_value=self.pad_id)
-        padded_a, padded_b = padded[: len(texts_a)], padded[len(texts_a) :]
-
-        return torch.stack([padded_a, padded_b]), torch.arange(len(texts_a))
+        pair_batch = PairBatch(TokenBatch.from_token_ids(texts), torch.tensor(text_ids, dtype=torch.int64))
+        return pair_batch, torch.arange(len(texts_a))
 
     def _drop_last(self, batch_size: int) -> bool:
         """Drop a final batch with a single pair, unless it is the only pair."""

@@ -11,12 +11,18 @@ from datasets import Column, DatasetDict, IterableColumn, IterableDataset, Itera
 from datasets import Dataset as HFDataset
 from tokenizers import Encoding, Tokenizer
 from torch import nn
-from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 
 from model2vec.inference import StaticModelPipeline
 from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel, _disable_padding, _get_unk_token_id
-from model2vec.train.dataset import ColumnRows, PairDataset, TextDataset, has_only_strings, has_transform
+from model2vec.train.dataset import (
+    ColumnRows,
+    PairDataset,
+    TextDataset,
+    TokenBatch,
+    has_only_strings,
+    has_transform,
+)
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
     MAX_VALIDATION_SIZE,
@@ -46,7 +52,7 @@ class BaseFinetuneable(nn.Module):
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a trainable StaticModel from a StaticModel.
@@ -59,10 +65,13 @@ class BaseFinetuneable(nn.Module):
         :param out_dim: The output dimension of the head.
         :param pad_id: The padding id. This is set to 0 in almost all model2vec models
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
-        :param weights: The weights of the model. If None, the weights are initialized to zeros.
+        :param weights: The token weights of the model. If None and `freeze_weights` is not False, the model has
+            no token weights and takes the unweighted mean of the token embeddings. If None and `freeze_weights`
+            is False, the token weights are initialized to 1.
         :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param max_length: The default maximum sequence length (in tokens) used to tokenize inputs.
             Matches `StaticModel.max_length`, defaulting to 512.
         """
@@ -91,9 +100,9 @@ class BaseFinetuneable(nn.Module):
             self.token_mapping = torch.arange(len(vectors), dtype=torch.int64)
         self.token_mapping = nn.Parameter(self.token_mapping, requires_grad=False)
         self.freeze = freeze
-        self.embeddings = nn.Embedding.from_pretrained(vectors.clone(), freeze=self.freeze, padding_idx=pad_id)
-        self.head = self.construct_head()
         self._weights = weights
+        self.embeddings = self.construct_embeddings()
+        self.head = self.construct_head()
         self.w = self.construct_weights()
         # Truncation happens here through `max_length`; a StaticModel's tokenizer carries its own setting.
         self.tokenizer = copy.deepcopy(tokenizer)
@@ -120,13 +129,24 @@ class BaseFinetuneable(nn.Module):
         """Turn a batch of labels, such as vectors, into a float tensor of targets."""
         return torch.as_tensor(labels, dtype=torch.float32)
 
-    def construct_weights(self) -> nn.Parameter:
-        """Construct the weights for the model."""
-        if self._weights is not None:
-            w = self._weights
+    @property
+    def _has_weights(self) -> bool:
+        """Whether the model has token weights: either given ones, or ones that are learned."""
+        return self._weights is not None or self.freeze_weights is False
+
+    def construct_embeddings(self) -> nn.EmbeddingBag:
+        """Construct the embeddings, which sum the weighted tokens if the model has weights, and average them otherwise."""
+        mode = "sum" if self._has_weights else "mean"
+        return nn.EmbeddingBag.from_pretrained(self.vectors.clone(), freeze=self.freeze, mode=mode)
+
+    def construct_weights(self) -> nn.Parameter | None:
+        """Construct the token weights for the model, or None if the model has no weights."""
+        if not self._has_weights:
+            return None
+        if self._weights is None:
+            w = torch.ones(len(self.token_mapping))
         else:
-            w = torch.ones(len(self.token_mapping)).float()
-            w[self.pad_id] = 0
+            w = self._weights.clone().float()
         return nn.Parameter(w, requires_grad=not self.freeze_weights)
 
     def construct_head(self) -> nn.Sequential:
@@ -162,9 +182,7 @@ class BaseFinetuneable(nn.Module):
     def _initialize(self) -> None:
         """Initialize the classifier for training."""
         self.head = self.construct_head()
-        self.embeddings = nn.Embedding.from_pretrained(
-            self.vectors.clone(), freeze=self.freeze, padding_idx=self.pad_id
-        )
+        self.embeddings = self.construct_embeddings()
         self.w = self.construct_weights()
         self.train()
 
@@ -182,7 +200,7 @@ class BaseFinetuneable(nn.Module):
         out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         **kwargs: Any,
     ) -> T:
         """Load the model from a pretrained model2vec model.
@@ -198,7 +216,8 @@ class BaseFinetuneable(nn.Module):
         :param out_dim: The output dimension of the head.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
@@ -228,7 +247,7 @@ class BaseFinetuneable(nn.Module):
         out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         **kwargs: Any,
     ) -> T:
         """Load the model from a static model.
@@ -242,7 +261,8 @@ class BaseFinetuneable(nn.Module):
         :param out_dim: The output dimension of the head.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
@@ -257,43 +277,39 @@ class BaseFinetuneable(nn.Module):
             **kwargs,
         )
 
-    def _apply_token_dropout(self, keep_mask: torch.Tensor) -> torch.Tensor:
-        """Randomly zero out a fraction of the kept tokens, leaving at least one token per sample.
+    def _apply_token_dropout(self, batch: TokenBatch) -> TokenBatch:
+        """Randomly drop a fraction of the tokens, leaving at least one token per non-empty sequence.
 
-        :param keep_mask: A 2D float tensor (batch, seq_len), 1 for real tokens and 0 for padding.
-        :return: `keep_mask` with a random subset of real tokens additionally zeroed out.
+        :param batch: The batch of token ids.
+        :return: The batch with a random subset of its tokens removed.
         """
         if not self.training or self.token_dropout <= 0:
-            return keep_mask
-        survives = torch.rand_like(keep_mask) >= self.token_dropout
-        dropped_mask = keep_mask * survives
-        needs_rescue = (dropped_mask.sum(dim=1) == 0) & (keep_mask.sum(dim=1) > 0)
-        if needs_rescue.any():
-            rescue_idx = keep_mask.argmax(dim=1)
-            dropped_mask[needs_rescue, rescue_idx[needs_rescue]] = 1.0
-        return dropped_mask
+            return batch
+        lengths = batch.lengths
+        sequence_of_token = torch.repeat_interleave(lengths)
+        keep = torch.rand(len(batch.ids), device=batch.ids.device) >= self.token_dropout
+        kept_lengths = torch.bincount(sequence_of_token[keep], minlength=len(batch))
+        needs_rescue = (kept_lengths == 0) & (lengths > 0)
+        keep[batch.offsets[needs_rescue]] = True
+        kept_lengths = kept_lengths + needs_rescue
+        return TokenBatch.from_lengths(batch.ids[keep], kept_lengths)
 
-    def _encode(self, input_ids: torch.Tensor) -> torch.Tensor:
+    def _encode(self, batch: TokenBatch) -> torch.Tensor:
         """A forward pass and mean pooling.
 
         This function is analogous to `StaticModel.encode`, but reimplemented to allow gradients
         to pass through.
 
-        :param input_ids: A 2D tensor of input ids. All input ids are have to be within bounds.
-        :return: The mean over the input ids, weighted by token weights.
+        :param batch: The batch of token ids. All token ids have to be within bounds.
+        :return: The mean over the token ids, weighted by token weights if the model has them.
         """
-        zeros = (input_ids != self.pad_id).float()
-        zeros = self._apply_token_dropout(zeros)
-        length = zeros.sum(1).clamp(min=1)
-        input_ids_embeddings = self.token_mapping[input_ids]
-        embedded = self.embeddings(input_ids_embeddings)
-
-        w = self.w[input_ids]
-        w = w * zeros
-        # Weigh each token
-        embedded = torch.bmm(w[:, None, :], embedded).squeeze(1)
-        # Mean pooling by dividing by the length
-        embedded = embedded / length[:, None]
+        batch = self._apply_token_dropout(batch)
+        embedding_ids = self.token_mapping[batch.ids]
+        if self.w is None:
+            embedded = self.embeddings(embedding_ids, batch.offsets)
+        else:
+            embedded = self.embeddings(embedding_ids, batch.offsets, per_sample_weights=self.w[batch.ids])
+            embedded = embedded / batch.lengths.clamp(min=1)[:, None]
 
         if self.normalize:
             return nn.functional.normalize(embedded)
@@ -313,20 +329,19 @@ class BaseFinetuneable(nn.Module):
 
         return np.concatenate(pred, axis=0)
 
-    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+    def forward(self, batch: TokenBatch) -> torch.Tensor:
         """Forward pass through the mean, and a classifier layer after."""
-        return self.head(self._encode(input_ids))
+        return self.head(self._encode(batch))
 
-    def tokenize(self, texts: list[str]) -> torch.Tensor:
-        """Tokenize a bunch of strings into a single padded 2D tensor.
+    def tokenize(self, texts: list[str]) -> TokenBatch:
+        """Tokenize a bunch of strings into a single batch of token ids.
 
         Note that this is not used during training.
 
         :param texts: The texts to tokenize.
-        :return: A 2D padded tensor
+        :return: The batch of token ids.
         """
-        encoded_ids: list[torch.Tensor] = [torch.LongTensor(token_ids) for token_ids in self._tokenize_ids(texts)]
-        return pad_sequence(encoded_ids, batch_first=True, padding_value=self.pad_id)
+        return TokenBatch.from_token_ids(self._tokenize_ids(texts))
 
     @property
     def device(self) -> torch.device:
@@ -336,13 +351,12 @@ class BaseFinetuneable(nn.Module):
     def to_static_model(self) -> StaticModel:
         """Convert the model to a static model."""
         with torch.no_grad():
-            emb = self.embeddings.weight
-            emb = emb.cpu().numpy()
-            w = self.w.cpu().numpy()
+            emb = self.embeddings.weight.cpu().numpy()
+            w = None if self.w is None else self.w.cpu().numpy()
 
-        # If the weights and emb are the same length, the model was not quantized before training.
-        if len(w) == len(emb):
-            emb = emb * w[:, None]
+        # If the token mapping and emb are the same length, the model was not quantized before training.
+        if len(self.token_mapping) == len(emb):
+            emb = emb if w is None else emb * w[:, None]
             return StaticModel(
                 vectors=emb,
                 weights=None,
@@ -509,7 +523,7 @@ class BaseFinetuneable(nn.Module):
         :param indices: The indices of the rows that belong to the dataset. If None, all rows belong to it.
         :return: The dataset.
         """
-        return TextDataset(rows, self._tokenize_ids, self._to_targets, indices, pad_id=self.pad_id)
+        return TextDataset(rows, self._tokenize_ids, self._to_targets, indices)
 
     def _create_datasets(
         self,
