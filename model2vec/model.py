@@ -6,6 +6,7 @@ import math
 import os
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
+from functools import cached_property
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -167,15 +168,27 @@ class StaticModel:
             mapping=self.token_mapping,
         )
 
-    def tokenize(self, sentences: Sequence[str]) -> list[list[int]]:
+    @cached_property
+    def _untruncated_tokenizer(self) -> Tokenizer:
+        """A copy of the tokenizer without truncation."""
+        tokenizer = copy.deepcopy(self.tokenizer)
+        tokenizer.no_truncation()
+        return tokenizer
+
+    def tokenize(self, sentences: Sequence[str], *, max_length: int | None | _UnsetType = _UNSET) -> list[list[int]]:
         """Tokenize a list of sentences.
 
         :param sentences: The sentences to tokenize.
+        :param max_length: The maximum number of tokens per sentence. If None, no truncation is done.
+            If not passed, the model's `max_length` is used.
         :return: A list of list of tokens.
         """
-        encodings: list[Encoding] = self.tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
+        if isinstance(max_length, _UnsetType):
+            max_length = self.max_length
+        tokenizer = self.tokenizer if max_length == self.max_length else self._untruncated_tokenizer
+        encodings: list[Encoding] = tokenizer.encode_batch_fast(sentences, add_special_tokens=False)
 
-        encodings_ids = [encoding.ids for encoding in encodings]
+        encodings_ids = [encoding.ids[:max_length] for encoding in encodings]
 
         if self.unk_token_id is not None:
             # NOTE: Remove the unknown token: necessary for word-level models.
@@ -261,7 +274,7 @@ class StaticModel:
         :param use_multiprocessing: Whether to use multiprocessing.
         :param multiprocessing_threshold: The threshold in number of sentences for using multiprocessing.
         :param batch_fn: The function to apply to each batch of sentences.
-        :param batch_args: Additional positional arguments passed to `batch_fn` after the batch.
+        :param batch_args: Additional positional arguments passed to `batch_fn` after the batch and `max_length`.
         :return: A tuple of the per-batch results and whether the input was a single sentence.
         """
         was_single = False
@@ -275,22 +288,18 @@ class StaticModel:
         sentence_batches = list(self._batch(sentences, batch_size))
         total_batches = math.ceil(len(sentences) / batch_size)
 
-        self._set_max_length_in_tokenizer(max_length)
-        try:
-            if use_multiprocessing and len(sentences) > multiprocessing_threshold:
-                # Disable parallelism for tokenizers
-                os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        if use_multiprocessing and len(sentences) > multiprocessing_threshold:
+            # Disable parallelism for tokenizers
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-                results = ProgressParallel(
-                    n_jobs=-1, backend="threading", use_tqdm=show_progress_bar, total=total_batches
-                )(delayed(batch_fn)(batch, *batch_args) for batch in sentence_batches)
-            else:
-                results = [
-                    batch_fn(batch, *batch_args)
-                    for batch in tqdm(sentence_batches, total=total_batches, disable=not show_progress_bar)
-                ]
-        finally:
-            self._set_max_length_in_tokenizer(self.max_length)
+            results = ProgressParallel(n_jobs=-1, backend="threading", use_tqdm=show_progress_bar, total=total_batches)(
+                delayed(batch_fn)(batch, max_length, *batch_args) for batch in sentence_batches
+            )
+        else:
+            results = [
+                batch_fn(batch, max_length, *batch_args)
+                for batch in tqdm(sentence_batches, total=total_batches, disable=not show_progress_bar)
+            ]
 
         return results, was_single
 
@@ -368,9 +377,9 @@ class StaticModel:
             return out_array[0]
         return out_array
 
-    def _encode_batch_as_sequence(self, sentences: Sequence[str]) -> list[np.ndarray]:
+    def _encode_batch_as_sequence(self, sentences: Sequence[str], max_length: int | None) -> list[np.ndarray]:
         """Encode a batch of sentences as a sequence."""
-        ids = self.tokenize(sentences=sentences)
+        ids = self.tokenize(sentences=sentences, max_length=max_length)
         out: list[np.ndarray] = []
         for id_list in ids:
             if id_list:
@@ -454,9 +463,9 @@ class StaticModel:
 
         return emb
 
-    def _encode_batch(self, sentences: Sequence[str], normalize: bool) -> np.ndarray:
+    def _encode_batch(self, sentences: Sequence[str], max_length: int | None, normalize: bool) -> np.ndarray:
         """Encode a batch of sentences."""
-        ids = self.tokenize(sentences=sentences)
+        ids = self.tokenize(sentences=sentences, max_length=max_length)
         dtype = self.embedding.dtype
         if dtype == np.int8:
             dtype = np.dtype(np.float32)

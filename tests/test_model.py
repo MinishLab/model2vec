@@ -345,6 +345,19 @@ def test_set_max_length(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> 
     assert model.tokenizer.truncation is None
 
 
+def test_encode_max_length_does_not_mutate_tokenizer(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Tests that a per-call max_length is applied without changing the tokenizer's truncation."""
+    model = StaticModel(mock_vectors, mock_tokenizer, {}, max_length=1)
+    sentences = ["word1 word2 word3"]
+
+    assert [len(x) for x in model.tokenize(sentences)] == [1]
+    assert [len(x) for x in model.tokenize(sentences, max_length=2)] == [2]
+    assert [len(x) for x in model.tokenize(sentences, max_length=None)] == [3]
+    assert len(model.encode_as_sequence(sentences[0])) == 3
+    assert np.allclose(model.encode(sentences, max_length=None), model.encode_as_sequence(sentences)[0].mean(axis=0))
+    assert model.tokenizer.truncation["max_length"] == 1
+
+
 def test_models_do_not_share_tokenizer(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Tests that two models built from the same tokenizer object have independent truncation state."""
     model_a = StaticModel(mock_vectors, mock_tokenizer, {}, max_length=128)
