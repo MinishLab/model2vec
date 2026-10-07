@@ -79,7 +79,7 @@ def _run_validation(
     total_samples = 0
     for x, y in val_loader:
         x, y = x.to(device), y.to(device)
-        batch_size = x.shape[0]
+        batch_size = len(y)
         head_out = model(x)
         loss = loss_function(head_out, y)
         for key, value in compute_metrics(head_out, y, loss).items():

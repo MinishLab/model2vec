@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
-from tokenizers import Tokenizer
 from torch import nn
 
 from model2vec.inference import StaticModelPipeline
@@ -24,21 +23,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_RANDOM_SEED = 42
 MAX_VALIDATION_SIZE = 10_000
-_KNOWN_PAD_TOKENS = ("[PAD]", "<pad>")
-
-
-def get_probable_pad_token_id(tokenizer: Tokenizer) -> int:
-    """Get a probable pad token by using the padding module and falling back to guessing."""
-    if tokenizer.padding is not None:
-        return tokenizer.padding["pad_id"]
-    vocab = tokenizer.get_vocab()
-    for token in _KNOWN_PAD_TOKENS:
-        token_id = vocab.get(token)
-        if token_id is not None:
-            return token_id
-
-    logger.warning("No known pad token found, using 0 as default")
-    return 0
 
 
 def to_pipeline(model: "BaseFinetuneable | StaticModelForClassification") -> StaticModelPipeline:

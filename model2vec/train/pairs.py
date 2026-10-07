@@ -11,7 +11,7 @@ from torch import nn
 
 from model2vec.model import DEFAULT_MAX_LENGTH, PathLike, StaticModel
 from model2vec.train.base import BaseFinetuneable, _load_static_model, _static_model_arguments
-from model2vec.train.dataset import ColumnRows, PairDataset
+from model2vec.train.dataset import ColumnRows, PairBatch, PairDataset
 from model2vec.train.utils import DEFAULT_RANDOM_SEED, MAX_VALIDATION_SIZE, seed_everything, split_indices
 from model2vec.types import _UNSET, _UnsetType
 
@@ -66,12 +66,11 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int | None = None,
-        pad_id: int = 0,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a model that is trained to embed pairs of texts close together.
@@ -82,18 +81,19 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             dimension, the model has no head, and the embeddings are used as is.
         :param hidden_dim: The hidden dimension of the head.
         :param out_dim: The output embedding dimension. If None, defaults to the input embedding dimension.
-        :param pad_id: The padding id. This is set to 0 in almost all model2vec models.
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
-        :param weights: The weights of the model. If None, the weights are initialized to zeros.
+        :param weights: The token weights of the model. If None and `freeze_weights` is not False, the model has
+            no token weights and takes the unweighted mean of the token embeddings. If None and `freeze_weights`
+            is False, the token weights are initialized to 1.
         :param freeze: Whether to freeze the embeddings. This should be set to False in most cases.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param max_length: The default maximum sequence length (in tokens) used to tokenize inputs.
         """
         super().__init__(
             vectors=vectors,
             out_dim=out_dim if out_dim is not None else vectors.shape[1],
-            pad_id=pad_id,
             tokenizer=tokenizer,
             token_mapping=token_mapping,
             weights=weights,
@@ -112,14 +112,13 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         *,
         token: str | None = None,
         model_name: PathLike | None = None,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int | None = None,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         **kwargs: Any,
     ) -> T:
         """Load the model from a pretrained model2vec model.
@@ -127,7 +126,6 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
-        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
@@ -136,14 +134,14 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param out_dim: The output embedding dimension. If None, defaults to the input embedding dimension.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
         model = _load_static_model(path, token=token, model_name=model_name)
         return cls.from_static_model(
             model=model,
-            pad_token=pad_token,
             max_length=max_length,
             n_layers=n_layers,
             hidden_dim=hidden_dim,
@@ -159,20 +157,18 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         cls: type[T],
         *,
         model: StaticModel,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int | None = None,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         **kwargs: Any,
     ) -> T:
         """Load the model from a static model.
 
         :param model: The static model to load from.
-        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
@@ -181,12 +177,13 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param out_dim: The output embedding dimension. If None, defaults to the input embedding dimension.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized model.
         """
         return cls(
-            **_static_model_arguments(model, pad_token=pad_token, max_length=max_length),
+            **_static_model_arguments(model, max_length=max_length),
             n_layers=n_layers,
             hidden_dim=hidden_dim,
             out_dim=out_dim,
@@ -197,18 +194,16 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         )
 
     def forward(  # type: ignore[override]
-        self, input_ids: torch.Tensor
+        self, batch: PairBatch
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Encode both halves of a pair batch through the shared embeddings and head.
 
-        :param input_ids: A `(2, batch_size, seq_len)` tensor, stacking the two padded text sets.
+        :param batch: The pair batch, holding the first texts followed by the second texts.
         :return: The head outputs for the first and second set of texts, followed by an id for each first
             text and each second text. Identical texts have the same id.
         """
-        out_a = self.head(self._encode(input_ids[0]))
-        out_b = self.head(self._encode(input_ids[1]))
-        ids_a = torch.unique(input_ids[0], dim=0, return_inverse=True)[1]
-        ids_b = torch.unique(input_ids[1], dim=0, return_inverse=True)[1]
+        out_a, out_b = self.head(self._encode(batch.tokens)).chunk(2)
+        ids_a, ids_b = batch.text_ids.chunk(2)
         return out_a, out_b, ids_a, ids_b
 
     @staticmethod
@@ -233,7 +228,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param indices: The indices of the rows that belong to the dataset. If None, all rows belong to it.
         :return: The dataset.
         """
-        return PairDataset(rows, self._tokenize_ids, indices, pad_id=self.pad_id)
+        return PairDataset(rows, self._tokenize_ids, indices)
 
     def _create_pair_datasets(
         self,

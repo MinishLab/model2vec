@@ -84,12 +84,11 @@ class StaticModelForClassification(BaseFinetuneable):
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int = 2,
-        pad_id: int = 0,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a standard classifier model."""
@@ -100,7 +99,6 @@ class StaticModelForClassification(BaseFinetuneable):
         super().__init__(
             vectors=vectors,
             out_dim=out_dim,
-            pad_id=pad_id,
             tokenizer=tokenizer,
             token_mapping=token_mapping,
             weights=weights,
@@ -119,14 +117,13 @@ class StaticModelForClassification(BaseFinetuneable):
         *,
         token: str | None = None,
         model_name: PathLike | None = None,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         **kwargs: Any,
     ) -> T:
         """Load a classifier from a pretrained model2vec model.
@@ -134,7 +131,6 @@ class StaticModelForClassification(BaseFinetuneable):
         :param path: The path to the folder containing the model, or a repository on the Hugging Face Hub.
         :param token: The token to use to download the model from the hub.
         :param model_name: Deprecated alias for `path`.
-        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
@@ -142,14 +138,14 @@ class StaticModelForClassification(BaseFinetuneable):
         :param out_dim: The number of classes. This is reset when calling `fit`.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized classifier.
         """
         model = _load_static_model(path, token=token, model_name=model_name)
         return cls.from_static_model(
             model=model,
-            pad_token=pad_token,
             max_length=max_length,
             n_layers=n_layers,
             hidden_dim=hidden_dim,
@@ -165,20 +161,18 @@ class StaticModelForClassification(BaseFinetuneable):
         cls: type[T],
         *,
         model: StaticModel,
-        pad_token: str | None = None,
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
         out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
-        freeze_weights: bool = False,
+        freeze_weights: bool | None = None,
         **kwargs: Any,
     ) -> T:
         """Load a classifier from a static model.
 
         :param model: The static model to load from.
-        :param pad_token: The token to use for padding. If None, it is inferred from the tokenizer.
         :param max_length: The default maximum sequence length to use for tokenization. If not passed, the
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
@@ -186,12 +180,13 @@ class StaticModelForClassification(BaseFinetuneable):
         :param out_dim: The number of classes. This is reset when calling `fit`.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
-        :param freeze_weights: Whether to freeze the learned token weights.
+        :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
+            and a model without weights gets none. If False, a model without weights learns weights that start at 1.
         :param **kwargs: Additional keyword arguments passed to the constructor.
         :return: The initialized classifier.
         """
         return cls(
-            **_static_model_arguments(model, pad_token=pad_token, max_length=max_length),
+            **_static_model_arguments(model, max_length=max_length),
             n_layers=n_layers,
             hidden_dim=hidden_dim,
             out_dim=out_dim,
