@@ -101,7 +101,9 @@ def load_pretrained(
     folder_or_repo_path = Path(folder_or_repo_path)
 
     # We resolve a folder or repo path to an actual local folder.
-    folder = _resolve_folder(folder_or_repo_path=folder_or_repo_path, token=token, force_download=force_download)
+    folder = _resolve_folder(
+        folder_or_repo_path=folder_or_repo_path, subfolder=subfolder, token=token, force_download=force_download
+    )
 
     if subfolder:
         folder = folder / subfolder
@@ -134,15 +136,20 @@ def load_pretrained(
     return embeddings, tokenizer, config, metadata, weights, mapping
 
 
-def _resolve_folder(folder_or_repo_path: Path, token: str | None, force_download: bool) -> Path:
+def _resolve_folder(folder_or_repo_path: Path, subfolder: str | None, token: str | None, force_download: bool) -> Path:
     """Resolve a folder locally or from hugging face hub."""
     if folder_or_repo_path.exists():
         return folder_or_repo_path
     # We now know we're dealing with either an invalid path, or
     # a HF model ID.
     if not force_download:
-        if folder := maybe_get_cached_model_path(str(folder_or_repo_path)):
+        folder = maybe_get_cached_model_path(str(folder_or_repo_path))
+        if folder is not None and _has_valid_layout(folder / subfolder if subfolder else folder):
             return folder
+
+    allow_patterns = [*get_all_model2vec_paths(), "README.md"]
+    if subfolder:
+        allow_patterns = [f"{subfolder.strip('/')}/{pattern}" for pattern in allow_patterns]
 
     # We use `tqdm_class=SilentTqdm` to disable download progress bars.
     # No partial because that doesn't always work, this is safer.
@@ -152,11 +159,16 @@ def _resolve_folder(folder_or_repo_path: Path, token: str | None, force_download
             repo_type="model",
             token=token,
             tqdm_class=SilentTqdm,
-            allow_patterns=get_all_model2vec_paths(),
+            allow_patterns=allow_patterns,
         )
     )
 
     return folder
+
+
+def _has_valid_layout(folder: Path) -> bool:
+    """Check if any known layout is present in a folder."""
+    return any(layout.with_parent(folder).is_valid() for layout in FOLDER_LAYOUTS)
 
 
 def _get_paths(folder: Path) -> Layout:
