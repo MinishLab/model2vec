@@ -19,7 +19,7 @@ from transformers import AutoTokenizer
 from model2vec.model import StaticModel
 from model2vec.train import StaticModelForClassification
 from model2vec.train.base import BaseFinetuneable
-from model2vec.train.classifier import _read_labels
+from model2vec.train.classifier import BinaryFocalLoss, FocalLoss, _read_labels
 from model2vec.train.dataset import (
     ColumnRows,
     PairDataset,
@@ -892,6 +892,74 @@ def test_y_val_none() -> None:
     with pytest.raises(ValueError):
         model.fit(X, y, X_val=None, y_val=y_val)
     model.fit(X, y, X_val=None, y_val=None)
+
+
+@pytest.mark.parametrize("weight", [None, torch.tensor([1.0, 2.0, 0.5])])
+def test_focal_loss_with_zero_gamma_is_cross_entropy(weight: torch.Tensor | None) -> None:
+    """With gamma 0, the focal loss equals (weighted) cross-entropy."""
+    torch.random.manual_seed(42)
+    logits = torch.randn(8, 3)
+    y = torch.randint(0, 3, (8,))
+    expected = nn.CrossEntropyLoss(weight=weight)(logits, y)
+    assert torch.allclose(FocalLoss(gamma=0.0, weight=weight)(logits, y), expected)
+
+
+@pytest.mark.parametrize("pos_weight", [None, torch.tensor([1.0, 2.0, 0.5])])
+def test_binary_focal_loss_with_zero_gamma_is_binary_cross_entropy(pos_weight: torch.Tensor | None) -> None:
+    """With gamma 0, the binary focal loss equals (weighted) binary cross-entropy."""
+    torch.random.manual_seed(42)
+    logits = torch.randn(8, 3)
+    y = torch.randint(0, 2, (8, 3)).float()
+    expected = nn.BCEWithLogitsLoss(pos_weight=pos_weight)(logits, y)
+    assert torch.allclose(BinaryFocalLoss(gamma=0.0, pos_weight=pos_weight)(logits, y), expected)
+
+
+def test_focal_loss_downweights_easy_examples() -> None:
+    """A positive gamma shrinks the loss of a confident correct prediction more than that of a wrong one."""
+    logits = torch.tensor([[4.0, 0.0], [0.0, 4.0]])
+    y = torch.tensor([0, 0])
+    ce = nn.CrossEntropyLoss(reduction="none")(logits, y)
+    easy = FocalLoss(gamma=2.0)(logits[:1], y[:1])
+    hard = FocalLoss(gamma=2.0)(logits[1:], y[1:])
+    assert easy / ce[0] < hard / ce[1] < 1
+
+
+@pytest.mark.parametrize("gamma", [0.0, 0.5, 2.0])
+def test_focal_loss_backward_with_confident_predictions(gamma: float) -> None:
+    """The focal loss has finite gradients when a prediction is confidently correct."""
+    logits = torch.tensor([[100.0, 0.0], [0.0, 1.0]], requires_grad=True)
+    y = torch.tensor([0, 1])
+    loss = FocalLoss(gamma=gamma, weight=torch.tensor([1.0, 2.0]))(logits, y)
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert logits.grad is not None
+    assert torch.isfinite(logits.grad).all()
+
+
+@pytest.mark.parametrize("gamma", [0.0, 0.5, 2.0])
+def test_binary_focal_loss_backward_with_confident_predictions(gamma: float) -> None:
+    """The binary focal loss has finite gradients when a prediction is confidently correct."""
+    logits = torch.tensor([[100.0, -100.0], [0.5, 0.0]], requires_grad=True)
+    y = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    loss = BinaryFocalLoss(gamma=gamma, pos_weight=torch.tensor([1.0, 2.0]))(logits, y)
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert logits.grad is not None
+    assert torch.isfinite(logits.grad).all()
+
+
+def test_fit_with_focal_gamma() -> None:
+    """fit() trains with a focal loss, and rejects a negative gamma."""
+    tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
+    torch.random.manual_seed(42)
+    vectors_torched = torch.randn(len(tokenizer.get_vocab()), 12)
+    model = StaticModelForClassification(vectors=vectors_torched, tokenizer=tokenizer, hidden_dim=12).to("cpu")
+
+    X = ["dog", "cat"]
+    with pytest.raises(ValueError):
+        model.fit(X, ["0", "1"], focal_gamma=-1.0, max_epochs=1)
+    model.fit(X, ["0", "1"], focal_gamma=2.0, class_weight="balanced", max_epochs=1)
+    model.fit(X, [["0"], ["0", "1"]], focal_gamma=2.0, class_weight="balanced", max_epochs=1)
 
 
 def test_class_weight() -> None:

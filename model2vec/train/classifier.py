@@ -46,6 +46,71 @@ def _multilabel_classifier_metrics(head_out: torch.Tensor, y: torch.Tensor, loss
     return {"loss": loss.item(), "accuracy": accuracy}
 
 
+def _focal_modulation(nll: torch.Tensor, gamma: float) -> torch.Tensor:
+    """Compute the focal modulating factor (1 - p) ** gamma from the negative log-likelihood.
+
+    :param nll: The negative log-likelihood of the target.
+    :param gamma: The focusing parameter.
+    :return: The modulating factor.
+    """
+    min_value = torch.finfo(nll.dtype).tiny
+    one_minus_p = (-torch.expm1(-nll)).clamp(min=min_value)
+    return one_minus_p**gamma
+
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma: float = 0.0, weight: torch.Tensor | None = None) -> None:
+        """Initialize the focal loss for single-label classification.
+
+        :param gamma: The focusing parameter. If this is 0.0, the loss is equal to cross-entropy.
+        :param weight: The weight of each class, or None to weight all classes equally.
+        """
+        super().__init__()
+        self.gamma = gamma
+        self.weight: torch.Tensor | None
+        self.register_buffer("weight", weight)
+
+    def forward(self, head_out: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Returns the focal loss, averaged like weighted cross-entropy.
+
+        :param head_out: The logits.
+        :param y: The class indices.
+        :return: The mean loss.
+        """
+        nll = -torch.log_softmax(head_out, dim=1).gather(1, y[:, None]).squeeze(1)
+        loss = _focal_modulation(nll, self.gamma) * nll
+        if self.weight is None:
+            return loss.mean()
+        sample_weight = self.weight[y]
+        return (loss * sample_weight).sum() / sample_weight.sum()
+
+
+class BinaryFocalLoss(nn.Module):
+    def __init__(self, gamma: float = 0.0, pos_weight: torch.Tensor | None = None) -> None:
+        """Initialize the focal loss for multi-label classification.
+
+        :param gamma: The focusing parameter. If this is 0.0, the loss is equal to binary cross-entropy.
+        :param pos_weight: The weight of the positive examples of each class, or None to weight them equally.
+        """
+        super().__init__()
+        self.gamma = gamma
+        self.pos_weight: torch.Tensor | None
+        self.register_buffer("pos_weight", pos_weight)
+
+    def forward(self, head_out: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Returns the focal loss, averaged over all samples and classes.
+
+        :param head_out: The logits.
+        :param y: The multi-hot targets.
+        :return: The mean loss.
+        """
+        loss = nn.functional.binary_cross_entropy_with_logits(head_out, y, pos_weight=self.pos_weight, reduction="none")
+        if self.gamma == 0:
+            return loss.mean()
+        nll = nn.functional.binary_cross_entropy_with_logits(head_out, y, reduction="none")
+        return (_focal_modulation(nll, self.gamma) * loss).mean()
+
+
 def _read_labels(y: LabelType, name: str) -> tuple[bool, Counter]:
     """Determine whether labels are multi-label, and count the number of times each class occurs.
 
@@ -271,6 +336,7 @@ class StaticModelForClassification(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
         token_dropout: float = 0.0,
+        focal_gamma: float = 0.0,
     ) -> StaticModelForClassification:
         """Fit a model.
 
@@ -309,8 +375,13 @@ class StaticModelForClassification(BaseFinetuneable):
         :param random_seed: The random seed to use. Defaults to 42.
         :param token_dropout: The fraction of tokens to randomly drop from each training sample.
             Has no effect during validation. Must be in the range [0, 1).
+        :param focal_gamma: The gamma of the focal loss. If this is 0.0, (binary) cross-entropy is used.
+            Must be non-negative.
         :return: The fitted model.
+        :raises ValueError: If `focal_gamma` is negative.
         """
+        if focal_gamma < 0:
+            raise ValueError(f"focal_gamma must be non-negative, got {focal_gamma}.")
         seed_everything(random_seed)
         logger.info("Re-initializing model.")
         self._check_inputs(X=X, y=y, X_val=X_val, y_val=y_val)
@@ -325,10 +396,10 @@ class StaticModelForClassification(BaseFinetuneable):
         )
 
         if self.multilabel:
-            loss_function: nn.Module = nn.BCEWithLogitsLoss(pos_weight=resolved_class_weight)
+            loss_function: nn.Module = BinaryFocalLoss(gamma=focal_gamma, pos_weight=resolved_class_weight)
             compute_metrics = _multilabel_classifier_metrics
         else:
-            loss_function = nn.CrossEntropyLoss(weight=resolved_class_weight)
+            loss_function = FocalLoss(gamma=focal_gamma, weight=resolved_class_weight)
             compute_metrics = _classifier_metrics
 
         self._train(
