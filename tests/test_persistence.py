@@ -46,6 +46,37 @@ def test_local_loading(mock_static_model: StaticModel) -> None:
             assert mock_snapshot.call_count == 3
 
 
+def test_hub_loading_downloads_readme(tmp_path: Path, mock_tokenizer: Tokenizer) -> None:
+    """Test that loading from the hub fetches the README and reads the language."""
+    vectors = np.random.RandomState(0).randn(len(mock_tokenizer.get_vocab()), 8)
+    StaticModel(vectors=vectors, tokenizer=mock_tokenizer, language=["en", "nl"]).save_pretrained(tmp_path)
+
+    with patch("model2vec.persistence.persistence.huggingface_hub.snapshot_download") as mock_snapshot:
+        mock_snapshot.return_value = tmp_path
+        model = StaticModel.from_pretrained("my_org/haha", force_download=True)
+
+    assert "README.md" in mock_snapshot.call_args.kwargs["allow_patterns"]
+    assert model.language == ["en", "nl"]
+
+
+def test_hub_subfolder_loading(tmp_path: Path, mock_static_model: StaticModel) -> None:
+    """Test that loading a subfolder from the hub fetches the files in that subfolder."""
+    mock_static_model.save_pretrained(tmp_path / "subfolder")
+
+    with patch("model2vec.persistence.persistence.huggingface_hub.snapshot_download") as mock_snapshot:
+        mock_snapshot.return_value = tmp_path
+        with patch("model2vec.persistence.persistence.maybe_get_cached_model_path") as cache:
+            # Cached snapshot without the subfolder files
+            cache.return_value = tmp_path / "other"
+            model = StaticModel.from_pretrained("my_org/haha", subfolder="subfolder")
+
+    allow_patterns = mock_snapshot.call_args.kwargs["allow_patterns"]
+    assert "subfolder/README.md" in allow_patterns
+    assert "subfolder/config.json" in allow_patterns
+    assert all(pattern.startswith("subfolder/") for pattern in allow_patterns)
+    assert model.tokens == mock_static_model.tokens
+
+
 def test_garbage(mock_static_model: StaticModel) -> None:
     """Test that garbage loading crashes."""
     with TemporaryDirectory() as dir_name:
