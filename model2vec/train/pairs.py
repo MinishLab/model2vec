@@ -279,6 +279,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         validation_steps: int | None = None,
         random_seed: int = DEFAULT_RANDOM_SEED,
         temperature: float = 0.05,
+        token_dropout: float = 0.0,
     ) -> T:
         """Fit a model that embeds paired texts close together.
 
@@ -313,6 +314,8 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param validation_steps: The number of steps to run validation for. If None, validation steps are estimated from the data.
         :param random_seed: The random seed to use. Defaults to 42.
         :param temperature: The temperature of the InfoNCE loss.
+        :param token_dropout: The fraction of tokens to randomly drop from each training text.
+            Has no effect during validation. Must be in the range [0, 1).
         :return: The fitted model.
         :raises ValueError: If `batch_size` is smaller than 2.
         """
@@ -339,6 +342,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             max_epochs=max_epochs,
             device=device,
             validation_steps=validation_steps,
+            token_dropout=token_dropout,
         )
 
         return self

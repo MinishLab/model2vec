@@ -833,6 +833,19 @@ def test_pair_similarity_fit_rejects_invalid_temperature_and_batch_size(
         model.fit(text_a, text_b, test_size=0.5, batch_size=1)
 
 
+def test_pair_similarity_fit_token_dropout(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """fit() passes token_dropout to training and rejects values outside [0, 1)."""
+    model = StaticModelForPairSimilarity(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    text_a, text_b = ["word1", "word2", "word3", "word1 word2"], ["word2", "word3", "word1", "word3"]
+    with pytest.raises(ValueError, match="token_dropout"):
+        model.fit(text_a, text_b, test_size=0.5, token_dropout=1.0)
+    with pytest.raises(ValueError, match="token_dropout"):
+        model.fit(text_a, text_b, test_size=0.5, token_dropout=-0.1)
+
+    model.fit(text_a, text_b, test_size=0.5, token_dropout=0.3, max_epochs=1)
+    assert model.token_dropout == 0.3
+
+
 def test_pairdataset_drops_single_pair_batches() -> None:
     """A final batch with a single pair is dropped, unless it is the only pair."""
     dataset = PairDataset(ColumnRows(text_a=[[1], [2], [3]], text_b=[[1], [2], [3]]), _pretokenized)
