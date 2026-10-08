@@ -46,6 +46,18 @@ def _multilabel_classifier_metrics(head_out: torch.Tensor, y: torch.Tensor, loss
     return {"loss": loss.item(), "accuracy": accuracy}
 
 
+def _focal_modulation(nll: torch.Tensor, gamma: float) -> torch.Tensor:
+    """Compute the focal modulating factor (1 - p) ** gamma from the negative log-likelihood.
+
+    :param nll: The negative log-likelihood of the target.
+    :param gamma: The focusing parameter.
+    :return: The modulating factor.
+    """
+    min_value = torch.finfo(nll.dtype).tiny
+    one_minus_p = (-torch.expm1(-nll)).clamp(min=min_value)
+    return one_minus_p**gamma
+
+
 class FocalLoss(nn.Module):
     def __init__(self, gamma: float = 0.0, weight: torch.Tensor | None = None) -> None:
         """Initialize the focal loss for single-label classification.
@@ -66,7 +78,7 @@ class FocalLoss(nn.Module):
         :return: The mean loss.
         """
         nll = -torch.log_softmax(head_out, dim=1).gather(1, y[:, None]).squeeze(1)
-        loss = (1 - torch.exp(-nll)) ** self.gamma * nll
+        loss = _focal_modulation(nll, self.gamma) * nll
         if self.weight is None:
             return loss.mean()
         sample_weight = self.weight[y]
@@ -96,7 +108,7 @@ class BinaryFocalLoss(nn.Module):
         if self.gamma == 0:
             return loss.mean()
         nll = nn.functional.binary_cross_entropy_with_logits(head_out, y, reduction="none")
-        return ((1 - torch.exp(-nll)) ** self.gamma * loss).mean()
+        return (_focal_modulation(nll, self.gamma) * loss).mean()
 
 
 def _read_labels(y: LabelType, name: str) -> tuple[bool, Counter]:

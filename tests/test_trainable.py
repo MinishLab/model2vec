@@ -924,6 +924,30 @@ def test_focal_loss_downweights_easy_examples() -> None:
     assert easy / ce[0] < hard / ce[1] < 1
 
 
+@pytest.mark.parametrize("gamma", [0.0, 0.5, 2.0])
+def test_focal_loss_backward_with_confident_predictions(gamma: float) -> None:
+    """The focal loss has finite gradients when a prediction is confidently correct."""
+    logits = torch.tensor([[100.0, 0.0], [0.0, 1.0]], requires_grad=True)
+    y = torch.tensor([0, 1])
+    loss = FocalLoss(gamma=gamma, weight=torch.tensor([1.0, 2.0]))(logits, y)
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert logits.grad is not None
+    assert torch.isfinite(logits.grad).all()
+
+
+@pytest.mark.parametrize("gamma", [0.0, 0.5, 2.0])
+def test_binary_focal_loss_backward_with_confident_predictions(gamma: float) -> None:
+    """The binary focal loss has finite gradients when a prediction is confidently correct."""
+    logits = torch.tensor([[100.0, -100.0], [0.5, 0.0]], requires_grad=True)
+    y = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    loss = BinaryFocalLoss(gamma=gamma, pos_weight=torch.tensor([1.0, 2.0]))(logits, y)
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert logits.grad is not None
+    assert torch.isfinite(logits.grad).all()
+
+
 def test_fit_with_focal_gamma() -> None:
     """fit() trains with a focal loss, and rejects a negative gamma."""
     tokenizer = AutoTokenizer.from_pretrained("tests/data/test_tokenizer").backend_tokenizer
