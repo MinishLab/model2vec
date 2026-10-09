@@ -237,6 +237,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         text_a_val: Sequence[str] | None,
         text_b_val: Sequence[str] | None,
         test_size: float | int,
+        random_seed: int = DEFAULT_RANDOM_SEED,
     ) -> tuple[PairDataset, PairDataset]:
         """Create the training and validation datasets of pairs.
 
@@ -247,6 +248,7 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         :param text_b_val: The second half of each validation pair.
         :param test_size: The size of the validation split if `text_a_val` is None: a fraction of the pairs,
             capped at `MAX_VALIDATION_SIZE` rows, or a number of pairs if it is an int.
+        :param random_seed: The random seed of the validation split.
         :return: The train and validation datasets.
         :raises ValueError: If only one of `text_a_val` and `text_b_val` is given, or if the halves of the pairs have
             different lengths.
@@ -260,7 +262,9 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
             self._check_aligned(text_a_val=text_a_val, text_b_val=text_b_val)
             return self._pair_dataset(rows), self._pair_dataset(ColumnRows(text_a=text_a_val, text_b=text_b_val))
 
-        train_indices, val_indices = split_indices(len(rows), test_size, max_test_size=MAX_VALIDATION_SIZE)
+        train_indices, val_indices = split_indices(
+            len(rows), test_size, max_test_size=MAX_VALIDATION_SIZE, random_seed=random_seed
+        )
         return self._pair_dataset(rows, train_indices), self._pair_dataset(rows, val_indices)
 
     def fit(
@@ -324,7 +328,9 @@ class StaticModelForPairSimilarity(BaseFinetuneable):
         self._check_inputs(text_a=text_a, text_b=text_b, text_a_val=text_a_val, text_b_val=text_b_val)
         loss_function = PairInfoNCELoss(temperature=temperature)
 
-        train_dataset, val_dataset = self._create_pair_datasets(text_a, text_b, text_a_val, text_b_val, test_size)
+        train_dataset, val_dataset = self._create_pair_datasets(
+            text_a, text_b, text_a_val, text_b_val, test_size, random_seed=random_seed
+        )
         self._check_pair_splits(len(train_dataset), len(val_dataset))
         batch_size = self._determine_batch_size(batch_size, len(train_dataset))
         if batch_size < 2:
