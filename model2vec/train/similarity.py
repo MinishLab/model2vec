@@ -242,7 +242,7 @@ class StaticModelForSimilarity(BaseFinetuneable):
         if y_val is not None and (val_dim := _vector_dim(y_val, "y_val")) != out_dim:
             raise ValueError(f"The vectors in y_val have dimension {val_dim}, but those in y have dimension {out_dim}.")
 
-        train_dataset, val_dataset = self._create_datasets(X, y, X_val, y_val, test_size)
+        train_dataset, val_dataset = self._create_datasets(X, y, X_val, y_val, test_size, random_seed=random_seed)
         self.out_dim = out_dim
         self._initialize()
         self._train(

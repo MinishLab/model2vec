@@ -1208,6 +1208,17 @@ def test_split_indices() -> None:
     assert list(test) == sorted(test)
 
 
+def test_split_indices_random_seed() -> None:
+    """The same seed gives the same split, and a different seed a different one."""
+    labels = ["a"] * 50 + ["b"] * 50
+    for stratify_by in (None, labels):
+        first = split_indices(100, 0.2, stratify_by=stratify_by, random_seed=1)
+        second = split_indices(100, 0.2, stratify_by=stratify_by, random_seed=1)
+        other = split_indices(100, 0.2, stratify_by=stratify_by, random_seed=2)
+        assert np.array_equal(first[1], second[1])
+        assert not np.array_equal(first[1], other[1])
+
+
 def test_split_indices_absolute_and_capped_sizes() -> None:
     """An int test size is a number of items, and a fractional test size can be capped."""
     assert len(split_indices(100, 7)[1]) == 7
@@ -1312,6 +1323,32 @@ def test_fit_only_stratifies_single_labels(
         model.fit(dataset["text"], y, test_size=0.5)  # type: ignore[attr-defined]
     stratify_by = split_mock.call_args.kwargs["stratify_by"]
     assert (stratify_by is y) if stratified else (stratify_by is None)
+
+
+@pytest.mark.parametrize(
+    ("model_class", "labels", "module"),
+    [
+        (StaticModelForClassification, ["a", "b"] * 4, "base"),
+        (StaticModelForSimilarity, [[0.5, 1.0]] * 8, "base"),
+        (StaticModelForRegression, [[0.5, 1.0]] * 8, "base"),
+        (StaticModelForPairSimilarity, None, "pairs"),
+    ],
+    ids=["classification", "similarity", "regression", "pairs"],
+)
+def test_fit_seeds_validation_split(
+    model_class: type[BaseFinetuneable],
+    labels: list[Any] | None,
+    module: str,
+    mock_vectors: np.ndarray,
+    mock_tokenizer: Tokenizer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The validation split uses the random seed passed to fit."""
+    monkeypatch.setattr("model2vec.train.base.run_training_loop", lambda **kwargs: kwargs["model"].state_dict())
+    model = model_class(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    with patch(f"model2vec.train.{module}.split_indices", wraps=split_indices) as split_mock:
+        model.fit(_TRAIN_TEXTS, labels or _TRAIN_TEXTS, test_size=0.5, random_seed=7)  # type: ignore[attr-defined]
+    assert split_mock.call_args.kwargs["random_seed"] == 7
 
 
 def test_column_strata_match_list_strata_across_batches() -> None:

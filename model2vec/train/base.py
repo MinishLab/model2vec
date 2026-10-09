@@ -25,6 +25,7 @@ from model2vec.train.dataset import (
 )
 from model2vec.train.trainer import MetricsFn, default_metrics, resolve_device, run_training_loop
 from model2vec.train.utils import (
+    DEFAULT_RANDOM_SEED,
     MAX_VALIDATION_SIZE,
     split_indices,
     to_pipeline,
@@ -524,6 +525,7 @@ class BaseFinetuneable(nn.Module):
         y_val: Any | None,
         test_size: float | int,
         stratify_by: Sequence[Any] | None = None,
+        random_seed: int = DEFAULT_RANDOM_SEED,
     ) -> tuple[TextDataset, TextDataset]:
         """Create the training and validation datasets.
 
@@ -535,6 +537,7 @@ class BaseFinetuneable(nn.Module):
             `MAX_VALIDATION_SIZE` rows, or a number of rows if it is an int.
         :param stratify_by: Validated single labels to stratify the validation split by. If None, the split is not
             stratified.
+        :param random_seed: The random seed of the validation split.
         :return: The train and validation datasets.
         :raises ValueError: If only one of `X_val` and `y_val` is given, or if the texts and labels have different
             lengths.
@@ -549,7 +552,11 @@ class BaseFinetuneable(nn.Module):
             return self._text_dataset(rows), self._text_dataset(ColumnRows(text=X_val, label=y_val))
 
         train_indices, val_indices = split_indices(
-            len(rows), test_size, max_test_size=MAX_VALIDATION_SIZE, stratify_by=stratify_by
+            len(rows),
+            test_size,
+            max_test_size=MAX_VALIDATION_SIZE,
+            stratify_by=stratify_by,
+            random_seed=random_seed,
         )
         return self._text_dataset(rows, train_indices), self._text_dataset(rows, val_indices)
 

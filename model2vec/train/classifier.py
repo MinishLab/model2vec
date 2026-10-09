@@ -392,7 +392,7 @@ class StaticModelForClassification(BaseFinetuneable):
         self._initialize()
         resolved_class_weight = self._resolve_class_weight(class_weight, label_counts)
         train_dataset, val_dataset = self._create_datasets(
-            X, y, X_val, y_val, test_size, stratify_by=None if self.multilabel else y
+            X, y, X_val, y_val, test_size, stratify_by=None if self.multilabel else y, random_seed=random_seed
         )
 
         if self.multilabel:

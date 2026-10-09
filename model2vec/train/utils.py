@@ -76,6 +76,7 @@ def split_indices(
     test_size: float | int,
     max_test_size: int | None = None,
     stratify_by: Sequence[Any] | None = None,
+    random_seed: int = DEFAULT_RANDOM_SEED,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Randomly split the indices `0..n-1` into sorted train and test indices.
 
@@ -88,12 +89,13 @@ def split_indices(
     :param stratify_by: The single label of each item, as strings or integers that have been validated. If every
         label occurs at least twice, each label is split separately, in the same proportion. If None, the split is
         not stratified.
+    :param random_seed: The random seed of the split.
     :return: The train indices and the test indices.
     :raises ValueError: If `test_size` is a bool.
     """
     if isinstance(test_size, bool):
         raise ValueError("test_size must be a float or an int, not a bool.")
-    rng = np.random.default_rng(DEFAULT_RANDOM_SEED)
+    rng = np.random.default_rng(random_seed)
     if isinstance(test_size, numbers.Integral):
         n_test = int(test_size)
     else:
