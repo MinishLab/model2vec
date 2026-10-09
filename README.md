@@ -74,7 +74,7 @@ m2v_model = distill(model_name="BAAI/bge-base-en-v1.5")
 m2v_model.save_pretrained("m2v_model")
 ```
 
-For advanced usage, see our [distillation docs](https://minish.ai/packages/model2vec/distillation), which includes some [distillation best practices](https://minish.ai/packages/model2vec/distillation#distillation-best-practices). After distillation, you can also fine-tune your own classification models on top of the distilled model, or on a pre-trained model. First, make sure you install the `training` extras with:
+For advanced usage, see our [distillation docs](https://minish.ai/packages/model2vec/distillation), which includes some [distillation best practices](https://minish.ai/packages/model2vec/distillation#distillation-best-practices). After distillation, you can also fine-tune the distilled model, or a pre-trained model, for classification, similarity, regression, or pair similarity (e.g. query-document retrieval). First, make sure you install the `training` extras with:
 
 ```bash
 pip install model2vec[train]
@@ -83,12 +83,11 @@ pip install model2vec[train]
 Then, you can fine-tune a model as follows:
 
 ```python
-import numpy as np
 from datasets import load_dataset
 from model2vec.train import StaticModelForClassification
 
 # Initialize a classifier from a pre-trained model
-classifier = StaticModelForClassification.from_pretrained(model_name="minishlab/potion-base-32M")
+classifier = StaticModelForClassification.from_pretrained(path="minishlab/potion-base-32M")
 
 # Load a dataset. Note: both single and multi-label classification datasets are supported
 ds = load_dataset("setfit/subj")
@@ -110,7 +109,7 @@ For advanced usage, see our [training docs](https://minish.ai/packages/model2vec
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
 - **Lightning-fast Inference**: up to 500 times faster on CPU than the original model.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset.
-- **Fine-tuning**: fine-tune your own classification models on top of Model2Vec models.
+- **Fine-tuning**: fine-tune Model2Vec models for classification, similarity, regression, or pair similarity, and run them without `torch`.
 - **Integrated in many popular libraries**: Model2Vec is integrated direclty into popular libraries such as [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [LangChain](https://github.com/langchain-ai/langchain). For more information, see our [integrations documentation](https://minish.ai/packages/model2vec/integrations).
 - **Tightly integrated with HuggingFace hub**: easily share and load models from the HuggingFace hub, using the familiar `from_pretrained` and `push_to_hub`. Our own models can be found [here](https://huggingface.co/minishlab).
 
