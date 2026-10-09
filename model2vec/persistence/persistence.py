@@ -64,14 +64,16 @@ def save_pretrained(
         cfg["vocabulary_quantization"] = int(embeddings.shape[0])
     else:
         cfg.pop("vocabulary_quantization", None)
-    json.dump(cfg, open(folder_path / "config.json", "w"), indent=4)
+    with open(folder_path / "config.json", "w") as config_file:
+        json.dump(cfg, config_file, indent=4)
 
     # Create modules.json
     modules = [{"idx": 0, "name": "0", "path": ".", "type": "sentence_transformers.models.StaticEmbedding"}]
     if cfg.get("normalize"):
         # If normalize=True, add sentence_transformers.models.Normalize
         modules.append({"idx": 1, "name": "1", "path": "1_Normalize", "type": "sentence_transformers.models.Normalize"})
-    json.dump(modules, open(folder_path / "modules.json", "w"), indent=4)
+    with open(folder_path / "modules.json", "w") as modules_file:
+        json.dump(modules, modules_file, indent=4)
 
     logger.info(f"Saved model to {folder_path}")
 
@@ -131,7 +133,8 @@ def load_pretrained(
         metadata = {}
 
     tokenizer: Tokenizer = Tokenizer.from_file(str(selected_layout.tokenizer))
-    config = json.load(open(selected_layout.config))
+    with open(selected_layout.config) as config_file:
+        config = json.load(config_file)
 
     return embeddings, tokenizer, config, metadata, weights, mapping
 

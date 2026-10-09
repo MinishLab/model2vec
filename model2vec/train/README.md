@@ -244,7 +244,7 @@ You can turn any trained model into a lightweight inference pipeline:
 pipeline = classifier.to_pipeline()
 ```
 
-This strips away `torch`: the head's weights are plain `numpy` arrays, so the resulting `StaticModelPipeline` can be used for inference without installing `torch`. For a classifier, `pipeline.predict` returns labels, and `pipeline.predict_proba` and `pipeline.evaluate` work as on the classifier. For the other models, `pipeline.predict` returns the output vectors.
+This strips away `torch`: the head's weights are plain `numpy` arrays, so the resulting `StaticModelPipeline` can be used for inference without installing `torch`. For a classifier, `pipeline.predict` returns labels, and `pipeline.predict_proba` and `pipeline.evaluate` work as on the classifier. For the other models, `pipeline.predict` returns the output vectors. See the [inference docs](../inference/README.md) for more.
 
 If you want to persist your pipeline locally, or to the Hugging Face Hub, you can use our built-in functions:
 
