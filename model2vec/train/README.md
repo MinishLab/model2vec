@@ -156,13 +156,13 @@ Both models stop early on the validation loss.
 ```python
 from model2vec.train import StaticModelForPairSimilarity
 
-model = StaticModelForPairSimilarity.from_pretrained(path="minishlab/potion-base-32M", n_layers=0)
+model = StaticModelForPairSimilarity.from_pretrained(path="minishlab/potion-base-32M")
 model.fit(text_a=queries, text_b=documents)
 
 static_model = model.to_static_model()
 ```
 
-With `n_layers=0`, the model has no head, so the trained embeddings can be turned back into a regular `StaticModel`. With the default `n_layers=1`, the model has an MLP head, and you need [`to_pipeline`](#using-a-trained-model) to keep it.
+`to_static_model` turns the trained model into a regular `StaticModel`, with the trained embeddings and token weights. The head is only used during training, and is discarded. If you want to keep the head, use [`to_pipeline`](#using-a-trained-model) instead.
 
 Because the other pairs in a batch serve as negatives, the training and validation sets each need at least two pairs, and the batch size must be at least two. Larger batches give more negatives per pair. Pairs with the same `text_a`, or the same `text_b`, are not used as negatives for each other.
 
@@ -201,7 +201,7 @@ With `n_layers=0`, a classifier gets a single linear layer. A similarity or pair
 | `X_val`, `y_val` | `None` | An explicit validation set. `text_a_val` and `text_b_val` for pair similarity. |
 | `validation_steps` | `None` | Validate every this many training steps. See [Validation](#validation). |
 | `device` | `"auto"` | The device to train on. `"auto"` picks CUDA, then MPS, then CPU. |
-| `random_seed` | `42` | The seed for initialization and shuffling. The validation split always uses a seed of 42. |
+| `random_seed` | `42` | The seed for the validation split, initialization and shuffling. |
 | `token_dropout` | `0.0` | The fraction of tokens to randomly drop from each training text. This is a form of data augmentation, and has no effect during validation. Must be in `[0, 1)`. |
 | `class_weight` | `None` | Classification only. See [Imbalanced data](#imbalanced-data). |
 | `focal_gamma` | `0.0` | Classification only. See [Imbalanced data](#imbalanced-data). |
@@ -271,7 +271,7 @@ from model2vec.onnx import export_model_to_onnx
 export_model_to_onnx(pipeline, "my_onnx_model")
 ```
 
-`to_static_model` turns a trained model into a regular `StaticModel`, without its head, but with the trained embeddings and token weights. This is mainly useful for models without a head, such as a pair similarity model with `n_layers=0`.
+`to_static_model` turns a trained model into a regular `StaticModel`, without its head, but with the trained embeddings and token weights. This is how you get a regular embedding model out of a pair similarity model.
 
 # Bring your own architecture
 
