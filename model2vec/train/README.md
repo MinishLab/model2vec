@@ -263,7 +263,11 @@ pipeline = StaticModelPipeline.from_pretrained("my_cool/project")
 
 Loading pipelines in this way is _extremely_ fast. It takes only 30ms to load a pipeline from disk.
 
-A pipeline can also be exported to ONNX, including its head:
+A pipeline can also be exported to ONNX, including its head. This requires the `onnx` extra:
+
+```bash
+pip install model2vec[onnx]
+```
 
 ```python
 from model2vec.onnx import export_model_to_onnx

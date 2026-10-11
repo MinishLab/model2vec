@@ -76,7 +76,11 @@ The underlying `StaticModel` is available as `pipeline.model`, and the head as `
 
 # ONNX export
 
-A pipeline can be exported to ONNX, including its head:
+A pipeline can be exported to ONNX, including its head. This requires the `onnx` extra:
+
+```bash
+pip install model2vec[onnx]
+```
 
 ```python
 from model2vec.onnx import export_model_to_onnx
