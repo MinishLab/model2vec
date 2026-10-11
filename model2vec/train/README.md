@@ -128,6 +128,8 @@ For multi-label classification, the weight of a class only applies to the texts 
 classifier.fit(X, y, focal_gamma=2.0)
 ```
 
+The loss of each text is multiplied by `(1 - p) ** focal_gamma`, where `p` is the predicted probability of the true label. For multi-label classification, this is done for each class separately, based on its binary cross-entropy. `focal_gamma` can be combined with `class_weight`, in which case the class weights are applied on top of the focal loss.
+
 ## Similarity and regression
 
 `StaticModelForSimilarity` and `StaticModelForRegression` learn to map each text to a target vector. Pass the vectors as `y`, as a 2D array or tensor, a list of lists, or a dataset column that holds lists of numbers. The output dimension of the model is set to the dimension of the vectors.
@@ -202,12 +204,22 @@ With `n_layers=0`, a classifier gets a single linear layer. A similarity or pair
 | `validation_steps` | `None` | Validate every this many training steps. See [Validation](#validation). |
 | `device` | `"auto"` | The device to train on. `"auto"` picks CUDA, then MPS, then CPU. |
 | `random_seed` | `42` | The seed for the validation split, initialization and shuffling. |
-| `token_dropout` | `0.0` | The fraction of tokens to randomly drop from each training text. This is a form of data augmentation, and has no effect during validation. Must be in `[0, 1)`. |
+| `token_dropout` | `0.0` | See [Token dropout](#token-dropout). |
 | `class_weight` | `None` | Classification only. See [Imbalanced data](#imbalanced-data). |
 | `focal_gamma` | `0.0` | Classification only. See [Imbalanced data](#imbalanced-data). |
 | `temperature` | `0.05` | Pair similarity only. The temperature of the InfoNCE loss. |
 
 Calling `fit` re-initializes the head, the embeddings and the token weights from the static model, so calling it twice does not continue training.
+
+## Token dropout
+
+`token_dropout` is a form of data augmentation. During training, every token of every text is dropped with this probability, and the text is embedded using the remaining tokens. A non-empty text always keeps at least one token. Token dropout has no effect during validation and inference. It must be in `[0, 1)`, and the default, `0.0`, disables it:
+
+```python
+classifier.fit(X, y, token_dropout=0.1)
+```
+
+Token dropout is available for all models. For pair similarity, it is applied to both texts of a pair.
 
 ## Validation
 
