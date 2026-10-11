@@ -55,7 +55,7 @@ embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to ever
 # Make sequences of token embeddings
 token_embeddings = model.encode_as_sequence(["It's dangerous to go alone!", "It's a secret to everybody."])
 ```
-For advanced usage, see our [inference docs](https://minish.ai/packages/model2vec/inference). Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. First, install the `distillation` extras with:
+For advanced usage, see our [inference docs](https://minish.ai/packages/model2vec/inference). Instead of using one of our models, you can also distill your own Model2Vec model from a Sentence Transformer model. First, install the `distill` extra with:
 
 ```bash
 pip install model2vec[distill]
@@ -74,7 +74,7 @@ m2v_model = distill(model_name="BAAI/bge-base-en-v1.5")
 m2v_model.save_pretrained("m2v_model")
 ```
 
-For advanced usage, see our [distillation docs](https://minish.ai/packages/model2vec/distillation), which includes some [distillation best practices](https://minish.ai/packages/model2vec/distillation#distillation-best-practices). After distillation, you can also fine-tune the distilled model, or a pre-trained model, for classification, similarity, regression, or pair similarity (e.g. query-document retrieval). First, make sure you install the `training` extras with:
+For advanced usage, see our [distillation docs](https://minish.ai/packages/model2vec/distillation), which includes some [distillation best practices](https://minish.ai/packages/model2vec/distillation#distillation-best-practices). After distillation, you can also fine-tune the distilled model, or a pre-trained model, for classification, similarity, regression, or pair similarity (e.g. query-document retrieval). First, make sure you install the `train` extras with:
 
 ```bash
 pip install model2vec[train]
