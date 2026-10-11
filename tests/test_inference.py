@@ -60,9 +60,9 @@ def test_init_predict_projector(mock_inference_pipeline_projector: StaticModelPi
     """Test successful init and predict with StaticModelPipeline."""
     assert mock_inference_pipeline_projector.head.activation == Activation.IDENTITY
     assert mock_inference_pipeline_projector.classes_ is None
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="predict_proba"):
         mock_inference_pipeline_projector.predict_proba(["dog"])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="evaluate"):
         mock_inference_pipeline_projector.evaluate(["dog"], ["a"])
 
     prediction = mock_inference_pipeline_projector.predict(["dog"])

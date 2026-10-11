@@ -159,7 +159,7 @@ class StaticModelPipeline:
         :raises ValueError: If the classifier type is projector.
         """
         if self.head.activation == Activation.IDENTITY:
-            raise ValueError("You are using evaluate on a projector model. This is not supported.")
+            raise ValueError("You are using predict_proba on a projector model. This is not supported.")
         encoded = self._encode_and_coerce_to_2d(
             X,
             show_progress_bar=show_progress_bar,

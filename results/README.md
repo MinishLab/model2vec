@@ -96,56 +96,60 @@ As can be seen, [potion-retrieval-32M](https://huggingface.co/minishlab/potion-r
 
 The main results for Model2Vec training are outlined in this section.
 
-We compare five different architectures for our main results:
-- `model2vec + logreg`: A model2vec model with a scikit-learn `LogisticRegressionCV` on top.
-- `model2vec full finetune`: A model2vec classifier with the full model finetuned. This uses our `StaticModelForClassification`.
+We compare six different architectures for our main results:
 - `tfidf`: A TF-IDF model with a scikit-learn `LogisticRegressionCV` on top.
-- `setfit`: A [SetFit](https://github.com/huggingface/setfit/tree/main) model trained using [all-minilm-l6-v2](sentence-transformers/all-MiniLM-L6-v2) as a base model.
-- `bge-base + logreg`: A [BGE-base](https://huggingface.co/BAAI/bge-base-en-v1.5) encoder model with a scikit-learn `LogisticRegressionCV` on top.
+- `fasttext`: A supervised [fastText](https://fasttext.cc/) classifier.
+- `model2vec + logreg`: A model2vec model ([potion-base-32M](https://huggingface.co/minishlab/potion-base-32M)) with a scikit-learn `LogisticRegressionCV` on top.
+- `model2vec full finetune`: A model2vec classifier with the full model finetuned, starting from [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M). This uses our `StaticModelForClassification`.
+- `setfit`: A [SetFit](https://github.com/huggingface/setfit/tree/main) model trained using [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) as a base model.
+- `minilm full finetune`: A [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model, fully finetuned as a sequence classifier using the Hugging Face `Trainer`.
 
-We use 14 classification datasets, using 1000 examples from the train set, and the full test set. No parameters were tuned on any validation set. All datasets were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
+We use 26 classification datasets, using 1000 examples from the train set, and the full test set. The scores are weighted F1 scores on the test set. No parameters were tuned on any validation set. All datasets except `banking77` ([mteb/banking77](https://huggingface.co/datasets/mteb/banking77)) and `clinc_oos` ([clinc/clinc_oos](https://huggingface.co/datasets/clinc/clinc_oos)) were taken from the [Setfit organization on Hugging Face](https://huggingface.co/datasets/SetFit).
 
-| dataset                    |   tfidf |   model2vec + logreg |   model2vec full finetune |   setfit |   bge-base + logreg |
-|:---------------------------|--------:|---------------------:|--------------------------:|---------:|--------------------:|
-| 20_newgroups               |   50.71 |                56.24 |                     57.94 |    61.29 |               67.39 |
-| ade                        |   71.46 |                79.20 |                     79.68 |    83.05 |               86.12 |
-| ag_news                    |   81.68 |                86.70 |                     87.20 |    88.01 |               88.95 |
-| amazon_counterfactual      |   85.18 |                90.96 |                     91.93 |    95.51 |               92.74 |
-| bbc                        |   95.09 |                95.80 |                     97.21 |    96.60 |               97.50 |
-| emotion                    |   59.28 |                65.57 |                     67.11 |    72.86 |               65.63 |
-| enron_spam                 |   96.00 |                96.40 |                     96.85 |    97.45 |               97.30 |
-| hatespeech_offensive       |   66.45 |                83.54 |                     85.61 |    87.69 |               84.92 |
-| imdb                       |   80.44 |                85.34 |                     85.59 |    86.00 |               92.25 |
-| massive_scenario           |   77.26 |                82.86 |                     84.42 |    83.54 |               87.07 |
-| senteval_cr                |   65.61 |                77.03 |                     79.47 |    86.15 |               90.53 |
-| sst5                       |   18.52 |                32.34 |                     37.95 |    42.31 |               38.49 |
-| student                    |   74.16 |                83.20 |                     85.02 |    89.62 |               89.71 |
-| subj                       |   86.39 |                89.20 |                     89.85 |    93.80 |               94.55 |
-| tweet_sentiment_extraction |   53.20 |                64.96 |                     62.65 |    75.15 |               69.48 |
-
-
-|         |   tfidf |   model2vec + logreg |   model2vec full finetune |   setfit |   bge-base + logreg |
-|:--------|--------:|---------------------:|--------------------------:|---------:|--------------------:|
-| average |    70.8 |                 78.0 |                      79.2 |     82.6 |                82.8 |
-
-
-
-
-As can be seen see, full fine-tuning brings modest performance improvements in some cases, but very large ones in other cases, leading to a pretty large increase in average score. Our advice is to test both if you can use `potion-base-32m`, and to use full fine-tuning if you are starting from another base model.
-
-The speed difference between model2vec and the other models is immeense, with the full finetune being 35x faster than a setfit based on `all-minilm-l6-v2` on CPU and 200x faster than the`bge-base` transformer model.
-
-
-|                  |   tfidf |   model2vec + logreg |   model2vec full finetune |   setfit |   bge-base + logreg |
-|:-----------------|--------:|---------------------:|--------------------------:|---------:|--------------------:|
-| samples / second |  108434 |                17925 |                     24744 |      716 |                 118 |
+| dataset                    | tfidf | fasttext | model2vec + logreg | model2vec full finetune | setfit | minilm full finetune |
+|:---------------------------|------:|---------:|-------------------:|------------------------:|-------:|---------------------:|
+| 20_newgroups               | 52.13 |    28.27 |              56.24 |                   58.14 |  61.28 |                58.49 |
+| ade                        | 79.76 |    76.25 |              79.20 |                   75.65 |  80.23 |                82.81 |
+| ag_news                    | 82.91 |    77.09 |              86.70 |                   87.00 |  87.69 |                87.95 |
+| amazon_counterfactual      | 92.77 |    93.00 |              90.96 |                   91.31 |  90.81 |                94.85 |
+| amazon_polarity            | 78.36 |    74.30 |              82.04 |                   83.25 |  78.87 |                87.77 |
+| banking77                  | 69.60 |    53.23 |              79.95 |                   75.61 |  56.42 |                48.72 |
+| bbc                        | 96.60 |    95.30 |              95.80 |                   96.41 |  94.59 |                96.70 |
+| clinc_oos                  | 56.71 |    39.67 |              68.11 |                   68.89 |  41.82 |                38.53 |
+| emotion                    | 61.88 |    56.48 |              65.57 |                   66.46 |  60.73 |                81.22 |
+| enron_spam                 | 96.30 |    95.50 |              96.40 |                   96.95 |  96.05 |                96.85 |
+| ethos                      | 61.82 |    58.31 |              69.38 |                   63.11 |  67.66 |                74.70 |
+| hatespeech_offensive       | 80.59 |    77.78 |              83.54 |                   84.90 |  85.50 |                86.20 |
+| imdb                       | 81.78 |    78.03 |              85.34 |                   86.08 |  82.92 |                81.30 |
+| insincere_questions        | 90.79 |    91.89 |              93.50 |                   93.24 |  94.43 |                94.09 |
+| massive_intent             | 67.54 |    63.99 |              73.83 |                   72.00 |  62.32 |                67.00 |
+| massive_scenario           | 79.60 |    77.37 |              82.86 |                   83.91 |  81.24 |                86.53 |
+| senteval_cr                | 74.89 |    73.78 |              77.03 |                   79.11 |  82.52 |                86.00 |
+| sst2                       | 72.16 |    70.70 |              79.76 |                   81.33 |  82.81 |                82.26 |
+| sst5                       | 31.12 |    33.02 |              32.34 |                   37.71 |  40.96 |                35.65 |
+| student                    | 79.74 |    75.39 |              83.20 |                   85.60 |  87.27 |                89.22 |
+| subj                       | 86.95 |    87.39 |              89.20 |                   89.79 |  89.90 |                92.65 |
+| toxic_conversations        | 88.30 |    88.48 |              90.44 |                   88.30 |  91.45 |                89.93 |
+| trec                       | 67.68 |    66.50 |              56.34 |                   55.97 |  57.79 |                73.58 |
+| tweet_sentiment_extraction | 57.88 |    52.53 |              64.96 |                   64.45 |  72.07 |                72.79 |
+| tweet_stance_abortion      | 63.58 |    64.11 |              71.99 |                   68.33 |  66.86 |                69.72 |
+| yelp_review_full           | 45.21 |    41.77 |              48.42 |                   50.96 |  48.38 |                48.54 |
 
 
-The figure below shows the relationship between the number of sentences per second and the average training score, where we've included more transformer-based models for comparison.
+|         | tfidf | fasttext | model2vec + logreg | model2vec full finetune | setfit | minilm full finetune |
+|:--------|------:|---------:|-------------------:|------------------------:|-------:|---------------------:|
+| average |  72.9 |     68.9 |               76.3 |                    76.3 |   74.7 |                 77.1 |
 
-| ![Description](../assets/images/training_speed_vs_score.png) |
-|:--:|
-|*Figure: The average training score plotted against sentences per second (log scale).*|
+
+The fully finetuned MiniLM model has the highest average score, followed by the two model2vec variants, which both outperform `setfit`. Full fine-tuning of model2vec scores higher than logistic regression on 17 of the 26 datasets, but loses heavily on a few, such as `ethos` and `banking77`, which leads to the same average score. Our advice is to test both if you can use `potion-base-32m`, and to use full fine-tuning if you are starting from another base model.
+
+The table below shows inference speed. The model2vec full finetune is about 80x faster than `setfit` and about 295x faster than the `minilm full finetune`, and comes close to the speed of `tfidf` and `fasttext`.
+
+
+|                  | tfidf | fasttext | model2vec + logreg | model2vec full finetune | setfit | minilm full finetune |
+|:-----------------|------:|---------:|-------------------:|------------------------:|-------:|---------------------:|
+| samples / second | 93718 |    96288 |              32869 |                   81018 |   1010 |                  274 |
+
 
 
 ## Ablations
