@@ -2,7 +2,7 @@ import inspect
 import logging
 from collections import Counter, UserList
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, TypeVar
 from unittest.mock import patch
 
 import numpy as np
@@ -37,6 +37,15 @@ from model2vec.train.utils import (
     split_indices,
 )
 
+M = TypeVar("M", bound=BaseFinetuneable)
+
+
+def _with_out_dim(model: M, out_dim: int) -> M:
+    """Set the output dimension of a model and construct its head."""
+    model.out_dim = out_dim
+    model._initialize()
+    return model
+
 
 @pytest.mark.parametrize("n_layers", [0, 1, 2, 3])
 def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -46,13 +55,28 @@ def test_init_predict(n_layers: int, mock_vectors: np.ndarray, mock_tokenizer: T
     assert s.vectors.shape == mock_vectors.shape
     assert s.w is None
     assert list(s.classes) == s.classes_
-    assert list(s.classes) == ["0", "1"]
+    assert list(s.classes) == []
 
+    s.out_dim = 2
     head = s.construct_head()
     assert head[0].in_features == mock_vectors.shape[1]
     head = s.construct_head()
     assert head[0].in_features == mock_vectors.shape[1]
     assert head[-1].out_features == 2
+
+
+@pytest.mark.parametrize("cls", [StaticModelForClassification, StaticModelForSimilarity, BaseFinetuneable])
+def test_init_without_out_dim(cls: type[BaseFinetuneable], mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """A model without `out_dim` has no head until `out_dim` is set."""
+    s = cls(vectors=torch.from_numpy(mock_vectors), tokenizer=mock_tokenizer)
+    assert s.out_dim is None
+    assert not any(name.startswith("_head") for name in s.state_dict())
+    with pytest.raises(ValueError, match="no head yet"):
+        s.head
+    with pytest.raises(ValueError, match="no head yet"):
+        s.encode(["word1 word2"])
+    with pytest.raises(ValueError, match="without `out_dim`"):
+        s.construct_head()
 
 
 def test_init_base_class(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
@@ -79,6 +103,8 @@ def test_empty_texts_have_finite_gradients(mock_vectors: np.ndarray, mock_tokeni
     model = StaticModelForClassification(
         vectors=torch.from_numpy(mock_vectors).float() * 1e20, tokenizer=mock_tokenizer, n_layers=0
     )
+    model._initialize_on_labels(["0", "1"])
+    model._initialize()
     dataset = model._text_dataset(ColumnRows(text=["word1 word2", ""], label=["0", "1"]))
     batch, y = next(iter(dataset.to_dataloader(shuffle=False, batch_size=2)))
 
@@ -156,6 +182,7 @@ def test_from_pretrained_explicit_arguments(
 ) -> None:
     """Test that from_pretrained passes each argument on to the model."""
     model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, weights=np.ones(len(mock_vectors)))
+    out_dim_kwargs = {"out_dim": 4} if "out_dim" in inspect.signature(cls.from_pretrained).parameters else {}
     with TemporaryDirectory() as temp_dir:
         model.save_pretrained(temp_dir)
         s = cls.from_pretrained(
@@ -163,15 +190,15 @@ def test_from_pretrained_explicit_arguments(
             max_length=7,
             n_layers=2,
             hidden_dim=3,
-            out_dim=4,
             freeze=True,
             normalize=False,
             freeze_weights=True,
+            **out_dim_kwargs,
         )
     assert s.max_length == 7
     assert s.n_layers == 2
     assert s.hidden_dim == 3
-    assert s.out_dim == 4
+    assert s.out_dim == out_dim_kwargs.get("out_dim")
     assert s.freeze
     assert not s.embeddings.weight.requires_grad
     assert not s.normalize
@@ -460,6 +487,7 @@ def test_column_rows() -> None:
 def test_training_batch_matches_tokenize(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Training batches hold the same tokens as `tokenize`, and a text encodes the same regardless of its batch."""
     s = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
+    s._initialize_on_labels(["0", "1"])
     texts = ["word2", "word2 word3"]
 
     dataset = s._text_dataset(ColumnRows(text=texts, label=["0", "1"]))
@@ -709,11 +737,9 @@ def test_pair_similarity_out_dim_defaults_to_embed_dim(mock_vectors: np.ndarray,
 )
 def test_no_head_without_layers(model_class: Any, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Without layers and with an unchanged dimension, the model has no head and matches its static model."""
-    model = model_class(
-        vectors=torch.from_numpy(mock_vectors).float(),
-        tokenizer=mock_tokenizer,
-        n_layers=0,
-        out_dim=mock_vectors.shape[1],
+    model = _with_out_dim(
+        model_class(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0),
+        mock_vectors.shape[1],
     )
     assert len(model.head) == 0
 
@@ -729,11 +755,9 @@ def test_head_without_layers_changes_dimension(
     model_class: Any, mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
 ) -> None:
     """Without layers but with a different output dimension, the head is a single linear layer."""
-    model = model_class(
-        vectors=torch.from_numpy(mock_vectors).float(),
-        tokenizer=mock_tokenizer,
-        n_layers=0,
-        out_dim=mock_vectors.shape[1] + 1,
+    model = _with_out_dim(
+        model_class(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0),
+        mock_vectors.shape[1] + 1,
     )
     assert len(model.head) == 1
     assert isinstance(model.head[0], torch.nn.Linear)
@@ -754,8 +778,11 @@ def test_similarity_fit_without_layers(mock_vectors: np.ndarray, mock_tokenizer:
 
 def test_classifier_keeps_head_when_dimensions_match(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """A classifier without layers keeps its linear layer, even if the number of classes equals the dimension."""
-    model = StaticModelForClassification(
-        vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0
+    model = _with_out_dim(
+        StaticModelForClassification(
+            vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer, n_layers=0
+        ),
+        mock_vectors.shape[1],
     )
     assert model.out_dim == mock_vectors.shape[1]
     assert isinstance(model.head[0], torch.nn.Linear)
