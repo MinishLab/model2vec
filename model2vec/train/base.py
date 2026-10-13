@@ -61,8 +61,7 @@ class BaseFinetuneable(nn.Module):
         :param hidden_dim: The hidden dimension of the head.
         :param n_layers: The number of layers in the head. If this is 0 and `out_dim` equals the embedding
             dimension, the model has no head and the embeddings are used as is.
-        :param out_dim: The output dimension of the head. If None, the head is constructed when `out_dim` is set,
-            for example by `fit`.
+        :param out_dim: The output dimension of the head.
         :param token_mapping: The token mapping. If None, the token mapping is set to the range of the number of vectors.
         :param weights: The token weights of the model. If None and `freeze_weights` is not False, the model has
             no token weights and takes the unweighted mean of the token embeddings. If None and `freeze_weights`
@@ -155,7 +154,7 @@ class BaseFinetuneable(nn.Module):
         :raises ValueError: If the head has not been constructed yet.
         """
         if self._head is None:
-            raise ValueError("The model has no head yet. Call `fit`, or pass `out_dim` when creating the model.")
+            raise ValueError("The model has no head yet. Call `fit`.")
         return self._head
 
     def construct_head(self) -> nn.Sequential:
@@ -226,8 +225,7 @@ class BaseFinetuneable(nn.Module):
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of layers in the head.
         :param hidden_dim: The hidden dimension of the head.
-        :param out_dim: The output dimension of the head. If None, the head is constructed when `out_dim` is set,
-            for example by `fit`.
+        :param out_dim: The output dimension of the head.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
