@@ -174,19 +174,19 @@ The validation set is passed as `text_a_val` and `text_b_val`, instead of `X_val
 
 # Model options
 
-All four models are created with `from_pretrained` or `from_static_model`, which take the same keyword arguments:
+All four models are created with `from_pretrained` or `from_static_model`, which take these keyword arguments:
 
 | Argument | Default | Description |
 | --- | --- | --- |
 | `n_layers` | `1` | The number of hidden layers in the head. |
 | `hidden_dim` | `512` | The size of the hidden layers. |
-| `out_dim` | | The output dimension. For classification, similarity and regression, this is set by `fit`. For pair similarity, it defaults to the embedding dimension. |
+| `out_dim` | The embedding dimension | Pair similarity only. The output dimension. For classification, similarity and regression, the output dimension is set by `fit`. |
 | `max_length` | The static model's | The maximum number of tokens per text, for both training and inference. Pass `None` to disable truncation. |
 | `freeze` | `False` | Freeze the token embeddings, so that only the head and token weights are trained. |
 | `freeze_weights` | `None` | Controls the token weights. `None` trains the model's own token weights, and leaves a model without token weights without them. `False` also gives a model without token weights learnable weights, starting at 1. `True` freezes them. |
 | `normalize` | `True` | Normalize the embeddings before the head. |
 
-With `n_layers=0`, a classifier gets a single linear layer. A similarity or pair model gets no head at all if `out_dim` equals the embedding dimension, and a single linear layer otherwise.
+With `n_layers=0`, a classifier gets a single linear layer. A similarity or pair model gets no head at all if its output dimension equals the embedding dimension, and a single linear layer otherwise.
 
 # Training options
 

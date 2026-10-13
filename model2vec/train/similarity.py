@@ -73,7 +73,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         tokenizer: Tokenizer,
         n_layers: int = 1,
         hidden_dim: int = 512,
-        out_dim: int = 2,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
@@ -84,7 +83,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         """Initialize a standard similarity model."""
         super().__init__(
             vectors=vectors,
-            out_dim=out_dim,
             tokenizer=tokenizer,
             token_mapping=token_mapping,
             weights=weights,
@@ -106,7 +104,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
-        out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool | None = None,
@@ -121,7 +118,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
         :param hidden_dim: The hidden dimension of the head.
-        :param out_dim: The output dimension of the head. This is reset when calling `fit`.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
@@ -135,7 +131,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
             max_length=max_length,
             n_layers=n_layers,
             hidden_dim=hidden_dim,
-            out_dim=out_dim,
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
@@ -150,7 +145,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
-        out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool | None = None,
@@ -163,7 +157,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
         :param hidden_dim: The hidden dimension of the head.
-        :param out_dim: The output dimension of the head. This is reset when calling `fit`.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
@@ -175,7 +168,6 @@ class StaticModelForSimilarity(BaseFinetuneable):
             **_static_model_arguments(model, max_length=max_length),
             n_layers=n_layers,
             hidden_dim=hidden_dim,
-            out_dim=out_dim,
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,

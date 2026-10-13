@@ -148,7 +148,6 @@ class StaticModelForClassification(BaseFinetuneable):
         tokenizer: Tokenizer,
         n_layers: int = 1,
         hidden_dim: int = 512,
-        out_dim: int = 2,
         token_mapping: list[int] | None = None,
         weights: torch.Tensor | None = None,
         freeze: bool = False,
@@ -157,13 +156,12 @@ class StaticModelForClassification(BaseFinetuneable):
         max_length: int | None = DEFAULT_MAX_LENGTH,
     ) -> None:
         """Initialize a standard classifier model."""
-        # Alias: Follows scikit-learn. Set to dummy classes
-        self.classes_: list[str] = [str(x) for x in range(out_dim)]
+        # Alias: Follows scikit-learn. Set by fit.
+        self.classes_: list[str] = []
         # multilabel flag will be set based on the type of `y` passed to fit.
         self.multilabel: bool = False
         super().__init__(
             vectors=vectors,
-            out_dim=out_dim,
             tokenizer=tokenizer,
             token_mapping=token_mapping,
             weights=weights,
@@ -185,7 +183,6 @@ class StaticModelForClassification(BaseFinetuneable):
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
-        out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool | None = None,
@@ -200,7 +197,6 @@ class StaticModelForClassification(BaseFinetuneable):
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
         :param hidden_dim: The hidden dimension of the head.
-        :param out_dim: The number of classes. This is reset when calling `fit`.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
@@ -214,7 +210,6 @@ class StaticModelForClassification(BaseFinetuneable):
             max_length=max_length,
             n_layers=n_layers,
             hidden_dim=hidden_dim,
-            out_dim=out_dim,
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
@@ -229,7 +224,6 @@ class StaticModelForClassification(BaseFinetuneable):
         max_length: int | None | _UnsetType = _UNSET,
         n_layers: int = 1,
         hidden_dim: int = 512,
-        out_dim: int = 2,
         freeze: bool = False,
         normalize: bool = True,
         freeze_weights: bool | None = None,
@@ -242,7 +236,6 @@ class StaticModelForClassification(BaseFinetuneable):
             static model's `max_length` is used. Pass None to disable truncation.
         :param n_layers: The number of hidden layers in the head.
         :param hidden_dim: The hidden dimension of the head.
-        :param out_dim: The number of classes. This is reset when calling `fit`.
         :param freeze: Whether to freeze the embeddings.
         :param normalize: Whether to normalize the embeddings.
         :param freeze_weights: Whether to freeze the token weights. If None, the model's own weights are trained,
@@ -254,7 +247,6 @@ class StaticModelForClassification(BaseFinetuneable):
             **_static_model_arguments(model, max_length=max_length),
             n_layers=n_layers,
             hidden_dim=hidden_dim,
-            out_dim=out_dim,
             freeze=freeze,
             normalize=normalize,
             freeze_weights=freeze_weights,
@@ -268,7 +260,7 @@ class StaticModelForClassification(BaseFinetuneable):
 
     def construct_head(self) -> nn.Sequential:
         """Constructs a classifier head, which always has at least one linear layer."""
-        if self.n_layers == 0:
+        if self.n_layers == 0 and self.out_dim is not None:
             linear = nn.Linear(self.embed_dim, self.out_dim)
             nn.init.xavier_uniform_(linear.weight)
             nn.init.zeros_(linear.bias)
