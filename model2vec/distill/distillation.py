@@ -5,6 +5,7 @@ import os
 import re
 from typing import Sequence, cast
 
+import numpy as np
 from huggingface_hub.hf_api import model_info
 from skeletoken import TokenizerModel
 from skeletoken.external.transformers import reshape_embeddings
@@ -65,35 +66,13 @@ def distill_from_model(
         'first': use the first token's hidden state ([CLS] token in BERT-style models).
         'pooler': use the pooler output (if available). This is often a non-linear projection of the [CLS] token.
     :return: A StaticModel.
-    :raises ValueError: if the vocabulary is empty after preprocessing.
 
     """
     quantize_to = DType(quantize_to)
     sif_coefficient, token_remove_regex = _validate_parameters(sif_coefficient, token_remove_pattern)
 
-    if vocabulary is None:
-        vocabulary = []
-
     device = select_optimal_device(device)
-    original_tokenizer_model = TokenizerModel.from_transformers_tokenizer(tokenizer)
-    original_tokenizer_model = original_tokenizer_model.prune_added_tokens()
-
-    # Clean the vocabulary by removing duplicate tokens and tokens that are in the internal vocabulary.
-    # Copy the original tokenizer model.
-    tokenizer_model = original_tokenizer_model.deep_copy()
-    if tokenizer_model.adds_prefix_space is not None:
-        tokenizer_model.adds_prefix_space = True
-
-    # Create the vocabulary in the new tokenizer.
-    tokenizer_model = clean_and_create_vocabulary(tokenizer_model, vocabulary, token_remove_regex=token_remove_regex)
-
-    # All tokens in a single list.
-    all_tokens = tokenizer_model.sorted_vocabulary
-    if not all_tokens:
-        raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")
-
-    # Turn all _new_ tokens into ids using the original tokenizer
-    token_ids = turn_tokens_into_ids(all_tokens, original_tokenizer_model)
+    original_tokenizer_model, tokenizer_model, token_ids = _prepare_tokenizer(tokenizer, vocabulary, token_remove_regex)
 
     # Reshape the transformer
     model = reshape_embeddings(model, original_tokenizer_model)
@@ -138,7 +117,173 @@ def distill_from_model(
         "pooling": pooling,
     }
 
-    if os.path.exists(model_name):
+    return _create_static_model(
+        embeddings=embeddings,
+        weights=weights,
+        token_mapping=token_mapping,
+        tokenizer_model=tokenizer_model,
+        config=config,
+        model_name=model_name,
+    )
+
+
+def random_init(
+    model_name: str,
+    vocabulary: Sequence[str] | None = None,
+    dim: int = 256,
+    sif_coefficient: float | None = 1e-4,
+    token_remove_pattern: str | None = r"\[unused\d+\]",
+    quantize_to: DType | str = DType.Float16,
+    seed: int = 42,
+    trust_remote_code: bool = False,
+) -> StaticModel:
+    """Create a staticmodel with random embeddings from a tokenizer.
+
+    The tokenizer and vocabulary are processed in the same way as in `distill_from_model`, but instead of
+    computing embeddings with a model, each token gets an embedding drawn from N(0, 1).
+
+    :param model_name: The name or path of the model whose tokenizer to load.
+    :param vocabulary: The vocabulary to use. If this is None, we use the tokenizer's vocabulary.
+    :param dim: The dimensionality of the embeddings.
+    :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
+        Should be a value > 0 and < 1.0. A value of 1e-4 is a good default.
+    :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to
+        this regex pattern will be removed from the vocabulary.
+    :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
+    :param seed: The random seed used to draw the embeddings.
+    :param trust_remote_code: Whether to trust remote code when loading the tokenizer.
+    :return: A StaticModel.
+
+    """
+    tokenizer = cast(
+        PreTrainedTokenizerFast,
+        AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code, use_fast=True),
+    )
+    return init_from_tokenizer(tokenizer, vocabulary, dim, sif_coefficient, token_remove_pattern, quantize_to, seed)
+
+
+def init_from_tokenizer(
+    tokenizer: PreTrainedTokenizerFast,
+    vocabulary: Sequence[str] | None = None,
+    dim: int = 256,
+    sif_coefficient: float | None = 1e-4,
+    token_remove_pattern: str | None = r"\[unused\d+\]",
+    quantize_to: DType | str = DType.Float16,
+    seed: int = 42,
+) -> StaticModel:
+    """Create a staticmodel with random embeddings from a tokenizer.
+
+    The tokenizer and vocabulary are processed in the same way as in `distill_from_model`, but instead of
+    computing embeddings with a model, each token gets an embedding drawn from N(0, 1).
+
+    :param tokenizer: The tokenizer to use.
+    :param vocabulary: The vocabulary to use. If this is None, we use the tokenizer's vocabulary.
+    :param dim: The dimensionality of the embeddings.
+    :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
+        Should be a value > 0 and < 1.0. A value of 1e-4 is a good default.
+    :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to
+        this regex pattern will be removed from the vocabulary.
+    :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
+    :param seed: The random seed used to draw the embeddings.
+    :return: A StaticModel.
+    :raises ValueError: if dim is not a positive integer.
+
+    """
+    if dim <= 0:
+        raise ValueError(f"dim must be a positive integer, got {dim}.")
+    quantize_to = DType(quantize_to)
+    sif_coefficient, token_remove_regex = _validate_parameters(sif_coefficient, token_remove_pattern)
+
+    _, tokenizer_model, token_ids = _prepare_tokenizer(tokenizer, vocabulary, token_remove_regex)
+
+    embeddings = np.random.default_rng(seed).standard_normal((len(token_ids), dim))
+    weights = compute_weights(len(embeddings), sif_coefficient=sif_coefficient)
+    embeddings = quantize_embeddings(embeddings * weights[:, None], quantize_to)
+
+    tokenizer_name = tokenizer.name_or_path
+
+    config: StaticModelConfig = {
+        "model_type": "model2vec",
+        "architectures": ["StaticModel"],
+        "tokenizer_name": tokenizer_name,
+        "apply_pca": None,
+        "sif_coefficient": sif_coefficient,
+        "hidden_dim": embeddings.shape[1],
+        "seq_length": 1000000,
+        "normalize": True,
+    }
+
+    return _create_static_model(
+        embeddings=embeddings,
+        weights=None,
+        token_mapping=None,
+        tokenizer_model=tokenizer_model,
+        config=config,
+        model_name=tokenizer_name,
+    )
+
+
+def _prepare_tokenizer(
+    tokenizer: PreTrainedTokenizerFast,
+    vocabulary: Sequence[str] | None,
+    token_remove_regex: re.Pattern[str] | None,
+) -> tuple[TokenizerModel, TokenizerModel, list[list[int]]]:
+    """Create the new tokenizer model and the ids of its tokens in the original tokenizer.
+
+    :param tokenizer: The original tokenizer.
+    :param vocabulary: The vocabulary to add. If this is None, no tokens are added.
+    :param token_remove_regex: Tokens matching this regex are removed from the vocabulary.
+    :return: The original tokenizer model, the new tokenizer model, and the token ids in the original tokenizer.
+    :raises ValueError: if the vocabulary is empty after preprocessing.
+
+    """
+    original_tokenizer_model = TokenizerModel.from_transformers_tokenizer(tokenizer)
+    original_tokenizer_model = original_tokenizer_model.prune_added_tokens()
+
+    # Clean the vocabulary by removing duplicate tokens and tokens that are in the internal vocabulary.
+    # Copy the original tokenizer model.
+    tokenizer_model = original_tokenizer_model.deep_copy()
+    if tokenizer_model.adds_prefix_space is not None:
+        tokenizer_model.adds_prefix_space = True
+
+    # Create the vocabulary in the new tokenizer.
+    tokenizer_model = clean_and_create_vocabulary(
+        tokenizer_model, vocabulary or [], token_remove_regex=token_remove_regex
+    )
+
+    # All tokens in a single list.
+    all_tokens = tokenizer_model.sorted_vocabulary
+    if not all_tokens:
+        raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")
+
+    # Turn all _new_ tokens into ids using the original tokenizer
+    token_ids = turn_tokens_into_ids(all_tokens, original_tokenizer_model)
+
+    return original_tokenizer_model, tokenizer_model, token_ids
+
+
+def _create_static_model(
+    embeddings: np.ndarray,
+    weights: np.ndarray | None,
+    token_mapping: np.ndarray | None,
+    tokenizer_model: TokenizerModel,
+    config: StaticModelConfig,
+    model_name: str,
+) -> StaticModel:
+    """Create a StaticModel, looking up the language of the base model on the Hugging Face Hub.
+
+    :param embeddings: The embeddings.
+    :param weights: The token weights, if any.
+    :param token_mapping: The mapping from tokens to embeddings, if any.
+    :param tokenizer_model: The tokenizer model.
+    :param config: The config of the model.
+    :param model_name: The name or path of the base model.
+    :return: A StaticModel.
+
+    """
+    if not model_name:
+        language = None
+    elif os.path.exists(model_name):
         # Using a local model. Get the model name from the path.
         model_name = os.path.basename(model_name)
         language = None
