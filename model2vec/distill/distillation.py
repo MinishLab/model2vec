@@ -72,7 +72,10 @@ def distill_from_model(
     sif_coefficient, token_remove_regex = _validate_parameters(sif_coefficient, token_remove_pattern)
 
     device = select_optimal_device(device)
-    original_tokenizer_model, tokenizer_model, token_ids = _prepare_tokenizer(tokenizer, vocabulary, token_remove_regex)
+    original_tokenizer_model, tokenizer_model = _prepare_tokenizer(tokenizer, vocabulary, token_remove_regex)
+
+    # Turn all _new_ tokens into ids using the original tokenizer
+    token_ids = turn_tokens_into_ids(tokenizer_model.sorted_vocabulary, original_tokenizer_model)
 
     # Reshape the transformer
     model = reshape_embeddings(model, original_tokenizer_model)
@@ -159,7 +162,15 @@ def random_init(
         PreTrainedTokenizerFast,
         AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code, use_fast=True),
     )
-    return init_from_tokenizer(tokenizer, vocabulary, dim, sif_coefficient, token_remove_pattern, quantize_to, seed)
+    return init_from_tokenizer(
+        tokenizer=tokenizer,
+        vocabulary=vocabulary,
+        dim=dim,
+        sif_coefficient=sif_coefficient,
+        token_remove_pattern=token_remove_pattern,
+        quantize_to=quantize_to,
+        seed=seed,
+    )
 
 
 def init_from_tokenizer(
@@ -186,7 +197,7 @@ def init_from_tokenizer(
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
     :param seed: The random seed used to draw the embeddings.
     :return: A StaticModel.
-    :raises ValueError: if dim is not a positive integer.
+    :raises ValueError: if the parameters are invalid or the vocabulary is empty after preprocessing.
 
     """
     if dim <= 0:
@@ -194,9 +205,9 @@ def init_from_tokenizer(
     quantize_to = DType(quantize_to)
     sif_coefficient, token_remove_regex = _validate_parameters(sif_coefficient, token_remove_pattern)
 
-    _, tokenizer_model, token_ids = _prepare_tokenizer(tokenizer, vocabulary, token_remove_regex)
+    _, tokenizer_model = _prepare_tokenizer(tokenizer, vocabulary, token_remove_regex)
 
-    embeddings = np.random.default_rng(seed).standard_normal((len(token_ids), dim))
+    embeddings = np.random.default_rng(seed).standard_normal((tokenizer_model.vocabulary_size, dim))
     weights = compute_weights(len(embeddings), sif_coefficient=sif_coefficient)
     embeddings = quantize_embeddings(embeddings * weights[:, None], quantize_to)
 
@@ -211,6 +222,7 @@ def init_from_tokenizer(
         "hidden_dim": embeddings.shape[1],
         "seq_length": 1000000,
         "normalize": True,
+        "pooling": "random",
     }
 
     return _create_static_model(
@@ -227,13 +239,13 @@ def _prepare_tokenizer(
     tokenizer: PreTrainedTokenizerFast,
     vocabulary: Sequence[str] | None,
     token_remove_regex: re.Pattern[str] | None,
-) -> tuple[TokenizerModel, TokenizerModel, list[list[int]]]:
-    """Create the new tokenizer model and the ids of its tokens in the original tokenizer.
+) -> tuple[TokenizerModel, TokenizerModel]:
+    """Create the original tokenizer model and the new tokenizer model.
 
     :param tokenizer: The original tokenizer.
     :param vocabulary: The vocabulary to add. If this is None, no tokens are added.
     :param token_remove_regex: Tokens matching this regex are removed from the vocabulary.
-    :return: The original tokenizer model, the new tokenizer model, and the token ids in the original tokenizer.
+    :return: The original tokenizer model and the new tokenizer model.
     :raises ValueError: if the vocabulary is empty after preprocessing.
 
     """
@@ -246,20 +258,14 @@ def _prepare_tokenizer(
     if tokenizer_model.adds_prefix_space is not None:
         tokenizer_model.adds_prefix_space = True
 
+    vocabulary = vocabulary if vocabulary is not None else []
     # Create the vocabulary in the new tokenizer.
-    tokenizer_model = clean_and_create_vocabulary(
-        tokenizer_model, vocabulary or [], token_remove_regex=token_remove_regex
-    )
+    tokenizer_model = clean_and_create_vocabulary(tokenizer_model, vocabulary, token_remove_regex=token_remove_regex)
 
-    # All tokens in a single list.
-    all_tokens = tokenizer_model.sorted_vocabulary
-    if not all_tokens:
+    if tokenizer_model.vocabulary_size == 0:
         raise ValueError("The vocabulary is empty after preprocessing. Please check your token_remove_pattern.")
 
-    # Turn all _new_ tokens into ids using the original tokenizer
-    token_ids = turn_tokens_into_ids(all_tokens, original_tokenizer_model)
-
-    return original_tokenizer_model, tokenizer_model, token_ids
+    return original_tokenizer_model, tokenizer_model
 
 
 def _create_static_model(
@@ -316,7 +322,7 @@ def _validate_parameters(
     """Validate the parameters passed to the distillation function.
 
     :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
-        Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
+        Should be a value > 0 and < 1.0. A value of 1e-4 is a good default.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to
         this regex pattern will be removed from the vocabulary.
     :return: The SIF coefficient to use.
@@ -365,7 +371,7 @@ def distill(
         If this is None, we don't apply PCA.
         If this is 'auto', we don't reduce dimenionality, but still apply PCA.
     :param sif_coefficient: The SIF coefficient to use. If this is None, no weighting is applied.
-        Should be a value >= 0 and < 1.0. A value of 1e-4 is a good default.
+        Should be a value > 0 and < 1.0. A value of 1e-4 is a good default.
     :param token_remove_pattern: If this is set to a string, we compile this into a regex. Any tokens that conform to
         this regex pattern will be removed from the vocabulary.
     :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming

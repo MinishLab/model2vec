@@ -10,6 +10,9 @@ import numpy as np
 import pytest
 from pytest import LogCaptureFixture
 from skeletoken import TokenizerModel
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.pre_tokenizers import ByteLevel
 from transformers import BertTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_tokenizers import PreTrainedTokenizerFast
@@ -299,6 +302,7 @@ def test_distill_from_tokenizer(
     assert static_model.embedding.shape == expected_shape
     assert static_model.config["hidden_dim"] == dim
     assert static_model.config["apply_pca"] is None
+    assert static_model.config["pooling"] == "random"
     assert static_model.base_model_name == "test_tokenizer"
     mock_model_info.assert_not_called()
 
@@ -337,6 +341,29 @@ def test_distill_from_tokenizer_invalid_parameters(
             sif_coefficient=sif_coefficient,
             token_remove_pattern=token_remove_pattern,
         )
+
+
+@pytest.fixture
+def byte_level_tokenizer() -> PreTrainedTokenizerFast:
+    """Create a byte-level BPE tokenizer without a prefix space."""
+    vocab = ["word1", "word2", "Ġword3", "[UNK]"]
+    tokenizer = Tokenizer(BPE(vocab={token: idx for idx, token in enumerate(vocab)}, merges=[], unk_token="[UNK]"))
+    tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=False)  # type: ignore
+    return PreTrainedTokenizerFast(tokenizer_object=tokenizer)
+
+
+def test_distill_from_tokenizer_adds_prefix_space(byte_level_tokenizer: PreTrainedTokenizerFast) -> None:
+    """Test that tokenizers with a prefix space setting get a prefix space."""
+    static_model = init_from_tokenizer(tokenizer=byte_level_tokenizer, dim=4, token_remove_pattern=None)
+    assert static_model.tokenizer.pre_tokenizer.add_prefix_space  # type: ignore
+    assert not byte_level_tokenizer.backend_tokenizer.pre_tokenizer.add_prefix_space  # type: ignore
+    assert static_model.embedding.shape == (4, 4)
+
+
+def test_distill_from_tokenizer_empty_vocabulary(byte_level_tokenizer: PreTrainedTokenizerFast) -> None:
+    """Test that removing all tokens raises."""
+    with pytest.raises(ValueError, match="The vocabulary is empty after preprocessing"):
+        init_from_tokenizer(tokenizer=byte_level_tokenizer, dim=4, token_remove_pattern=r".*")
 
 
 @pytest.mark.parametrize(
