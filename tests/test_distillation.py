@@ -17,7 +17,8 @@ from transformers import BertTokenizer
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils_tokenizers import PreTrainedTokenizerFast
 
-from model2vec.distill.distillation import distill, distill_from_model, init_from_tokenizer, random_init
+from model2vec.distill import init_from_tokenizer, random_init
+from model2vec.distill.distillation import distill, distill_from_model
 from model2vec.distill.inference import PoolingMode, apply_pca, compute_weights, create_embeddings
 from model2vec.model import StaticModel
 from model2vec.tokenizer import clean_and_create_vocabulary
@@ -202,6 +203,14 @@ def test_distill_removal_pattern(
             token_remove_pattern="[...papapa",
         )
 
+    # Random init from the tokenizer only
+    full = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8, token_remove_pattern=None)
+    pruned = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8)
+    assert len(full.embedding) == expected_vocab_size
+    assert any(token.startswith("[unused") for token in full.tokens)
+    assert not any(token.startswith("[unused") for token in pruned.tokens)
+    assert len(pruned.embedding) == len(pruned.tokens)
+
 
 @pytest.mark.parametrize(
     "vocabulary, pca_dims, sif_coefficient, expected_shape",
@@ -275,72 +284,75 @@ def test_missing_modelinfo(
 
 
 @pytest.mark.parametrize(
-    "vocabulary, dim, sif_coefficient, expected_shape",
+    "vocabulary, dim, sif_coefficient, token_remove_pattern, quantize_to, expected_shape",
     [
-        (None, 256, 1e-4, (30519, 256)),
-        (None, 16, None, (30519, 16)),
-        (["wordA", "wordB"], 8, None, (30521, 8)),
+        (None, 256, 1e-4, None, "float16", (30519, 256)),  # SIF on
+        (None, 16, None, None, "float32", (30519, 16)),  # SIF off
+        (None, 16, None, None, "float64", (30519, 16)),
+        (["wordA", "wordB"], 8, None, None, "int8", (30521, 8)),  # Custom vocab
+        (None, 0, None, None, "float16", None),  # invalid dim -> raises
+        (None, -1, None, None, "float16", None),  # invalid dim -> raises
+        (None, 8, 0, None, "float16", None),  # invalid SIF (too low) -> raises
+        (None, 8, 1, None, "float16", None),  # invalid SIF (too high) -> raises
+        (None, 8, None, "[", "float16", None),  # invalid regex -> raises
     ],
 )
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
-def test_distill_from_tokenizer(
+def test_init_from_tokenizer(
     mock_model_info: MagicMock,
     mock_berttokenizer: PreTrainedTokenizerFast,
+    tmp_path: Path,
     vocabulary: list[str] | None,
     dim: int,
     sif_coefficient: float | None,
-    expected_shape: tuple[int, int],
+    token_remove_pattern: str | None,
+    quantize_to: str,
+    expected_shape: tuple[int, int] | None,
 ) -> None:
-    """Test distilling from a tokenizer only."""
+    """Test creating a random model from a tokenizer only."""
+    if expected_shape is None:
+        with pytest.raises(ValueError):
+            init_from_tokenizer(
+                tokenizer=mock_berttokenizer,
+                dim=dim,
+                sif_coefficient=sif_coefficient,
+                token_remove_pattern=token_remove_pattern,
+            )
+        return
+
     static_model = init_from_tokenizer(
         tokenizer=mock_berttokenizer,
         vocabulary=vocabulary,
         dim=dim,
         sif_coefficient=sif_coefficient,
-        token_remove_pattern=None,
+        token_remove_pattern=token_remove_pattern,
+        quantize_to=quantize_to,
     )
     assert static_model.embedding.shape == expected_shape
+    assert static_model.embedding.dtype == np.dtype(quantize_to)
+    assert static_model.weights is None
+    assert static_model.token_mapping is None
     assert static_model.config["hidden_dim"] == dim
     assert static_model.config["apply_pca"] is None
-    assert static_model.config["pooling"] == "random"
+    assert static_model.config["sif_coefficient"] == sif_coefficient
+    assert static_model.config["pooling"] == PoolingMode.RANDOM
     assert static_model.base_model_name == "test_tokenizer"
     mock_model_info.assert_not_called()
+
+    for token in vocabulary or []:
+        assert static_model.tokenizer.normalizer.normalize_str(token) in static_model.tokens
+    assert static_model.encode([" ".join(vocabulary or ["hello"])]).shape == (1, dim)
+
+    static_model.save_pretrained(tmp_path)
+    loaded = StaticModel.from_pretrained(tmp_path)
+    assert np.array_equal(loaded.embedding, static_model.embedding)
+    assert loaded.tokens == static_model.tokens
 
     seeded = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=dim, seed=1)
     seeded_again = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=dim, seed=1)
     other_seed = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=dim, seed=2)
     assert np.array_equal(seeded.embedding, seeded_again.embedding)
     assert not np.array_equal(seeded.embedding, other_seed.embedding)
-
-
-@pytest.mark.parametrize("dim", [0, -1])
-def test_distill_from_tokenizer_invalid_dim(mock_berttokenizer: PreTrainedTokenizerFast, dim: int) -> None:
-    """Test that a non-positive dim raises."""
-    with pytest.raises(ValueError):
-        init_from_tokenizer(tokenizer=mock_berttokenizer, dim=dim)
-
-
-@pytest.mark.parametrize(
-    "sif_coefficient, token_remove_pattern",
-    [
-        (0, None),
-        (1, None),
-        (None, "["),
-    ],
-)
-def test_distill_from_tokenizer_invalid_parameters(
-    mock_berttokenizer: PreTrainedTokenizerFast,
-    sif_coefficient: float | None,
-    token_remove_pattern: str | None,
-) -> None:
-    """Test that invalid sif coefficients and regexes raise."""
-    with pytest.raises(ValueError):
-        init_from_tokenizer(
-            tokenizer=mock_berttokenizer,
-            dim=8,
-            sif_coefficient=sif_coefficient,
-            token_remove_pattern=token_remove_pattern,
-        )
 
 
 @pytest.fixture
@@ -352,38 +364,18 @@ def byte_level_tokenizer() -> PreTrainedTokenizerFast:
     return PreTrainedTokenizerFast(tokenizer_object=tokenizer)
 
 
-def test_distill_from_tokenizer_adds_prefix_space(byte_level_tokenizer: PreTrainedTokenizerFast) -> None:
-    """Test that tokenizers with a prefix space setting get a prefix space."""
+def test_init_from_tokenizer_byte_level(byte_level_tokenizer: PreTrainedTokenizerFast) -> None:
+    """Test that byte-level tokenizers get a prefix space, and that removing all tokens raises."""
     static_model = init_from_tokenizer(tokenizer=byte_level_tokenizer, dim=4, token_remove_pattern=None)
     assert static_model.tokenizer.pre_tokenizer.add_prefix_space  # type: ignore
     assert not byte_level_tokenizer.backend_tokenizer.pre_tokenizer.add_prefix_space  # type: ignore
     assert static_model.embedding.shape == (4, 4)
 
-
-def test_distill_from_tokenizer_empty_vocabulary(byte_level_tokenizer: PreTrainedTokenizerFast) -> None:
-    """Test that removing all tokens raises."""
     with pytest.raises(ValueError, match="The vocabulary is empty after preprocessing"):
         init_from_tokenizer(tokenizer=byte_level_tokenizer, dim=4, token_remove_pattern=r".*")
 
 
-@pytest.mark.parametrize(
-    "quantize_to, expected_dtype",
-    [
-        ("float16", np.float16),
-        ("float32", np.float32),
-        ("float64", np.float64),
-        ("int8", np.int8),
-    ],
-)
-def test_distill_from_tokenizer_quantize(
-    mock_berttokenizer: PreTrainedTokenizerFast, quantize_to: str, expected_dtype: type[np.generic]
-) -> None:
-    """Test that the embeddings are quantized to the requested dtype."""
-    static_model = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8, quantize_to=quantize_to)
-    assert static_model.embedding.dtype == expected_dtype
-
-
-def test_distill_from_tokenizer_sif_weighting(mock_berttokenizer: PreTrainedTokenizerFast) -> None:
+def test_init_from_tokenizer_sif_weighting(mock_berttokenizer: PreTrainedTokenizerFast) -> None:
     """Test that SIF weights are folded into the embeddings."""
     unweighted = init_from_tokenizer(
         tokenizer=mock_berttokenizer, dim=8, sif_coefficient=None, token_remove_pattern=None, quantize_to="float64"
@@ -392,65 +384,35 @@ def test_distill_from_tokenizer_sif_weighting(mock_berttokenizer: PreTrainedToke
         tokenizer=mock_berttokenizer, dim=8, sif_coefficient=1e-4, token_remove_pattern=None, quantize_to="float64"
     )
     weights = compute_weights(len(unweighted.embedding), sif_coefficient=1e-4)
-    assert weighted.weights is None
-    assert weighted.token_mapping is None
-    assert weighted.config["sif_coefficient"] == 1e-4
     assert np.allclose(weighted.embedding, unweighted.embedding * weights[:, None])
 
 
-def test_distill_from_tokenizer_token_remove_pattern(mock_berttokenizer: PreTrainedTokenizerFast) -> None:
-    """Test that tokens matching the remove pattern are removed from the vocabulary."""
-    full = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8, token_remove_pattern=None)
-    pruned = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8)
-    assert any(token.startswith("[unused") for token in full.tokens)
-    assert not any(token.startswith("[unused") for token in pruned.tokens)
-    assert len(pruned.embedding) < len(full.embedding)
-    assert len(pruned.embedding) == len(pruned.tokens)
-
-
-def test_distill_from_tokenizer_vocabulary_tokenizes(mock_berttokenizer: PreTrainedTokenizerFast) -> None:
-    """Test that added vocabulary items are single tokens in the resulting model."""
-    static_model = init_from_tokenizer(
-        tokenizer=mock_berttokenizer, vocabulary=["wordA", "wordB"], dim=8, token_remove_pattern=None
-    )
-    assert "worda" in static_model.tokens
-    assert "wordb" in static_model.tokens
-    assert static_model.encode(["wordA wordB"]).shape == (1, 8)
-
-
+@pytest.mark.parametrize(
+    "name_or_path, card_data, expected_language",
+    [
+        ("", None, None),  # No name -> no hub call
+        ("some-org/some-model", {"language": "en"}, "en"),  # Hub name -> language from model card
+    ],
+)
 @patch.object(import_module("model2vec.distill.distillation"), "model_info")
-def test_distill_from_tokenizer_empty_name(
-    mock_model_info: MagicMock, mock_berttokenizer: PreTrainedTokenizerFast
+def test_init_from_tokenizer_model_info(
+    mock_model_info: MagicMock,
+    mock_berttokenizer: PreTrainedTokenizerFast,
+    name_or_path: str,
+    card_data: dict[str, str] | None,
+    expected_language: str | None,
 ) -> None:
-    """Test that a tokenizer without a name does not query the hub."""
-    mock_berttokenizer.name_or_path = ""
+    """Test that the hub is only queried for tokenizers with a hub name."""
+    mock_model_info.return_value = type("ModelInfo", (object,), {"cardData": card_data})
+    mock_berttokenizer.name_or_path = name_or_path
     static_model = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8)
-    assert static_model.language is None
-    assert static_model.config["tokenizer_name"] == ""
-    mock_model_info.assert_not_called()
-
-
-@patch.object(import_module("model2vec.distill.distillation"), "model_info")
-def test_distill_from_tokenizer_hub_name(
-    mock_model_info: MagicMock, mock_berttokenizer: PreTrainedTokenizerFast
-) -> None:
-    """Test that a tokenizer with a hub name gets its language from the model card."""
-    mock_model_info.return_value = type("ModelInfo", (object,), {"cardData": {"language": "en"}})
-    mock_berttokenizer.name_or_path = "some-org/some-model"
-    static_model = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8)
-    mock_model_info.assert_called_once_with("some-org/some-model")
-    assert static_model.language == "en"
-    assert static_model.base_model_name == "some-org/some-model"
-
-
-def test_distill_from_tokenizer_save_load(mock_berttokenizer: PreTrainedTokenizerFast, tmp_path: Path) -> None:
-    """Test that a randomly initialized model survives a save/load roundtrip."""
-    static_model = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8)
-    static_model.save_pretrained(tmp_path)
-    loaded = StaticModel.from_pretrained(tmp_path)
-    assert np.array_equal(loaded.embedding, static_model.embedding)
-    assert loaded.tokens == static_model.tokens
-    assert loaded.config["hidden_dim"] == 8
+    assert static_model.language == expected_language
+    assert static_model.config["tokenizer_name"] == name_or_path
+    if card_data is None:
+        mock_model_info.assert_not_called()
+    else:
+        mock_model_info.assert_called_once_with(name_or_path)
+        assert static_model.base_model_name == name_or_path
 
 
 @patch("model2vec.distill.distillation.AutoTokenizer.from_pretrained")
@@ -462,15 +424,6 @@ def test_random_init(mock_from_pretrained: MagicMock, mock_berttokenizer: PreTra
     expected = init_from_tokenizer(tokenizer=mock_berttokenizer, dim=8, seed=3)
     assert np.array_equal(static_model.embedding, expected.embedding)
     assert static_model.tokens == expected.tokens
-
-
-def test_init_from_tokenizer_exported() -> None:
-    """Test that init_from_tokenizer and random_init are exported from the distill package."""
-    from model2vec.distill import init_from_tokenizer as exported_init
-    from model2vec.distill import random_init as exported_random
-
-    assert exported_init is init_from_tokenizer
-    assert exported_random is random_init
 
 
 @pytest.mark.parametrize(

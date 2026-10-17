@@ -222,7 +222,7 @@ def init_from_tokenizer(
         "hidden_dim": embeddings.shape[1],
         "seq_length": 1000000,
         "normalize": True,
-        "pooling": "random",
+        "pooling": PoolingMode.RANDOM,
     }
 
     return _create_static_model(
