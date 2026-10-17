@@ -31,12 +31,14 @@ class PoolingMode(str, Enum):
     - POOLER: use the model's `pooler_output`. In BERT-like models this is
                computed as the hidden state at [CLS], passed through a learned
                dense layer + activation. Not all models provide this.
+    - RANDOM: no model is used; each token gets a randomly drawn embedding.
     """
 
     MEAN = "mean"
     LAST = "last"
     FIRST = "first"
     POOLER = "pooler"
+    RANDOM = "random"
 
 
 def create_embeddings(
