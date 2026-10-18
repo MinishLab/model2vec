@@ -21,7 +21,7 @@ from model2vec.distill import init_from_tokenizer, random_init
 from model2vec.distill.distillation import distill, distill_from_model
 from model2vec.distill.inference import PoolingMode, apply_pca, compute_weights, create_embeddings
 from model2vec.model import StaticModel
-from model2vec.tokenizer import clean_and_create_vocabulary
+from model2vec.tokenizer import clean_and_create_vocabulary, turn_tokens_into_ids
 
 try:
     # For huggingface_hub>=0.25.0
@@ -501,6 +501,35 @@ def test_clean_and_create_vocabulary(
         logged_warnings = [record.message for record in caplog.records]
         for expected_warning in expected_warnings:
             assert any(expected_warning in logged_warning for logged_warning in logged_warnings)
+
+
+@pytest.mark.parametrize(
+    "token,expected_tokens",
+    [
+        ("##ing", ["[CLS]", "##ing", "[SEP]"]),
+        ("##xyzq", ["[CLS]", "x", "##y", "##z", "##q", "[SEP]"]),
+        ("hello world", ["[CLS]", "hello", "world", "[SEP]"]),
+    ],
+)
+def test_turn_tokens_into_ids(mock_tokenizermodel: TokenizerModel, token: str, expected_tokens: list[str]) -> None:
+    """Test that tokens are decoded before being re-encoded."""
+    ids = turn_tokens_into_ids([token], mock_tokenizermodel)
+    expected_ids = [mock_tokenizermodel.vocabulary[t] for t in expected_tokens]
+    assert ids == [expected_ids]
+
+
+def test_turn_tokens_into_ids_byte_level() -> None:
+    """Test that unmatched byte-level tokens are decoded to text with a leading space before being re-encoded."""
+    vocab = ["[UNK]", "Ġ", "Ä", "ł", "w", "o", "r", "d", "1"]
+    tokenizer = Tokenizer(BPE(vocab={token: idx for idx, token in enumerate(vocab)}, merges=[], unk_token="[UNK]"))
+    tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=False)  # type: ignore
+    model = TokenizerModel.from_transformers_tokenizer(PreTrainedTokenizerFast(tokenizer_object=tokenizer))
+    assert "Ġword1" not in model.vocabulary
+
+    ids = turn_tokens_into_ids(["Ġword1"], model)
+    expected_ids = model.to_tokenizer().encode(" word1").ids
+    assert expected_ids == [model.vocabulary[t] for t in ["Ġ", "w", "o", "r", "d", "1"]]
+    assert ids == [expected_ids]
 
 
 @pytest.mark.parametrize(

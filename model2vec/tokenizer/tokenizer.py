@@ -135,6 +135,8 @@ def turn_tokens_into_ids(tokens: list[str], model: TokenizerModel) -> list[list[
         if token_id is not None:
             token_ids.append([*prefix, token_id, *suffix])
         else:
-            token_ids.append(tokenizer.encode(token).ids)
+            decoded = model.preprocessor.decode(token)
+            enc = tokenizer.encode(decoded.decoded).ids
+            token_ids.append(enc)
 
     return token_ids
