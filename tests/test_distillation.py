@@ -21,7 +21,7 @@ from model2vec.distill import init_from_tokenizer, random_init
 from model2vec.distill.distillation import distill, distill_from_model
 from model2vec.distill.inference import PoolingMode, apply_pca, compute_weights, create_embeddings
 from model2vec.model import StaticModel
-from model2vec.tokenizer import clean_and_create_vocabulary
+from model2vec.tokenizer import clean_and_create_vocabulary, turn_tokens_into_ids
 
 try:
     # For huggingface_hub>=0.25.0
@@ -501,6 +501,21 @@ def test_clean_and_create_vocabulary(
         logged_warnings = [record.message for record in caplog.records]
         for expected_warning in expected_warnings:
             assert any(expected_warning in logged_warning for logged_warning in logged_warnings)
+
+
+@pytest.mark.parametrize(
+    "token,expected_tokens",
+    [
+        ("##ing", ["[CLS]", "##ing", "[SEP]"]),
+        ("##xyzq", ["[CLS]", "x", "##y", "##z", "##q", "[SEP]"]),
+        ("hello world", ["[CLS]", "hello", "world", "[SEP]"]),
+    ],
+)
+def test_turn_tokens_into_ids(mock_tokenizermodel: TokenizerModel, token: str, expected_tokens: list[str]) -> None:
+    """Test that tokens are decoded before being re-encoded."""
+    ids = turn_tokens_into_ids([token], mock_tokenizermodel)
+    expected_ids = [mock_tokenizermodel.vocabulary[t] for t in expected_tokens]
+    assert ids == [expected_ids]
 
 
 @pytest.mark.parametrize(
