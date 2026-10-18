@@ -518,6 +518,20 @@ def test_turn_tokens_into_ids(mock_tokenizermodel: TokenizerModel, token: str, e
     assert ids == [expected_ids]
 
 
+def test_turn_tokens_into_ids_byte_level() -> None:
+    """Test that unmatched byte-level tokens are decoded to text with a leading space before being re-encoded."""
+    vocab = ["[UNK]", "Ġ", "Ä", "ł", "w", "o", "r", "d", "1"]
+    tokenizer = Tokenizer(BPE(vocab={token: idx for idx, token in enumerate(vocab)}, merges=[], unk_token="[UNK]"))
+    tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=False)  # type: ignore
+    model = TokenizerModel.from_transformers_tokenizer(PreTrainedTokenizerFast(tokenizer_object=tokenizer))
+    assert "Ġword1" not in model.vocabulary
+
+    ids = turn_tokens_into_ids(["Ġword1"], model)
+    expected_ids = model.to_tokenizer().encode(" word1").ids
+    assert expected_ids == [model.vocabulary[t] for t in ["Ġ", "w", "o", "r", "d", "1"]]
+    assert ids == [expected_ids]
+
+
 @pytest.mark.parametrize(
     "pooling,with_pooler,expected_rows",
     [
