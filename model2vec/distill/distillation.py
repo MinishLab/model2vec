@@ -18,7 +18,6 @@ from model2vec.model import StaticModel
 from model2vec.quantization import DType, quantize_embeddings
 from model2vec.tokenizer import clean_and_create_vocabulary, turn_tokens_into_ids
 from model2vec.types import StaticModelConfig
-from model2vec.vocabulary_quantization import quantize_vocabulary
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,6 @@ def distill_from_model(
     sif_coefficient: float | None = 1e-4,
     token_remove_pattern: str | None = r"\[unused\d+\]",
     quantize_to: DType | str = DType.Float16,
-    vocabulary_quantization: int | None = None,
     pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> StaticModel:
     """Distill a staticmodel from a sentence transformer.
@@ -58,8 +56,6 @@ def distill_from_model(
         If the pattern is so general that it removes all tokens, we throw an error. If the pattern can't be compiled
         into a valid regex, we also throw an error.
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
-    :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no
-         quantization is performed.
     :param pooling: The pooling mode to use for creating embeddings. Can be one of:
         'mean' (default): mean over all tokens. Robust and works well in most cases.
         'last': use the last token's hidden state (often the [EOS] token). Common for decoder-style models.
@@ -89,20 +85,10 @@ def distill_from_model(
         pooling=pooling,
     )
 
-    # Apply quantization
-    if vocabulary_quantization is not None:
-        weights = compute_weights(len(embeddings), sif_coefficient=sif_coefficient)
-        embeddings, token_mapping, weights = quantize_vocabulary(
-            n_clusters=vocabulary_quantization, weights=weights, embeddings=embeddings
-        )
-        embeddings = apply_pca(embeddings, pca_dims)
-    else:
-        # Post-process the embeddings.
-        weights = compute_weights(len(embeddings), sif_coefficient=sif_coefficient)
-        embeddings = apply_pca(embeddings, pca_dims)
-        embeddings = embeddings * weights[:, None]
-        weights = None
-        token_mapping = None
+    # Post-process the embeddings.
+    weights = compute_weights(len(embeddings), sif_coefficient=sif_coefficient)
+    embeddings = apply_pca(embeddings, pca_dims)
+    embeddings = embeddings * weights[:, None]
     # Quantize the embeddings.
     embeddings = quantize_embeddings(embeddings, quantize_to)
 
@@ -122,8 +108,6 @@ def distill_from_model(
 
     return _create_static_model(
         embeddings=embeddings,
-        weights=weights,
-        token_mapping=token_mapping,
         tokenizer_model=tokenizer_model,
         config=config,
         model_name=model_name,
@@ -227,8 +211,6 @@ def init_from_tokenizer(
 
     return _create_static_model(
         embeddings=embeddings,
-        weights=None,
-        token_mapping=None,
         tokenizer_model=tokenizer_model,
         config=config,
         model_name=tokenizer_name,
@@ -270,8 +252,6 @@ def _prepare_tokenizer(
 
 def _create_static_model(
     embeddings: np.ndarray,
-    weights: np.ndarray | None,
-    token_mapping: np.ndarray | None,
     tokenizer_model: TokenizerModel,
     config: StaticModelConfig,
     model_name: str,
@@ -279,8 +259,6 @@ def _create_static_model(
     """Create a StaticModel, looking up the language of the base model on the Hugging Face Hub.
 
     :param embeddings: The embeddings.
-    :param weights: The token weights, if any.
-    :param token_mapping: The mapping from tokens to embeddings, if any.
     :param tokenizer_model: The tokenizer model.
     :param config: The config of the model.
     :param model_name: The name or path of the base model.
@@ -305,8 +283,6 @@ def _create_static_model(
 
     return StaticModel(
         vectors=embeddings,
-        weights=weights,
-        token_mapping=token_mapping,
         tokenizer=tokenizer_model.to_tokenizer(),
         config=config,
         base_model_name=model_name,
@@ -352,7 +328,6 @@ def distill(
     token_remove_pattern: str | None = r"\[unused\d+\]",
     trust_remote_code: bool = False,
     quantize_to: DType | str = DType.Float16,
-    vocabulary_quantization: int | None = None,
     pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> StaticModel:
     """Distill a staticmodel from a sentence transformer.
@@ -377,8 +352,6 @@ def distill(
     :param trust_remote_code: Whether to trust the remote code. If this is False, we will only load components coming
         from `transformers`. If this is True, we will load all components.
     :param quantize_to: The data type to quantize to. Can be any of the DType enum members or their string equivalents.
-    :param vocabulary_quantization: The number of clusters to use for vocabulary quantization. If this is None, no
-        quantization is performed.
     :param pooling: The pooling mode to use for creating embeddings. Can be one of:
         'mean' (default): mean over all tokens. Robust and works well in most cases.
         'last': use the last token's hidden state (often the [EOS] token). Common for decoder-style models.
@@ -402,6 +375,5 @@ def distill(
         token_remove_pattern=token_remove_pattern,
         sif_coefficient=sif_coefficient,
         quantize_to=quantize_to,
-        vocabulary_quantization=vocabulary_quantization,
         pooling=pooling,
     )
