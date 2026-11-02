@@ -31,6 +31,37 @@ def test_quantize_embeddings(input_dtype: DType, target_dtype: DType, expected_d
         assert np.allclose(quantized, embeddings.astype(expected_dtype))
 
 
+def test_quantize_embeddings_int8_matches_float32_reference() -> None:
+    """Int8 quantization must round in full precision, not through a float16 buffer.
+
+    Scaling in float16 (~3 significant digits) rounds the scaled values differently
+    than the exact quotient, flipping a fraction of codes by +/-1 even for ordinary,
+    small-magnitude embeddings. The quantized codes must match the reference computed
+    directly in float32.
+    """
+    rng = np.random.default_rng(0)
+    embeddings = (rng.standard_normal((2000, 256)) * 0.1).astype(np.float32)
+
+    quantized = quantize_embeddings(embeddings, DType.Int8)
+
+    scale = np.max(np.abs(embeddings)) / 127.0
+    reference = np.clip(np.rint(embeddings.astype(np.float32) / scale), -127, 127).astype(np.int8)
+
+    assert np.array_equal(quantized, reference)
+
+
+def test_quantize_embeddings_int8_handles_values_above_float16_max() -> None:
+    """Values above the float16 maximum (65504) must not overflow to inf before scaling."""
+    embeddings = np.array([[70000.0, 1.0, 2.0, 3.0]], dtype=np.float32)
+
+    quantized = quantize_embeddings(embeddings, DType.Int8)
+
+    # The dominant value maps to the clip bound, the rest map to 0 at this scale.
+    assert quantized.dtype == np.int8
+    assert quantized[0, 0] == 127
+    assert np.all(quantized[0, 1:] == 0)
+
+
 def test_quantize_and_reduce_dim() -> None:
     """Test quantization and dimensionality reduction."""
     embeddings = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)

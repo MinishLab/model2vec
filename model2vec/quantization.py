@@ -43,9 +43,12 @@ def quantize_embeddings(embeddings: np.ndarray, quantize_to: DType) -> np.ndarra
         # Normalize to [-128, 127] range for int8
         # We normalize to -127 to 127 to keep symmetry.
         scale = np.max(np.abs(embeddings)) / 127.0
-        # Turn into float16 to minimize memory usage during computation
-        # we copy once.
-        buf = embeddings.astype(np.float16, copy=True)
+        # Compute the quantization in float32. We copy once.
+        # float16 cannot be used here: its ~3 significant digits round the
+        # scaled values differently than the true quotient, which flips a
+        # non-trivial fraction of codes by +/-1, and any embedding value above
+        # the float16 maximum (65504) would overflow to inf before scaling.
+        buf = embeddings.astype(np.float32, copy=True)
         # Divide by the scale
         np.divide(buf, scale, out=buf)
         # Round to int, copy to the buffer
