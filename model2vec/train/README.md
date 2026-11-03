@@ -227,7 +227,7 @@ Without an explicit validation set, `fit` holds out `test_size` of the data for 
 
 By default, the model is validated once per epoch. If an epoch has more than 250 batches, it is instead validated about four times per epoch, but at most once every 250 steps. `validation_steps` sets a fixed number of steps between validations instead.
 
-Classifiers stop early on the validation accuracy, the other models on the validation loss. Whenever the validation loss stops improving for a few epochs, the learning rate is halved. After training, the weights from the best validation check are loaded back into the model.
+Classifiers stop early on the validation accuracy, the other models on the validation loss. Whenever the validation loss fails to improve by at least 3% for three validation checks in a row, the learning rate is halved, down to a minimum of `1e-6`. This counts validation checks, not epochs, so with several checks per epoch the learning rate can drop within a single epoch, and a smaller `validation_steps` makes it drop sooner. After training, the weights from the best validation check are loaded back into the model.
 
 The training loop shows the loss, and for classifiers the accuracy, of the latest training batches and of the latest validation check in the progress bar.
 

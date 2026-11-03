@@ -1196,8 +1196,8 @@ def test_run_training_loop_mid_epoch_early_stop() -> None:
     assert set(state_dict) == set(model.state_dict())
 
 
-def test_run_training_loop_steps_scheduler_once_per_epoch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The LR scheduler steps once per epoch, not once per validation check."""
+def test_run_training_loop_steps_scheduler_once_per_validation_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The LR scheduler steps once per validation check, not once per epoch."""
     step_calls: list[float] = []
     original_step = torch.optim.lr_scheduler.ReduceLROnPlateau.step
 
@@ -1223,7 +1223,7 @@ def test_run_training_loop_steps_scheduler_once_per_epoch(monkeypatch: pytest.Mo
         val_check_interval=1,
         check_val_every_epoch=None,
     )
-    assert len(step_calls) == 3
+    assert len(step_calls) == 18
 
 
 def test_split_indices() -> None:

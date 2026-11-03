@@ -47,14 +47,6 @@ def _resolve_max_epochs(max_epochs: int | None) -> int:
     return max_epochs
 
 
-def _step_plateau_scheduler(
-    scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau, latest_val_loss: float | None
-) -> None:
-    """Step a ReduceLROnPlateau scheduler with the latest val_loss, once per epoch, if one is available yet."""
-    if latest_val_loss is not None:
-        scheduler.step(latest_val_loss)
-
-
 def resolve_device(device: str) -> torch.device:
     """Resolve a device string, with "auto" picking the best available accelerator."""
     if device != "auto":
@@ -132,7 +124,7 @@ def run_training_loop(  # noqa: C901
         optimizer,
         mode="min",
         factor=0.5,
-        patience=3,
+        patience=2,
         min_lr=1e-6,
         threshold=0.03,
         threshold_mode="rel",
@@ -151,12 +143,11 @@ def run_training_loop(  # noqa: C901
     global_step = 0
     postfix: dict[str, str] = {}
     train_metric_windows: dict[str, deque[float]] = defaultdict(lambda: deque(maxlen=_TRAIN_METRICS_WINDOW))
-    latest_val_loss: float | None = None
 
     def validate_and_checkpoint() -> bool:
-        nonlocal best_checkpoint, best_val_metric, latest_val_loss
+        nonlocal best_checkpoint, best_val_metric
         metrics = _run_validation(model, loss_function, compute_metrics, val_loader, device)
-        latest_val_loss = metrics["val_loss"]
+        scheduler.step(metrics["val_loss"])
         current = metrics[val_metric]
         improved = current < best_val_metric if early_stopping_direction == "min" else current > best_val_metric
         if improved:
@@ -199,8 +190,6 @@ def run_training_loop(  # noqa: C901
                 pbar.set_postfix(postfix)
                 if should_stop and (min_epochs is None or current_epoch >= min_epochs):
                     return best_checkpoint
-
-            _step_plateau_scheduler(scheduler, latest_val_loss)
 
             if current_epoch >= max_epochs:
                 return best_checkpoint
