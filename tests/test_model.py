@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import numpy as np
@@ -110,6 +111,24 @@ def test_encode_multiprocessing(
     sentences = ["word1 word2"] * 15_000
     encoded = model.encode(sentences, use_multiprocessing=True)
     assert encoded.shape == (15000, 2)
+
+
+@pytest.mark.parametrize("previous", [None, "true"])
+def test_encode_multiprocessing_restores_tokenizers_parallelism(
+    mock_vectors: np.ndarray,
+    mock_tokenizer: Tokenizer,
+    mock_config: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    previous: str | None,
+) -> None:
+    """Test that multiprocessing encoding restores TOKENIZERS_PARALLELISM."""
+    if previous is None:
+        monkeypatch.delenv("TOKENIZERS_PARALLELISM", raising=False)
+    else:
+        monkeypatch.setenv("TOKENIZERS_PARALLELISM", previous)
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
+    model.encode(["word1 word2"] * 15_000, use_multiprocessing=True)
+    assert os.environ.get("TOKENIZERS_PARALLELISM") == previous
 
 
 def test_encode_as_sequence_max_length(
