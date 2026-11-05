@@ -276,6 +276,7 @@ class StaticModel:
         total_batches = math.ceil(len(sentences) / batch_size)
 
         self._set_max_length_in_tokenizer(max_length)
+        previous_parallelism = os.environ.get("TOKENIZERS_PARALLELISM")
         try:
             if use_multiprocessing and len(sentences) > multiprocessing_threshold:
                 # Disable parallelism for tokenizers
@@ -291,6 +292,10 @@ class StaticModel:
                 ]
         finally:
             self._set_max_length_in_tokenizer(self.max_length)
+            if previous_parallelism is None:
+                os.environ.pop("TOKENIZERS_PARALLELISM", None)
+            else:
+                os.environ["TOKENIZERS_PARALLELISM"] = previous_parallelism
 
         return results, was_single
 
