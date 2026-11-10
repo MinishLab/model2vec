@@ -310,6 +310,25 @@ def test_encoder_onnx_without_unk_token(tmp_path: Path) -> None:
     np.testing.assert_allclose(onnx_output, expected, atol=1e-5)
 
 
+def test_encoder_onnx_float16_normalized_empty_rows(tmp_path: Path) -> None:
+    """A normalized float16 encoder returns zero rows, not NaNs, for inputs without known tokens."""
+    vocab = ["[PAD]", "dog", "cat", "[UNK]"]
+    tokenizer = Tokenizer(
+        BPE(vocab={t: i for i, t in enumerate(vocab)}, merges=[], unk_token="[UNK]", ignore_merges=True)
+    )
+    tokenizer.pre_tokenizer = Whitespace()  # type: ignore[assignment]
+    vectors = np.array([[0, 0], [1, 2], [2, 1], [5, 6]], dtype=np.float16)
+    model = StaticModel(vectors=vectors, tokenizer=tokenizer, normalize=True)
+
+    texts = ["dog cat", "", "zzz"]
+    onnx_output = _encoder_onnx_output(model, texts, tmp_path / "model.onnx")
+    expected = model.encode(texts)
+
+    assert onnx_output.dtype == np.float16
+    assert not np.isnan(onnx_output).any()
+    np.testing.assert_allclose(onnx_output, expected, atol=1e-3)
+
+
 def _vocabulary_quantized_model() -> StaticModel:
     """Build a small model whose vocabulary has been quantized, so ids go through `token_mapping` and `weights`."""
     vocab = ["[PAD]", "dog", "cat", "fish", "bird", "cow", "horse", "[UNK]"]

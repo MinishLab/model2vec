@@ -101,7 +101,7 @@ class TorchStaticModel(torch.nn.Module):
         embeddings = embeddings.sum(dim=1) / mask.sum(dim=1).clamp(min=1)
         # Normalize if required
         if self.normalize:
-            embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=-1)
+            embeddings = torch.nn.functional.normalize(embeddings.float(), p=2, dim=-1).to(embeddings.dtype)
         return embeddings
 
 
