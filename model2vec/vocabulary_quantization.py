@@ -24,9 +24,9 @@ def quantize_vocabulary(
     logger.info(f"Quantizing vocabulary to {n_clusters} clusters.")
     # If the model does not have weights, we assume the norm to be informative.
     if weights is None:
-        weights = cast(np.ndarray, np.linalg.norm(embeddings, axis=1) + 1e-32)
+        weights = cast(np.ndarray, np.linalg.norm(embeddings, axis=1))
         # Divide by the norm to normalize the embeddings, so we don't bias the clustering.
-        embeddings = embeddings / weights[:, None]
+        embeddings = np.divide(embeddings, weights[:, None], out=np.zeros_like(embeddings), where=weights[:, None] > 0)
 
     # Ensure the embeddings are in float32 for KMeans
     # Store the original dtype to restore it later

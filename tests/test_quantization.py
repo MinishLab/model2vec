@@ -74,3 +74,15 @@ def test_quantize_vocabulary() -> None:
     # Test with float16 quantization
     quantized_embeddings, _, quantized_weights = quantize_vocabulary(8, None, embeddings)
     assert quantized_embeddings.dtype == np.float16
+
+
+@pytest.mark.parametrize("dtype", [np.float16, np.float32])
+def test_quantize_vocabulary_zero_row(dtype: type) -> None:
+    """Test quantization of vocabulary with a zero row."""
+    embeddings = np.array([[0, 0], [1, 2], [2, 1], [-1, -2]], dtype=dtype)
+
+    quantized_embeddings, _, quantized_weights = quantize_vocabulary(2, None, embeddings)
+    assert quantized_embeddings.dtype == dtype
+    assert np.isfinite(quantized_embeddings).all()
+    assert np.isfinite(quantized_weights).all()
+    assert quantized_weights[0] == 0
