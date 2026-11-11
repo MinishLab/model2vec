@@ -74,3 +74,39 @@ def test_quantize_vocabulary() -> None:
     # Test with float16 quantization
     quantized_embeddings, _, quantized_weights = quantize_vocabulary(8, None, embeddings)
     assert quantized_embeddings.dtype == np.float16
+
+
+@pytest.mark.parametrize("dtype", [np.float16, np.float32])
+def test_quantize_vocabulary_zero_row(dtype: type) -> None:
+    """Test quantization of vocabulary with a zero row."""
+    embeddings = np.array([[0, 0], [1, 2], [2, 1], [-1, -2]], dtype=dtype)
+
+    quantized_embeddings, _, quantized_weights = quantize_vocabulary(2, None, embeddings)
+    assert quantized_embeddings.dtype == dtype
+    assert np.isfinite(quantized_embeddings).all()
+    assert np.isfinite(quantized_weights).all()
+    assert quantized_weights[0] == 0
+
+
+@pytest.mark.parametrize("dtype", [np.float16, np.float32])
+def test_quantize_vocabulary_small_row(dtype: type) -> None:
+    """Test quantization of vocabulary with a small nonzero row."""
+    embeddings = np.array([[1e-4, 1e-4], [1, 2], [2, 1], [-1, -2]], dtype=dtype)
+
+    quantized_embeddings, token_mapping, quantized_weights = quantize_vocabulary(2, None, embeddings)
+    assert quantized_embeddings.dtype == dtype
+    assert np.isfinite(quantized_embeddings).all()
+    assert np.isclose(quantized_weights[0], np.sqrt(2) * 1e-4, rtol=1e-2)
+    assert np.any(quantized_embeddings[token_mapping[0]] != 0)
+
+
+def test_quantize_vocabulary_int8() -> None:
+    """Test quantization of vocabulary with int8 embeddings."""
+    embeddings = np.array([[0, 0], [1, 2], [2, 1], [-1, -2]], dtype=np.int8)
+
+    quantized_embeddings, _, quantized_weights = quantize_vocabulary(2, None, embeddings)
+    assert np.issubdtype(quantized_embeddings.dtype, np.floating)
+    assert np.isfinite(quantized_embeddings).all()
+    assert np.isfinite(quantized_weights).all()
+    assert quantized_weights[0] == 0
+    assert np.isclose(quantized_weights[1], np.sqrt(5))
