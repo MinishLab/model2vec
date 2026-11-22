@@ -4,7 +4,7 @@ import warnings
 from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import huggingface_hub
 import numpy as np
@@ -71,24 +71,9 @@ class StaticModelPipeline:
             _save_pipeline(self, temp_dir)
             push_folder_to_hub(Path(temp_dir), subfolder, repo_id, private, token)
 
-    def _encode_and_coerce_to_2d(
-        self,
-        X: Sequence[str],
-        show_progress_bar: bool,
-        max_length: int | None | _UnsetType,
-        batch_size: int,
-        use_multiprocessing: bool,
-        multiprocessing_threshold: int,
-    ) -> np.ndarray:
+    def _encode_and_coerce_to_2d(self, X: str | Sequence[str], max_length: int | None | _UnsetType) -> np.ndarray:
         """Encode the instances and coerce the output to a matrix."""
-        encoded = self.model.encode(
-            X,
-            show_progress_bar=show_progress_bar,
-            max_length=max_length,
-            batch_size=batch_size,
-            use_multiprocessing=use_multiprocessing,
-            multiprocessing_threshold=multiprocessing_threshold,
-        )
+        encoded = self.model.encode(X, max_length=max_length)
         if np.ndim(encoded) == 1:
             encoded = encoded[None, :]
 
@@ -96,34 +81,23 @@ class StaticModelPipeline:
 
     def predict(
         self,
-        X: Sequence[str],
-        show_progress_bar: bool = False,
+        X: str | Sequence[str],
+        *,
         max_length: int | None | _UnsetType = _UNSET,
-        batch_size: int = 1024,
-        use_multiprocessing: bool = True,
-        multiprocessing_threshold: int = 10_000,
         threshold: float = 0.5,
+        **kwargs: Any,
     ) -> np.ndarray:
         """Predict the labels of the input.
 
         :param X: The input data to predict. Can be a list of strings or a single string.
-        :param show_progress_bar: Whether to display a progress bar during prediction. Defaults to False.
         :param max_length: The maximum length of the input sequences. If not passed, the encoder model's
             `max_length` is used. Pass `max_length=None` to disable truncation.
-        :param batch_size: The batch size for prediction. Defaults to 1024.
-        :param use_multiprocessing: Whether to use multiprocessing for encoding. Defaults to True.
-        :param multiprocessing_threshold: The threshold for the number of samples to use multiprocessing. Defaults to 10,000.
         :param threshold: The threshold for multilabel classification. Defaults to 0.5. Ignored if not multilabel.
+        :param **kwargs: Any additional arguments, such as the removed `show_progress_bar`, `batch_size` and
+            `use_multiprocessing`. These are ignored.
         :return: The predicted labels or probabilities.
         """
-        encoded = self._encode_and_coerce_to_2d(
-            X,
-            show_progress_bar=show_progress_bar,
-            max_length=max_length,
-            batch_size=batch_size,
-            use_multiprocessing=use_multiprocessing,
-            multiprocessing_threshold=multiprocessing_threshold,
-        )
+        encoded = self._encode_and_coerce_to_2d(X, max_length=max_length)
 
         if self.head.activation == Activation.IDENTITY:
             return self.head.predict_regression(encoded)
@@ -139,53 +113,42 @@ class StaticModelPipeline:
 
     def predict_proba(
         self,
-        X: Sequence[str],
-        show_progress_bar: bool = False,
+        X: str | Sequence[str],
+        *,
         max_length: int | None | _UnsetType = _UNSET,
-        batch_size: int = 1024,
-        use_multiprocessing: bool = True,
-        multiprocessing_threshold: int = 10_000,
+        **kwargs: Any,
     ) -> np.ndarray:
         """Predict the labels of the input.
 
         :param X: The input data to predict. Can be a list of strings or a single string.
-        :param show_progress_bar: Whether to display a progress bar during prediction. Defaults to False.
         :param max_length: The maximum length of the input sequences. If not passed, the encoder model's
             `max_length` is used. Pass `max_length=None` to disable truncation.
-        :param batch_size: The batch size for prediction. Defaults to 1024.
-        :param use_multiprocessing: Whether to use multiprocessing for encoding. Defaults to True.
-        :param multiprocessing_threshold: The threshold for the number of samples to use multiprocessing. Defaults to 10,000.
+        :param **kwargs: Any additional arguments, such as the removed `show_progress_bar`, `batch_size` and
+            `use_multiprocessing`. These are ignored.
         :return: The predicted labels or probabilities.
         :raises ValueError: If the classifier type is projector.
         """
         if self.head.activation == Activation.IDENTITY:
             raise ValueError("You are using predict_proba on a projector model. This is not supported.")
-        encoded = self._encode_and_coerce_to_2d(
-            X,
-            show_progress_bar=show_progress_bar,
-            max_length=max_length,
-            batch_size=batch_size,
-            use_multiprocessing=use_multiprocessing,
-            multiprocessing_threshold=multiprocessing_threshold,
-        )
+        encoded = self._encode_and_coerce_to_2d(X, max_length=max_length)
 
         return self.head.predict_proba(encoded)
 
     def evaluate(
-        self, X: Sequence[str], y: LabelType, batch_size: int = 1024, threshold: float = 0.5
+        self, X: Sequence[str], y: LabelType, *, threshold: float = 0.5, **kwargs: Any
     ) -> dict[str, dict[str, float]]:
         """Evaluate the classifier on a given dataset using a classification report.
 
         :param X: The texts to predict on.
         :param y: The ground truth labels.
-        :param batch_size: The batch size.
         :param threshold: The threshold for multilabel classification.
+        :param **kwargs: Any additional arguments, such as the removed `batch_size`. These are ignored.
         :return: A classification report, as a dictionary.
         :raises ValueError: If the classifier type is projector.
         """
         if self.head.activation == Activation.IDENTITY:
             raise ValueError("You are using evaluate on a projector model. This is not supported.")
-        predictions = self.predict(X, show_progress_bar=True, batch_size=batch_size, threshold=threshold)
+        predictions = self.predict(X, threshold=threshold)
         return evaluate_single_or_multi_label(predictions=predictions, y=y)
 
 

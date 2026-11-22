@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import numpy as np
@@ -102,35 +101,6 @@ def test_encode_as_sequence(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer,
     assert np.allclose(means, encoded)
 
 
-def test_encode_multiprocessing(
-    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
-) -> None:
-    """Test encoding with multiprocessing."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    # Generate a list of 15k inputs to test multiprocessing
-    sentences = ["word1 word2"] * 15_000
-    encoded = model.encode(sentences, use_multiprocessing=True)
-    assert encoded.shape == (15000, 2)
-
-
-@pytest.mark.parametrize("previous", [None, "true"])
-def test_encode_multiprocessing_restores_tokenizers_parallelism(
-    mock_vectors: np.ndarray,
-    mock_tokenizer: Tokenizer,
-    mock_config: dict[str, str],
-    monkeypatch: pytest.MonkeyPatch,
-    previous: str | None,
-) -> None:
-    """Test that multiprocessing encoding restores TOKENIZERS_PARALLELISM."""
-    if previous is None:
-        monkeypatch.delenv("TOKENIZERS_PARALLELISM", raising=False)
-    else:
-        monkeypatch.setenv("TOKENIZERS_PARALLELISM", previous)
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    model.encode(["word1 word2"] * 15_000, use_multiprocessing=True)
-    assert os.environ.get("TOKENIZERS_PARALLELISM") == previous
-
-
 def test_encode_as_sequence_max_length(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
@@ -141,17 +111,6 @@ def test_encode_as_sequence_max_length(
     truncated = model.encode_as_sequence(sentences, max_length=1)
 
     assert len(truncated[0]) < len(full[0])
-
-
-def test_encode_as_sequence_multiprocessing(
-    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
-) -> None:
-    """Test encoding of sentences as tokens with multiprocessing."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    # Generate a list of 15k inputs to test multiprocessing
-    sentences = ["word1 word2"] * 15_000
-    encoded = model.encode_as_sequence(sentences, use_multiprocessing=True)
-    assert len(encoded) == 15_000
 
 
 def test_encode_as_tokens_empty(
@@ -380,3 +339,48 @@ def test_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: d
     model = StaticModel(mock_vectors, mock_tokenizer, mock_config)
     assert model.dim == 2
     assert model.dim == model.embedding.shape[1]
+
+
+@pytest.mark.parametrize("normalize", [False, True])
+@pytest.mark.parametrize("max_length", [None, 1])
+def test_encode_matches_sequence_mean(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, normalize: bool, max_length: int | None
+) -> None:
+    """Test that encode matches the mean of encode_as_sequence, with weights and a token mapping."""
+    weights = np.linspace(0.5, 1.5, len(mock_vectors)).astype(np.float32)
+    token_mapping = np.array([0, 1, 2, 1, 0])
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, weights=weights, token_mapping=token_mapping)
+    sentences = ["word1 word2", "word3 word1 word2", "", "unknown"]
+    encoded = model.encode(sentences, normalize=normalize, max_length=max_length)
+    expected = np.stack(
+        [
+            seq.mean(axis=0) if len(seq) else np.zeros(model.dim)
+            for seq in model.encode_as_sequence(sentences, max_length=max_length)
+        ]
+    )
+    if normalize:
+        expected = expected / (np.linalg.norm(expected, axis=1, keepdims=True) + 1e-32)
+    assert encoded.dtype == model.embedding.dtype
+    np.testing.assert_allclose(encoded, expected, rtol=1e-5, atol=1e-7)
+
+
+def test_encode_rust_backend_rebuilds(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test that the Rust backend is cached and rebuilt when the embedding is replaced."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    before = model.encode(["word1"])
+    backend = model._get_rust_backend()
+    assert model._get_rust_backend() is backend
+    model.embedding = model.embedding * 2
+    assert model._get_rust_backend() is not backend
+    np.testing.assert_allclose(model.encode(["word1"]), before * 2)
+
+
+def test_pickle_and_copy_with_rust_backend(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test that a model with a built Rust backend can be pickled and copied."""
+    import copy
+    import pickle
+
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    expected = model.encode(["word1 word2"])
+    for clone in (pickle.loads(pickle.dumps(model)), copy.deepcopy(model), copy.copy(model)):
+        np.testing.assert_allclose(clone.encode(["word1 word2"]), expected)

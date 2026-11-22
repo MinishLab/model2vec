@@ -70,7 +70,7 @@ The report has the same format as the dictionary returned by scikit-learn's `cla
 
 `predict_proba` and `evaluate` raise an error for pipelines that predict vectors.
 
-`predict` and `predict_proba` take the same encoding options as `StaticModel.encode`: `batch_size`, `max_length`, `show_progress_bar`, `use_multiprocessing` and `multiprocessing_threshold`. If `max_length` is not passed, the model's own `max_length` is used. Pass `max_length=None` to disable truncation.
+`predict` and `predict_proba` take `max_length`, like `StaticModel.encode`. If `max_length` is not passed, the model's own `max_length` is used. Pass `max_length=None` to disable truncation.
 
 The underlying `StaticModel` is available as `pipeline.model`, and the head as `pipeline.head`.
 

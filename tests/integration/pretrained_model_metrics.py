@@ -50,13 +50,13 @@ def measure_encoding_speed(model: StaticModel) -> dict[str, float]:
     :param model: The model to benchmark.
     :return: Best-of-N sentences/second and tokens/second over `_SPEED_CORPUS`.
     """
-    model.encode(_SPEED_CORPUS[:64], use_multiprocessing=False)
+    model.encode(_SPEED_CORPUS[:64])
 
     n_tokens = sum(len(ids) for ids in model.tokenize(_SPEED_CORPUS))
     best_seconds = float("inf")
     for _ in range(_SPEED_RUNS):
         start = time.perf_counter()
-        model.encode(_SPEED_CORPUS, use_multiprocessing=False)
+        model.encode(_SPEED_CORPUS)
         best_seconds = min(best_seconds, time.perf_counter() - start)
 
     return {

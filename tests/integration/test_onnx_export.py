@@ -63,7 +63,7 @@ def test_onnx_export_matches_encode_on_real_sentences(model: StaticModel, onnx_s
 
     onnx_output = onnx_session.run(None, {"input_ids": input_ids, "attention_mask": attention_mask})[0]
     assert isinstance(onnx_output, np.ndarray)
-    expected = model.encode(_SENTENCES, use_multiprocessing=False)
+    expected = model.encode(_SENTENCES)
 
     assert onnx_output.shape == expected.shape
     np.testing.assert_allclose(onnx_output, expected, rtol=1e-4, atol=1e-4)

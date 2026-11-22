@@ -31,7 +31,7 @@
 
 
 
-Model2Vec is a technique to turn any sentence transformer into a small, fast static embedding model. Model2Vec reduces model size by a factor up to 50 and makes models up to 500 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model in the world. See our [results](results/README.md), read our [docs](https://minish.ai/packages/model2vec/introduction), or dive in to see how it works.
+Model2Vec is a technique to turn any sentence transformer into a small, fast static embedding model. Model2Vec reduces model size by a factor up to 50 and makes models up to 30000 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model in the world. See our [results](results/README.md), read our [docs](https://minish.ai/packages/model2vec/introduction), or dive in to see how it works.
 
 
 ## Quickstart
@@ -107,7 +107,7 @@ For advanced usage, see our [training docs](https://minish.ai/packages/model2vec
 - **State-of-the-Art Performance**: Model2Vec models outperform any other static embeddings (such as GLoVe and BPEmb) by a large margin, as can be seen in our [results](results/README.md).
 - **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of up to 50. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is just ~30 MB on disk, and our smallest model just ~8 MB (making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
-- **Lightning-fast Inference**: up to 500 times faster on CPU than the original model.
+- **Lightning-fast Inference**: up to 30000 times faster on CPU than the original model.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset.
 - **Fine-tuning**: fine-tune Model2Vec models for classification, similarity, regression, or pair similarity, and run them without `torch`.
 - **Integrated in many popular libraries**: Model2Vec is integrated direclty into popular libraries such as [Sentence Transformers](https://github.com/UKPLab/sentence-transformers) and [LangChain](https://github.com/langchain-ai/langchain). For more information, see our [integrations documentation](https://minish.ai/packages/model2vec/integrations).

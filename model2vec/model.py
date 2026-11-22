@@ -2,23 +2,19 @@ from __future__ import annotations
 
 import copy
 import json
-import math
-import os
-from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Mapping, TypeVar, cast, overload
 
+import model2vec_rs
 import numpy as np
-from joblib import delayed
+import numpy.typing as npt
 from tokenizers import Encoding, Tokenizer
-from tqdm import tqdm
 
 from model2vec.quantization import DType, quantize_and_reduce_dim
 from model2vec.types import _UNSET, StaticModelConfig, _UnsetType
-from model2vec.utils import ProgressParallel
 
 PathLike = Path | str
 
@@ -89,6 +85,38 @@ class StaticModel:
         self.language = language
         self.max_length = max_length
         self.normalize = normalize
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Get the state for pickling, without the Rust backend."""
+        state = self.__dict__.copy()
+        state.pop("_rust_backend", None)
+        return state
+
+    def _get_rust_backend(self) -> model2vec_rs.StaticModel:
+        """Get the Rust backend used by `encode`, rebuilding it if the vectors or tokenizer were replaced.
+
+        :return: The Rust backend.
+        """
+        key = (self.embedding, self.weights, self.token_mapping, self.tokenizer)
+        cached = self.__dict__.get("_rust_backend")
+        if cached is not None and all(old is new for old, new in zip(cached[0], key)):
+            return cached[1]
+        embedding: npt.NDArray[np.float32] | npt.NDArray[np.int8]
+        if self.embedding.dtype == np.int8:
+            embedding = np.ascontiguousarray(self.embedding, dtype=np.int8)
+        else:
+            embedding = np.ascontiguousarray(self.embedding, dtype=np.float32)
+        backend = model2vec_rs.StaticModel.from_arrays(
+            self.tokenizer.to_str(),
+            embedding,
+            normalize=False,
+            weights=None if self.weights is None else np.ascontiguousarray(self.weights, dtype=np.float32),
+            token_mapping=(
+                None if self.token_mapping is None else np.ascontiguousarray(self.token_mapping, dtype=np.int64)
+            ),
+        )
+        self._rust_backend = (key, backend)
+        return backend
 
     @property
     def dim(self) -> int:
@@ -240,105 +268,22 @@ class StaticModel:
         else:
             self.tokenizer.enable_truncation(max_length)
 
-    def _encode_dispatch(
-        self,
-        sentences: str | Sequence[str],
-        *,
-        max_length: int | None,
-        batch_size: int,
-        show_progress_bar: bool,
-        use_multiprocessing: bool,
-        multiprocessing_threshold: int,
-        batch_fn: Any,
-        batch_args: tuple[Any, ...] = (),
-    ) -> tuple[list[Any], bool]:
-        """Shared truncation, batching, and multiprocessing dispatch logic for `encode` and `encode_as_sequence`.
-
-        :param sentences: The sentence or sentences to encode.
-        :param max_length: The maximum length of the sentences. Any tokens beyond this length are truncated.
-        :param batch_size: The batch size to use.
-        :param show_progress_bar: Whether to show the progress bar.
-        :param use_multiprocessing: Whether to use multiprocessing.
-        :param multiprocessing_threshold: The threshold in number of sentences for using multiprocessing.
-        :param batch_fn: The function to apply to each batch of sentences.
-        :param batch_args: Additional positional arguments passed to `batch_fn` after the batch.
-        :return: A tuple of the per-batch results and whether the input was a single sentence.
-        """
-        was_single = False
-        if isinstance(sentences, str):
-            sentences = [sentences]
-            was_single = True
-        if max_length is not None:
-            m = max_length * self.median_token_length
-            sentences = [sentence[:m] for sentence in sentences]
-
-        sentence_batches = list(self._batch(sentences, batch_size))
-        total_batches = math.ceil(len(sentences) / batch_size)
-
-        self._set_max_length_in_tokenizer(max_length)
-        previous_parallelism = os.environ.get("TOKENIZERS_PARALLELISM")
-        try:
-            if use_multiprocessing and len(sentences) > multiprocessing_threshold:
-                # Disable parallelism for tokenizers
-                os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-                results = ProgressParallel(
-                    n_jobs=-1, backend="threading", use_tqdm=show_progress_bar, total=total_batches
-                )(delayed(batch_fn)(batch, *batch_args) for batch in sentence_batches)
-            else:
-                results = [
-                    batch_fn(batch, *batch_args)
-                    for batch in tqdm(sentence_batches, total=total_batches, disable=not show_progress_bar)
-                ]
-        finally:
-            self._set_max_length_in_tokenizer(self.max_length)
-            if previous_parallelism is None:
-                os.environ.pop("TOKENIZERS_PARALLELISM", None)
-            else:
-                os.environ["TOKENIZERS_PARALLELISM"] = previous_parallelism
-
-        return results, was_single
+    @overload
+    def encode_as_sequence(self, sentences: str, *, max_length: int | None = None, **kwargs: Any) -> np.ndarray: ...
 
     @overload
     def encode_as_sequence(
-        self,
-        sentences: str,
-        *,
-        max_length: int | None = None,
-        batch_size: int = 1024,
-        show_progress_bar: bool = False,
-        use_multiprocessing: bool = True,
-        multiprocessing_threshold: int = 10_000,
-    ) -> np.ndarray: ...
-
-    @overload
-    def encode_as_sequence(
-        self,
-        sentences: list[str],
-        *,
-        max_length: int | None = None,
-        batch_size: int = 1024,
-        show_progress_bar: bool = False,
-        use_multiprocessing: bool = True,
-        multiprocessing_threshold: int = 10_000,
+        self, sentences: list[str], *, max_length: int | None = None, **kwargs: Any
     ) -> list[np.ndarray]: ...
 
     def encode_as_sequence(
-        self,
-        sentences: str | list[str],
-        *,
-        max_length: int | None = None,
-        batch_size: int = 1024,
-        show_progress_bar: bool = False,
-        use_multiprocessing: bool = True,
-        multiprocessing_threshold: int = 10_000,
+        self, sentences: str | list[str], *, max_length: int | None = None, **kwargs: Any
     ) -> list[np.ndarray] | np.ndarray:
         """Encode a list of sentences as a list of numpy arrays of tokens.
 
         This is useful if you want to use the tokens for further processing, or if you want to do sequence
         modeling.
-        Note that if you just want the mean, you should use the `encode` method.
-        This is about twice as slow.
+        Note that if you just want the mean, you should use the `encode` method, which is much faster.
         Sentences that do not contain any tokens will be turned into an empty array.
         Unlike `encode`, this method ignores the model's `max_length`: truncation is only applied if you
         explicitly pass `max_length` here.
@@ -349,73 +294,49 @@ class StaticModel:
         :param sentences: The list of sentences to encode.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done. Note that this is independent of the model's `max_length`.
-        :param batch_size: The batch size to use.
-        :param show_progress_bar: Whether to show the progress bar.
-        :param use_multiprocessing: Whether to use multiprocessing.
-            By default, this is enabled for inputs > multiprocessing_threshold sentences and disabled otherwise.
-        :param multiprocessing_threshold: The threshold in number of sentences for using multiprocessing.
+        :param **kwargs: Any additional arguments, such as the removed `batch_size`, `show_progress_bar`,
+            `use_multiprocessing` and `multiprocessing_threshold`. These are ignored.
         :return: The encoded sentences with an embedding per token.
         """
-        results, was_single = self._encode_dispatch(
-            sentences,
-            max_length=max_length,
-            batch_size=batch_size,
-            show_progress_bar=show_progress_bar,
-            use_multiprocessing=use_multiprocessing,
-            multiprocessing_threshold=multiprocessing_threshold,
-            batch_fn=self._encode_batch_as_sequence,
-        )
-        out_array: list[np.ndarray] = []
-        for r in results:
-            out_array.extend(r)
+        was_single = isinstance(sentences, str)
+        sentence_list: list[str] = [sentences] if isinstance(sentences, str) else list(sentences)
+        if max_length is not None:
+            m = max_length * self.median_token_length
+            sentence_list = [sentence[:m] for sentence in sentence_list]
 
+        self._set_max_length_in_tokenizer(max_length)
+        try:
+            ids = self.tokenize(sentence_list)
+        finally:
+            self._set_max_length_in_tokenizer(self.max_length)
+
+        out = [self._encode_helper(id_list) if id_list else np.zeros((0, self.dim)) for id_list in ids]
         if was_single:
-            return out_array[0]
-        return out_array
-
-    def _encode_batch_as_sequence(self, sentences: Sequence[str]) -> list[np.ndarray]:
-        """Encode a batch of sentences as a sequence."""
-        ids = self.tokenize(sentences=sentences)
-        out: list[np.ndarray] = []
-        for id_list in ids:
-            if id_list:
-                out.append(self._encode_helper(id_list))
-            else:
-                out.append(np.zeros((0, self.dim)))
-
+            return out[0]
         return out
 
     def encode(
         self,
-        sentences: Sequence[str],
+        sentences: str | Sequence[str],
         *,
-        show_progress_bar: bool = False,
         max_length: int | None | _UnsetType = _UNSET,
         normalize: bool | None = None,
-        batch_size: int = 1024,
-        use_multiprocessing: bool = True,
-        multiprocessing_threshold: int = 10_000,
         **kwargs: Any,
     ) -> np.ndarray:
         """Encode a list of sentences.
 
         This function encodes a list of sentences by averaging the word embeddings of the tokens in the sentence.
-        For ease of use, we don't batch sentences together.
 
         NOTE: the return type is currently underspecified. In the case of a single string, this returns a 1D array,
             but in the case of a list of strings, this returns a 2D array. Not possible to implement in numpy currently.
 
         :param sentences: The list of sentences to encode. You can also pass a single sentence.
-        :param show_progress_bar: Whether to show the progress bar.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done. If not passed, the model's `max_length` is used.
         :param normalize: Whether to normalize the resulting embeddings. If not passed, the model's `normalize`
             setting is used.
-        :param batch_size: The batch size to use.
-        :param use_multiprocessing: Whether to use multiprocessing.
-            By default, this is enabled for inputs > multiprocessing_threshold sentences and disabled otherwise.
-        :param multiprocessing_threshold: The threshold in number of sentences for using multiprocessing.
-        :param **kwargs: Any additional arguments. These are ignored.
+        :param **kwargs: Any additional arguments, such as the removed `show_progress_bar`, `batch_size` and
+            `use_multiprocessing`. These are ignored.
         :return: The encoded sentences. If a single sentence was passed, a vector is returned.
         """
         if isinstance(max_length, _UnsetType):
@@ -423,26 +344,14 @@ class StaticModel:
         if normalize is None:
             normalize = self.normalize
 
-        results, was_single = self._encode_dispatch(
-            sentences,
-            max_length=max_length,
-            batch_size=batch_size,
-            show_progress_bar=show_progress_bar,
-            use_multiprocessing=use_multiprocessing,
-            multiprocessing_threshold=multiprocessing_threshold,
-            batch_fn=self._encode_batch,
-            batch_args=(normalize,),
-        )
-        out_array = np.concatenate(results, axis=0)
-
-        if was_single:
-            return out_array[0]
-        return out_array
+        out = self._get_rust_backend().encode(sentences, max_length=max_length, normalize=normalize)
+        if self.embedding.dtype != np.int8:
+            out = out.astype(self.embedding.dtype, copy=False)
+        return out
 
     def _encode_helper(self, id_list: list[int]) -> np.ndarray:
         """Helper function to encode a list of ids.
 
-        This function is used to deduplicate the logic in `encode` and `encode_as_sequence`.
         It retrieves the embeddings for the given list of ids, applying weights if available.
 
         :param id_list: A list of token ids.
@@ -458,40 +367,6 @@ class StaticModel:
             emb = emb * self.weights[id_list][:, None]
 
         return emb
-
-    def _encode_batch(self, sentences: Sequence[str], normalize: bool) -> np.ndarray:
-        """Encode a batch of sentences."""
-        ids = self.tokenize(sentences=sentences)
-        dtype = self.embedding.dtype
-        if dtype == np.int8:
-            dtype = np.dtype(np.float32)
-        out = np.zeros((len(ids), self.dim), dtype=dtype)
-
-        if self.token_mapping is None and self.weights is None:
-            buckets: dict[int, list[int]] = defaultdict(list)
-            for i, id_list in enumerate(ids):
-                if id_list:
-                    buckets[len(id_list)].append(i)
-            for _, indices in buckets.items():
-                id_matrix = np.array([ids[i] for i in indices], dtype=np.int64)
-                out[indices] = self.embedding[id_matrix].mean(axis=1)
-        else:
-            for i, id_list in enumerate(ids):
-                if id_list:
-                    emb = self._encode_helper(id_list)
-                    out[i] = emb.mean(axis=0)
-
-        if normalize:
-            out32 = out.astype(np.float32)
-            norm = np.linalg.norm(out32, axis=1, keepdims=True) + 1e-32
-            return (out32 / norm).astype(out.dtype)
-
-        return out
-
-    @staticmethod
-    def _batch(sentences: Sequence[str], batch_size: int) -> Iterator[Sequence[str]]:
-        """Batch the sentences into equal-sized."""
-        return (sentences[i : i + batch_size] for i in range(0, len(sentences), batch_size))
 
     def push_to_hub(
         self, repo_id: str, private: bool = False, token: str | None = None, subfolder: str | None = None
