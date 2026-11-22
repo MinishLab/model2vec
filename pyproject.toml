@@ -26,10 +26,10 @@ dependencies = [
     "jinja2",
     "numpy",
     "safetensors",
-    "tokenizers>=0.20",
+    "tokenizers>=0.22,<1.0.0",
     "tqdm",
     "huggingface-hub>=1.0.0",
-    "model2vec-rs",
+    "model2vec-rs>=0.5.0,<0.6.0",
 ]
 
 [build-system]

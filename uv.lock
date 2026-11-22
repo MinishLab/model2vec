@@ -1336,7 +1336,7 @@ requires-dist = [
     { name = "skeletoken", marker = "extra == 'distill'", specifier = ">=0.6.0,<0.7.0" },
     { name = "skeletoken", marker = "extra == 'onnx'", specifier = ">=0.6.0,<0.7.0" },
     { name = "skops", marker = "extra == 'tests'" },
-    { name = "tokenizers", specifier = ">=0.20" },
+    { name = "tokenizers", specifier = ">=0.22,<1.0.0" },
     { name = "torch", marker = "extra == 'distill'" },
     { name = "torch", marker = "extra == 'onnx'" },
     { name = "torch", marker = "extra == 'train'" },
