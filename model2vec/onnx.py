@@ -71,13 +71,13 @@ class TorchStaticModel(torch.nn.Module):
     def __init__(self, model: StaticModel) -> None:
         """Initialize the TorchStaticModel with a StaticModel instance."""
         super().__init__()
-        embeddings = torch.from_numpy(model.embedding)
+        embeddings = torch.tensor(model.embedding)
         if embeddings.dtype in {torch.int8, torch.uint8}:
             embeddings = embeddings.to(torch.float16)
         self.embeddings = torch.nn.Embedding.from_pretrained(embeddings, freeze=True)
         # Vocabulary-quantized models look up ids through `token_mapping` and weigh tokens, like `_encode_helper`
-        token_mapping = None if model.token_mapping is None else torch.from_numpy(model.token_mapping).long()
-        weights = None if model.weights is None else torch.from_numpy(model.weights).to(embeddings.dtype)
+        token_mapping = None if model.token_mapping is None else torch.tensor(model.token_mapping, dtype=torch.long)
+        weights = None if model.weights is None else torch.tensor(model.weights, dtype=embeddings.dtype)
         self.register_buffer("token_mapping", token_mapping)
         self.register_buffer("weights", weights)
         self.normalize = model.normalize

@@ -375,6 +375,55 @@ def test_encode_rust_backend_rebuilds(mock_vectors: np.ndarray, mock_tokenizer: 
     np.testing.assert_allclose(model.encode(["word1"]), before * 2)
 
 
+@pytest.mark.parametrize("dtype", [np.float16, np.float32, np.int8])
+def test_arrays_are_read_only(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, dtype: type) -> None:
+    """Test that the model arrays cannot be changed in place, before or after encoding, and only by assignment."""
+    import pickle
+
+    model = StaticModel(
+        vectors=(mock_vectors * 10).astype(dtype),
+        tokenizer=mock_tokenizer,
+        weights=np.ones(len(mock_vectors), dtype=np.float32),
+        token_mapping=np.arange(len(mock_vectors)),
+    )
+    for clone in (model, pickle.loads(pickle.dumps(model))):
+        for array in (clone.embedding, clone.weights, clone.token_mapping):
+            with pytest.raises(ValueError, match="read-only"):
+                array *= 2
+    before = model.encode(["word1"])
+    with pytest.raises(ValueError, match="read-only"):
+        model.embedding *= 2
+    model.embedding = model.embedding * 2
+    with pytest.raises(ValueError, match="read-only"):
+        model.embedding[0] = 0
+    np.testing.assert_allclose(model.encode(["word1"]), before * 2)
+    np.testing.assert_allclose(model.encode(["word1"])[0], model.encode_as_sequence(["word1"])[0].mean(axis=0))
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.float16, np.float64])
+def test_encode_shares_arrays_with_rust_backend(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, dtype: type
+) -> None:
+    """Test that encoding swaps the arrays for views of the Rust backend's memory when their dtypes match."""
+    original = (mock_vectors * 10).astype(dtype)
+    weights = np.ones(len(mock_vectors), dtype=np.float32)
+    model = StaticModel(vectors=original, tokenizer=mock_tokenizer, weights=weights)
+    expected = model.encode(["word1 word2"])
+    backend = model._get_rust_backend()
+
+    shared = dtype in (np.float32, np.int8)
+    assert np.shares_memory(model.embedding, backend.embeddings) == shared
+    assert (model.embedding is original) != shared
+    assert np.shares_memory(model.weights, backend.weights)
+    assert model.embedding.dtype == dtype
+    np.testing.assert_array_equal(model.embedding, original)
+    np.testing.assert_array_equal(model.weights, weights)
+    assert model._get_rust_backend() is backend
+    np.testing.assert_array_equal(model.encode(["word1 word2"]), expected)
+    with pytest.raises(ValueError, match="read-only"):
+        model.embedding[0] = 0
+
+
 def test_pickle_and_copy_with_rust_backend(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
     """Test that a model with a built Rust backend can be pickled and copied."""
     import copy

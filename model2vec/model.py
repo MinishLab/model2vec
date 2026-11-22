@@ -39,7 +39,8 @@ class StaticModel:
     ) -> None:
         """Initialize the StaticModel.
 
-        :param vectors: The vectors to use.
+        :param vectors: The vectors to use. `vectors`, `weights` and `token_mapping` are made read-only;
+            assign new arrays to `embedding`, `weights` or `token_mapping` to change them.
         :param tokenizer: The Transformers tokenizer to use.
         :param config: Any metadata config. Stored as a copy, so mutating it afterwards does not affect
             the model, and vice versa.
@@ -71,9 +72,7 @@ class StaticModel:
 
         self.embedding = vectors
         self.weights = weights
-        # Convert to an array for fast lookups
-        # We can't use or short circuit here because np.ndarray as booleans are ambiguous.
-        self.token_mapping: np.ndarray | None = token_mapping
+        self.token_mapping = token_mapping
 
         self.tokenizer = copy.deepcopy(tokenizer)
         _disable_padding(self.tokenizer)
@@ -92,8 +91,44 @@ class StaticModel:
         state.pop("_rust_backend", None)
         return state
 
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore the state from pickling, keeping the arrays read-only."""
+        for name in ("embedding", "weights", "token_mapping"):
+            state[f"_{name}"] = _read_only(state.pop(f"_{name}", state.pop(name, None)))
+        self.__dict__.update(state)
+
+    @property
+    def embedding(self) -> np.ndarray:
+        """The read-only embedding matrix."""
+        return self._embedding
+
+    @embedding.setter
+    def embedding(self, value: np.ndarray) -> None:
+        self._embedding = _read_only(value)
+
+    @property
+    def weights(self) -> np.ndarray | None:
+        """The read-only token weights, or None."""
+        return self._weights
+
+    @weights.setter
+    def weights(self, value: np.ndarray | None) -> None:
+        self._weights = _read_only(value)
+
+    @property
+    def token_mapping(self) -> np.ndarray | None:
+        """The read-only mapping from token ids to rows of `embedding`, or None."""
+        return self._token_mapping
+
+    @token_mapping.setter
+    def token_mapping(self, value: np.ndarray | None) -> None:
+        self._token_mapping = _read_only(value)
+
     def _get_rust_backend(self) -> model2vec_rs.StaticModel:
         """Get the Rust backend used by `encode`, rebuilding it if the vectors or tokenizer were replaced.
+
+        Building the backend replaces `embedding` and `weights` with read-only views of the backend's memory
+        when their dtypes match.
 
         :return: The Rust backend.
         """
@@ -115,7 +150,12 @@ class StaticModel:
                 None if self.token_mapping is None else np.ascontiguousarray(self.token_mapping, dtype=np.int64)
             ),
         )
-        self._rust_backend = (key, backend)
+        shared_embedding, shared_weights = backend.embeddings, backend.weights
+        if shared_embedding is not None and shared_embedding.dtype == self.embedding.dtype:
+            self.embedding = shared_embedding
+        if shared_weights is not None and self.weights is not None and self.weights.dtype == shared_weights.dtype:
+            self.weights = shared_weights
+        self._rust_backend = ((self.embedding, self.weights, self.token_mapping, self.tokenizer), backend)
         return backend
 
     @property
@@ -511,6 +551,21 @@ def _get_unk_token_id(tokenizer: Tokenizer) -> int | None:
         return tokenizer.token_to_id(token)
     # Unigram
     return json.loads(tokenizer.to_str())["model"].get("unk_id")
+
+
+@overload
+def _read_only(array: np.ndarray) -> np.ndarray: ...
+
+
+@overload
+def _read_only(array: np.ndarray | None) -> np.ndarray | None: ...
+
+
+def _read_only(array: np.ndarray | None) -> np.ndarray | None:
+    """Mark an array read-only in place and return it."""
+    if array is not None:
+        array.setflags(write=False)
+    return array
 
 
 T = TypeVar("T", bound=StaticModel)
