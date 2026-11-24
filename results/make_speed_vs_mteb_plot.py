@@ -81,7 +81,7 @@ def make_plot(df: pd.DataFrame) -> ggplot:
 
 def benchmark_model(name: str, info: list[str], texts: list[str]) -> dict[str, float | str]:
     """Benchmark a single model."""
-    logger.info("Starting", name)
+    logger.info("Starting %s", name)
     if info[1] == "BPEmb":
         model = BPEmbEmbedder(vs=50_000, dim=300)  # type: ignore
     elif info[1] == "ST":
