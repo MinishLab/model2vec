@@ -31,7 +31,7 @@
 
 
 
-Model2Vec is a technique to turn any sentence transformer into a small, fast static embedding model. Model2Vec reduces model size by a factor up to 50 and makes models up to 30000 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model in the world. See our [results](results/README.md), read our [docs](https://minish.ai/packages/model2vec/introduction), or dive in to see how it works.
+Model2Vec is a technique to turn any sentence transformer into a small, fast static embedding model. Model2Vec reduces model size by a factor up to 50 and makes models up to 30000 times faster, with a small drop in performance. Our [best model](https://huggingface.co/minishlab/blink-8M) is the most performant static embedding model in the world. See our [results](results/README.md), read our [docs](https://minish.ai/packages/model2vec/introduction), or dive in to see how it works.
 
 
 ## Quickstart
@@ -42,12 +42,12 @@ Install the lightweight base package with:
 pip install model2vec
 ```
 
-You can start using Model2Vec by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/potion-6721e0abd4ea41881417f062). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings, which you can use for any task, such as  text classification, retrieval, clustering, or building a RAG system:
+You can start using Model2Vec by loading one of our [flagship models from the HuggingFace hub](https://huggingface.co/collections/minishlab/blink). These models are pre-trained and ready to use. The following code snippet shows how to load a model and make embeddings, which you can use for any task, such as  text classification, retrieval, clustering, or building a RAG system:
 ```python
 from model2vec import StaticModel
 
-# Load a model from the HuggingFace hub (in this case the potion-base-32M model)
-model = StaticModel.from_pretrained("minishlab/potion-base-32M")
+# Load a model from the HuggingFace hub (in this case the blink-8M model)
+model = StaticModel.from_pretrained("minishlab/blink-8M")
 
 # Make embeddings
 embeddings = model.encode(["It's dangerous to go alone!", "It's a secret to everybody."])
@@ -87,7 +87,7 @@ from datasets import load_dataset
 from model2vec.train import StaticModelForClassification
 
 # Initialize a classifier from a pre-trained model
-classifier = StaticModelForClassification.from_pretrained(path="minishlab/potion-base-32M")
+classifier = StaticModelForClassification.from_pretrained(path="minishlab/blink-8M")
 
 # Load a dataset. Note: both single and multi-label classification datasets are supported
 ds = load_dataset("setfit/subj")
@@ -105,7 +105,7 @@ For advanced usage, see our [training docs](https://minish.ai/packages/model2vec
 ## Main Features
 
 - **State-of-the-Art Performance**: Model2Vec models outperform any other static embeddings (such as GLoVe and BPEmb) by a large margin, as can be seen in our [results](results/README.md).
-- **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of up to 50. Our [best model](https://huggingface.co/minishlab/potion-base-8M) is just ~30 MB on disk, and our smallest model just ~8 MB (making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
+- **Small**: Model2Vec reduces the size of a Sentence Transformer model by a factor of up to 50. Our [best model](https://huggingface.co/minishlab/blink-8M) is just ~30 MB on disk, and our smallest model just ~8 MB (making it the smallest model on [MTEB](https://huggingface.co/spaces/mteb/leaderboard)!).
 - **Lightweight Dependencies**: the base package's only major dependency is `numpy`.
 - **Lightning-fast Inference**: up to 30000 times faster on CPU than the original model.
 - **Fast, Dataset-free Distillation**: distill your own model in 30 seconds on a CPU, without a dataset.
@@ -126,17 +126,15 @@ Our official documentation can be found [here](https://minish.ai/packages/model2
 
 ## Model List
 
-We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/model2vec-base-models-66fd9dd9b7c3b3c0f25ca90e) and can be loaded using the `from_pretrained` method. The models are listed below.
+We provide a number of models that can be used out of the box. These models are available on the [HuggingFace hub](https://huggingface.co/collections/minishlab/blink) and can be loaded using the `from_pretrained` method. The models are listed below.
 
 
 
 | Model                                                                 | Language    | Sentence Transformer                                            | Params  | Task      |
 |-----------------------------------------------------------------------|------------|-----------------------------------------------------------------|---------|-----------|
-| [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M)   | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 32.3M   | General   |
-| [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M) | Multilingual | [bge-m3](https://huggingface.co/BAAI/bge-m3)      | 128M    | General   |
-| [potion-retrieval-32M](https://huggingface.co/minishlab/potion-retrieval-32M) | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 32.3M   | Retrieval |
-| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)     | English    | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 7.5M    | General   |
-| [potion-code-16M-v2](https://huggingface.co/minishlab/potion-code-16M-v2) | Code       | [CodeRankEmbed](https://huggingface.co/nomic-ai/CodeRankEmbed) | 16.2M   | Code      |
+| [blink-8M](https://huggingface.co/minishlab/blink-8M)                 | English      | [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) | 7.7M    | General   |
+| [blink-multilingual-64M](https://huggingface.co/minishlab/blink-multilingual-64M) | Multilingual | [bge-m3](https://huggingface.co/BAAI/bge-m3)      | 64.0M   | General   |
+| [blink-code-16M](https://huggingface.co/minishlab/blink-code-16M)     | Code         | [CodeRankEmbed](https://huggingface.co/nomic-ai/CodeRankEmbed) | 16.0M   | Code      |
 
 
 
