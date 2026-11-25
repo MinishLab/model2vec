@@ -68,7 +68,7 @@ def test_pipeline_onnx_matches_predict_proba(mock_inference_pipeline: StaticMode
     input_ids, attention_mask = _tokenize(mock_inference_pipeline, texts)
 
     onnx_output = _export(torch_model, input_ids, attention_mask, tmp_path / "model.onnx")
-    expected = mock_inference_pipeline.predict_proba(texts, use_multiprocessing=False)
+    expected = mock_inference_pipeline.predict_proba(texts)
 
     assert onnx_output.shape == expected.shape
     np.testing.assert_allclose(onnx_output, expected, atol=1e-4)
@@ -141,7 +141,7 @@ def test_pipeline_onnx_matches_projector(
     input_ids, attention_mask = _tokenize(mock_inference_pipeline_projector, texts)
 
     onnx_output = _export(torch_model, input_ids, attention_mask, tmp_path / "model.onnx")
-    expected = mock_inference_pipeline_projector.predict(texts, use_multiprocessing=False)
+    expected = mock_inference_pipeline_projector.predict(texts)
 
     assert onnx_output.shape == expected.shape
     np.testing.assert_allclose(onnx_output, expected, atol=1e-4)
@@ -159,7 +159,7 @@ def test_pipeline_onnx_matches_empty_head(mock_vectors: np.ndarray, mock_tokeniz
     input_ids, attention_mask = _tokenize(pipeline, texts)
 
     onnx_output = _export(torch_model, input_ids, attention_mask, tmp_path / "model.onnx")
-    expected = pipeline.predict(texts, use_multiprocessing=False)
+    expected = pipeline.predict(texts)
 
     np.testing.assert_allclose(onnx_output, expected, atol=1e-4)
 
@@ -369,6 +369,6 @@ def test_pipeline_onnx_vocabulary_quantized(tmp_path: Path) -> None:
     input_ids, attention_mask = _tokenize(pipeline, texts)
 
     onnx_output = _export(torch_model, input_ids, attention_mask, tmp_path / "model.onnx")
-    expected = pipeline.predict_proba(texts, use_multiprocessing=False)
+    expected = pipeline.predict_proba(texts)
 
     np.testing.assert_allclose(onnx_output, expected, atol=1e-4)

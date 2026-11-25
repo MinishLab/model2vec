@@ -605,10 +605,10 @@ def _static_model_arguments(model: StaticModel, *, max_length: int | None | _Uns
     :return: The constructor arguments.
     """
     model.embedding = np.nan_to_num(model.embedding)
-    weights = torch.from_numpy(model.weights) if model.weights is not None else None
+    weights = torch.tensor(model.weights) if model.weights is not None else None
     token_mapping = model.token_mapping.tolist() if model.token_mapping is not None else None
     return {
-        "vectors": torch.from_numpy(model.embedding),
+        "vectors": torch.tensor(model.embedding),
         "tokenizer": model.tokenizer,
         "token_mapping": token_mapping,
         "weights": weights,

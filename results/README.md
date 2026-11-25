@@ -5,22 +5,22 @@ This document contains the results of the Model2Vec project. The results are pre
 - [MMTEB Results (Multilingual)](#mmteb-results-multilingual)
 - [Retrieval Results](#retrieval-results)
 - [Training Results](#training-results)
-- [Ablations](#ablations)
 
 ## MTEB Results (English)
 
-Model2Vec is evaluated on MTEB, as well as two additional tasks: [PEARL](https://github.com/tigerchen52/PEARL) (a phrase representation task) and WordSim (a collection of _word_ similarity tasks). The results are shown in the table below.
+Model2Vec is evaluated on MTEB. The results are shown in the table below.
 
-Note: The `potion` and `M2V` models are our static models.
+Note: The `blink`, `potion` and `M2V` models are our static models.
 
-| Model                  |   Avg (All) |   Avg (MTEB) |   Class |   Clust |   PairClass |   Rank |    Ret |    STS |    Sum |   Pearl |   WordSim |
-|:-----------------------|------------:|-------------:|--------:|--------:|------------:|-------:|-------:|-------:|-------:|--------:|----------:|
-| [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)        | 55.80     | 55.93      | 69.25  | 44.90  | 82.37     | 47.14  | 42.92  | 78.95  | 25.96  | 60.83  | 49.91   |
-| [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M)                     | 52.83     | 52.13      | 71.70  | 41.25  | 78.17     | 42.45  | 32.67  | 73.93  | 24.74  | 55.37  | 55.15   |
-| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)                       | 51.32     | 51.08      | 70.34  | 39.74  | 76.62     | 41.79  | 31.11  | 72.91  | 25.06  | 53.54  | 50.75   |
-| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)                     | 48.77     | 47.96      | 66.84  | 33.96  | 74.90     | 39.31  | 25.36  | 68.76  | 26.61  | 54.02  | 49.18   |
-| [GloVe_300d](https://huggingface.co/sentence-transformers/average_word_embeddings_glove.6B.300d)             | 45.49     | 45.82      | 62.73  | 37.10  | 72.48     | 38.28  | 21.80  | 61.52  | 26.81  | 45.65  | 43.05   |
-| [BPEmb_50k_300d](https://github.com/bheinzerling/bpemb)                                  | 42.33     | 41.74      | 61.72  | 35.17  | 57.86     | 37.26  | 15.36  | 55.30  | 29.49  | 47.56  | 41.28   |
+| Model                  |   Avg (MTEB) |   Class |   Clust |   PairClass |   Rank |    Ret |    STS |    Sum |
+|:-----------------------|-------------:|--------:|--------:|------------:|-------:|-------:|-------:|-------:|
+| [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)        | 55.93      | 69.25  | 44.90  | 82.37     | 47.14  | 42.92  | 78.95  | 25.96  |
+| [blink-8M](https://huggingface.co/minishlab/blink-8m)                                    | 55.35      | 67.88  | 41.49  | 78.42     | 43.12  | 38.86  | 73.56  | 22.48  |
+| [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M)                     | 52.13      | 71.70  | 41.25  | 78.17     | 42.45  | 32.67  | 73.93  | 24.74  |
+| [potion-base-8M](https://huggingface.co/minishlab/potion-base-8M)                       | 51.08      | 70.34  | 39.74  | 76.62     | 41.79  | 31.11  | 72.91  | 25.06  |
+| [M2V_base_output](https://huggingface.co/minishlab/M2V_base_output)                     | 47.96      | 66.84  | 33.96  | 74.90     | 39.31  | 25.36  | 68.76  | 26.61  |
+| [GloVe_300d](https://huggingface.co/sentence-transformers/average_word_embeddings_glove.6B.300d)             | 45.82      | 62.73  | 37.10  | 72.48     | 38.28  | 21.80  | 61.52  | 26.81  |
+| [BPEmb_50k_300d](https://github.com/bheinzerling/bpemb)                                  | 41.74      | 61.72  | 35.17  | 57.86     | 37.26  | 15.36  | 55.30  | 29.49  |
 
 
 <details>
@@ -36,13 +36,13 @@ For readability, the MTEB task names are abbreviated as follows:
 - Sum: Summarization
 </details>
 
-The results show that [potion-base-32M](https://huggingface.co/minishlab/potion-base-32M) is the most performant static embedding model. It reaches 93.21% of the performance of [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) with an average MTEB score of 52.13 while being orders of magnitude faster.
+The results show that [blink-8M](https://huggingface.co/minishlab/blink-8m) is the most performant static embedding model. It reaches 98.96% of the performance of [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) with an average MTEB score of 55.35 while being orders of magnitude faster.
 
 The figure below shows the relationship between the number of sentences per second and the average MTEB score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
-This plot shows that the potion and M2V models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
-NOTE: for fairness of comparison, we disabled multiprocessing for Model2Vec for this benchmark. All sentence-transformers models are run with the [sentence-transformers](https://github.com/UKPLab/sentence-transformers) library's default settings for `encode`.
+This plot shows that [blink-8M](https://huggingface.co/minishlab/blink-8m) is much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
+NOTE: all models encode the same 1,000 Wikipedia articles on CPU. Model2Vec models are truncated to 512 tokens, like [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5). All sentence-transformers models are run with the [sentence-transformers](https://github.com/UKPLab/sentence-transformers) library's default settings for `encode`. The script is [make_speed_vs_mteb_plot.py](make_speed_vs_mteb_plot.py).
 
-| ![Description](../assets/images/speed_vs_mteb_plot.png) |
+| ![Average MTEB score plotted against samples per second](../assets/images/speed_vs_mteb_plot.svg) |
 |:--:|
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 
@@ -149,27 +149,3 @@ The table below shows inference speed. The model2vec full finetune is about 80x 
 |                  | tfidf | fasttext | model2vec + logreg | model2vec full finetune | setfit | minilm full finetune |
 |:-----------------|------:|---------:|-------------------:|------------------------:|-------:|---------------------:|
 | samples / second | 93718 |    96288 |              32869 |                   81018 |   1010 |                  274 |
-
-
-
-## Ablations
-
-To better understand the factors contributing to the performance of Model2Vec, we conducted a comprehensive set of ablation studies, covering various aspects of the model's architecture and preprocessing methods. In these studies, we examined the impact of key elements such as PCA, Zipf weighting, and the use of Sentence Transformers versus regular transformer models. We also compared the performance of input embeddings versus output embeddings, since it would seem plausible that these should also work well. The results are shown in the table below.
-
-
-| Model                        |   Avg (All) |   Avg (MTEB) |   Class |   Clust |   PairClass |   Rank |   Ret |   STS |   Sum |   Pearl |   WordSim |
-|:-----------------------------|------------:|-------------:|--------:|--------:|------------:|-------:|------:|------:|------:|--------:|----------:|
-| M2V_base_output              |       46.79 |        45.34 |   61.25 |   25.58 |       74.9  |  47.63 | 26.14 | 68.58 | 29.2  |   54.02 |     49.18 |
-| M2V_base_output_nopca        |       44.04 |        42.31 |   61.42 |   20.15 |       68.21 |  44.67 | 25.25 | 61.87 | 29.85 |   51.02 |     48.96 |
-| M2V_base_output_nozipf       |       43.61 |        41.52 |   60.44 |   21.62 |       72.15 |  45.57 | 20.35 | 62.71 | 30.66 |   52.28 |     49.17 |
-| M2V_base_input_nozipf_nopca  |       40.97 |        39.55 |   54.16 |   18.62 |       68.3  |  43.65 | 23.63 | 59.38 | 32.04 |   50.19 |     40.52 |
-| M2V_base_output_nozipf_nopca |       40.8  |        38.44 |   59.78 |   19.31 |       62.39 |  42.26 | 19.01 | 55.16 | 30    |   49.09 |     48.97 |
-| M2V_base_input               |       40.74 |        39.93 |   60.35 |   22.66 |       59.63 |  43.02 | 25.47 | 50.05 | 29.35 |   50.61 |     34.47 |
-| M2V_bert_output_nozipf_nopca              |       35.54 |        34.82 |   55.69 |   15.42 |       58.68 |  39.87 | 12.92 | 55.24 | 30.15 |   46.9  |     26.72 |
-
-
-There's four main findings in these results:
-1. Non-Sentence Transformers do not work well. This can be seen by comparing `M2V_bert_output_nozipf_nopca` (which uses [BERT](https://huggingface.co/google-bert/bert-base-uncased), a non-Sentence Transformer) and `M2V_base_output_nozipf_nopca` (which uses [BGE-base](https://huggingface.co/BAAI/bge-base-en-v1.5), a Sentence Transformer). Using a Sentence Transformer gives a ~5.2% increase in performance.
-2. PCA is crucial for performance. This can be seen by comparing `M2V_base_output_nozipf_nopca` and `M2V_base_output_nozipf` which gives a ~2.8% increase in performance. Furthermore, PCA improves performance on _all_ tasks.
-3. Zipf weighting is crucial for performance. This can be seen by comparing `M2V_base_output_nozipf_nopca` and `M2V_base_output_nopca` which gives a ~3.1% increase in performance.
-4. Output embeddings outperform input embeddings. This can be seen by comparing `M2V_base_input` and `M2V_base_output` which gives a ~6.1% increase in performance. Note that input embeddings do work well for some tasks. We hypothesize that this is because input embeddings are inherently normalized.

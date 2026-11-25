@@ -75,6 +75,13 @@ def test_init_predict_proba(mock_inference_pipeline: StaticModelPipeline) -> Non
     assert mock_inference_pipeline.predict_proba(["dog"]).argmax(1).tolist() == [1]
 
 
+@pytest.mark.parametrize("method", ["predict", "predict_proba"])
+def test_pipeline_removed_arguments_warn(mock_inference_pipeline: StaticModelPipeline, method: str) -> None:
+    """Test that the removed encoding arguments raise a DeprecationWarning in the pipeline."""
+    with pytest.warns(DeprecationWarning, match="`use_multiprocessing`"):
+        getattr(mock_inference_pipeline, method)(["dog"], use_multiprocessing=False)
+
+
 def test_init_evaluate(mock_inference_pipeline: StaticModelPipeline) -> None:
     """Test successful init and evaluate with StaticModelPipeline."""
     target: list[str] | list[list[str]]

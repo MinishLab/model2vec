@@ -24,12 +24,12 @@ classifiers = [
 
 dependencies = [
     "jinja2",
-    "joblib",
     "numpy",
     "safetensors",
-    "tokenizers>=0.20",
+    "tokenizers>=0.22,<1.0.0",
     "tqdm",
     "huggingface-hub>=1.0.0",
+    "model2vec-rs>=0.5.1,<0.6.0",
 ]
 
 [build-system]
@@ -124,4 +124,4 @@ version = {attr = "model2vec.version.__version__"}
 
 [tool.uv]
 exclude-newer = "1 week"
-exclude-newer-package = { skeletoken = false }
+exclude-newer-package = { skeletoken = false , model2vec-rs = false}

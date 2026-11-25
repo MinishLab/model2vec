@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import numpy as np
@@ -102,35 +101,6 @@ def test_encode_as_sequence(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer,
     assert np.allclose(means, encoded)
 
 
-def test_encode_multiprocessing(
-    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
-) -> None:
-    """Test encoding with multiprocessing."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    # Generate a list of 15k inputs to test multiprocessing
-    sentences = ["word1 word2"] * 15_000
-    encoded = model.encode(sentences, use_multiprocessing=True)
-    assert encoded.shape == (15000, 2)
-
-
-@pytest.mark.parametrize("previous", [None, "true"])
-def test_encode_multiprocessing_restores_tokenizers_parallelism(
-    mock_vectors: np.ndarray,
-    mock_tokenizer: Tokenizer,
-    mock_config: dict[str, str],
-    monkeypatch: pytest.MonkeyPatch,
-    previous: str | None,
-) -> None:
-    """Test that multiprocessing encoding restores TOKENIZERS_PARALLELISM."""
-    if previous is None:
-        monkeypatch.delenv("TOKENIZERS_PARALLELISM", raising=False)
-    else:
-        monkeypatch.setenv("TOKENIZERS_PARALLELISM", previous)
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    model.encode(["word1 word2"] * 15_000, use_multiprocessing=True)
-    assert os.environ.get("TOKENIZERS_PARALLELISM") == previous
-
-
 def test_encode_as_sequence_max_length(
     mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
 ) -> None:
@@ -141,17 +111,6 @@ def test_encode_as_sequence_max_length(
     truncated = model.encode_as_sequence(sentences, max_length=1)
 
     assert len(truncated[0]) < len(full[0])
-
-
-def test_encode_as_sequence_multiprocessing(
-    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: dict[str, str]
-) -> None:
-    """Test encoding of sentences as tokens with multiprocessing."""
-    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, config=mock_config)
-    # Generate a list of 15k inputs to test multiprocessing
-    sentences = ["word1 word2"] * 15_000
-    encoded = model.encode_as_sequence(sentences, use_multiprocessing=True)
-    assert len(encoded) == 15_000
 
 
 def test_encode_as_tokens_empty(
@@ -380,3 +339,139 @@ def test_dim(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, mock_config: d
     model = StaticModel(mock_vectors, mock_tokenizer, mock_config)
     assert model.dim == 2
     assert model.dim == model.embedding.shape[1]
+
+
+@pytest.mark.parametrize("normalize", [False, True])
+@pytest.mark.parametrize("max_length", [None, 1])
+def test_encode_matches_sequence_mean(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, normalize: bool, max_length: int | None
+) -> None:
+    """Test that encode matches the mean of encode_as_sequence, with weights and a token mapping."""
+    weights = np.linspace(0.5, 1.5, len(mock_vectors)).astype(np.float32)
+    token_mapping = np.array([0, 1, 2, 1, 0])
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer, weights=weights, token_mapping=token_mapping)
+    sentences = ["word1 word2", "word3 word1 word2", "", "unknown"]
+    encoded = model.encode(sentences, normalize=normalize, max_length=max_length)
+    expected = np.stack(
+        [
+            seq.mean(axis=0) if len(seq) else np.zeros(model.dim)
+            for seq in model.encode_as_sequence(sentences, max_length=max_length)
+        ]
+    )
+    if normalize:
+        expected = expected / (np.linalg.norm(expected, axis=1, keepdims=True) + 1e-32)
+    assert encoded.dtype == model.embedding.dtype
+    np.testing.assert_allclose(encoded, expected, rtol=1e-5, atol=1e-7)
+
+
+def test_encode_rust_backend_rebuilds(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test that the Rust backend is cached and rebuilt when the embedding is replaced."""
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    before = model.encode(["word1"])
+    backend = model._get_rust_backend()
+    assert model._get_rust_backend() is backend
+    model.embedding = model.embedding * 2
+    assert model._get_rust_backend() is not backend
+    np.testing.assert_allclose(model.encode(["word1"]), before * 2)
+
+
+@pytest.mark.parametrize("dtype", [np.float16, np.float32, np.int8])
+def test_arrays_are_read_only(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, dtype: type) -> None:
+    """Test that the model arrays cannot be changed in place, before or after encoding, and only by assignment."""
+    import pickle
+
+    model = StaticModel(
+        vectors=(mock_vectors * 10).astype(dtype),
+        tokenizer=mock_tokenizer,
+        weights=np.ones(len(mock_vectors), dtype=np.float32),
+        token_mapping=np.arange(len(mock_vectors)),
+    )
+    for clone in (model, pickle.loads(pickle.dumps(model))):
+        for array in (clone.embedding, clone.weights, clone.token_mapping):
+            with pytest.raises(ValueError, match="read-only"):
+                array *= 2
+    before = model.encode(["word1"])
+    with pytest.raises(ValueError, match="read-only"):
+        model.embedding *= 2
+    model.embedding = model.embedding * 2
+    with pytest.raises(ValueError, match="read-only"):
+        model.embedding[0] = 0
+    np.testing.assert_allclose(model.encode(["word1"]), before * 2)
+    np.testing.assert_allclose(model.encode(["word1"])[0], model.encode_as_sequence(["word1"])[0].mean(axis=0))
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.float16, np.float64])
+def test_encode_shares_arrays_with_rust_backend(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, dtype: type
+) -> None:
+    """Test that encoding swaps the arrays for views of the Rust backend's memory when their dtypes match."""
+    original = (mock_vectors * 10).astype(dtype)
+    weights = np.ones(len(mock_vectors), dtype=np.float32)
+    model = StaticModel(vectors=original, tokenizer=mock_tokenizer, weights=weights)
+    expected = model.encode(["word1 word2"])
+    backend = model._get_rust_backend()
+
+    shared = dtype in (np.float32, np.int8)
+    assert np.shares_memory(model.embedding, backend.embeddings) == shared
+    assert np.shares_memory(model.embedding, original) != shared
+    assert np.shares_memory(model.weights, backend.weights)
+    assert model.embedding.dtype == dtype
+    np.testing.assert_array_equal(model.embedding, original)
+    np.testing.assert_array_equal(model.weights, weights)
+    assert model._get_rust_backend() is backend
+    np.testing.assert_array_equal(model.encode(["word1 word2"]), expected)
+    with pytest.raises(ValueError, match="read-only"):
+        model.embedding[0] = 0
+
+
+def test_input_arrays_stay_writable(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test that the model does not make the arrays it is given read-only."""
+    vectors = mock_vectors.copy()
+    weights = np.ones(len(vectors), dtype=np.float32)
+    token_mapping = np.arange(len(vectors))
+    model = StaticModel(vectors=vectors, tokenizer=mock_tokenizer, weights=weights, token_mapping=token_mapping)
+    model.encode(["word1"])
+    for array in (vectors, weights, token_mapping):
+        assert array.flags.writeable
+        array[0] = 0
+
+
+def test_encode_rust_backend_rebuilds_on_tokenizer_assignment(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Test that assigning the tokenizer rebuilds the Rust backend, so in-place changes are used."""
+    from tokenizers.normalizers import Lowercase
+
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    before = model.encode(["WORD1"])
+    backend = model._get_rust_backend()
+    model.tokenizer.normalizer = Lowercase()
+    model.tokenizer = model.tokenizer
+    assert model._get_rust_backend() is not backend
+    after = model.encode(["WORD1"])
+    assert not np.allclose(before, after)
+    np.testing.assert_allclose(after, model.encode(["word1"]))
+
+
+@pytest.mark.parametrize("method", ["encode", "encode_as_sequence"])
+def test_encode_removed_arguments_warn(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, method: str) -> None:
+    """Test that the removed encoding arguments raise a DeprecationWarning, and other arguments do not."""
+    import warnings
+
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with pytest.warns(DeprecationWarning, match="`batch_size`, `show_progress_bar`"):
+        getattr(model, method)(["word1"], show_progress_bar=True, batch_size=2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        getattr(model, method)(["word1"], something_else=True)
+
+
+def test_pickle_and_copy_with_rust_backend(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test that a model with a built Rust backend can be pickled and copied."""
+    import copy
+    import pickle
+
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    expected = model.encode(["word1 word2"])
+    for clone in (pickle.loads(pickle.dumps(model)), copy.deepcopy(model), copy.copy(model)):
+        np.testing.assert_allclose(clone.encode(["word1 word2"]), expected)
