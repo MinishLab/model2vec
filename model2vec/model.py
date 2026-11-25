@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import warnings
 from collections.abc import Sequence
 from logging import getLogger
 from pathlib import Path
@@ -39,9 +40,10 @@ class StaticModel:
     ) -> None:
         """Initialize the StaticModel.
 
-        :param vectors: The vectors to use. `vectors`, `weights` and `token_mapping` are made read-only;
-            assign new arrays to `embedding`, `weights` or `token_mapping` to change them.
-        :param tokenizer: The Transformers tokenizer to use.
+        :param vectors: The vectors to use. The model stores read-only views of `vectors`, `weights` and
+            `token_mapping`; assign new arrays to `embedding`, `weights` or `token_mapping` to change them.
+        :param tokenizer: The Transformers tokenizer to use. Stored as a copy. If you change `model.tokenizer`
+            in place, assign it again (`model.tokenizer = model.tokenizer`) for `encode` to use the changes.
         :param config: Any metadata config. Stored as a copy, so mutating it afterwards does not affect
             the model, and vice versa.
         :param normalize: Whether to normalize the embeddings. Defaults to False. This value is authoritative:
@@ -95,7 +97,18 @@ class StaticModel:
         """Restore the state from pickling, keeping the arrays read-only."""
         for name in ("embedding", "weights", "token_mapping"):
             state[f"_{name}"] = _read_only(state.pop(f"_{name}", state.pop(name, None)))
+        state["_tokenizer"] = state.pop("_tokenizer", state.pop("tokenizer", None))
         self.__dict__.update(state)
+
+    @property
+    def tokenizer(self) -> Tokenizer:
+        """The tokenizer. Assign it again after changing it in place, so that `encode` uses the changes."""
+        return self._tokenizer
+
+    @tokenizer.setter
+    def tokenizer(self, value: Tokenizer) -> None:
+        self._tokenizer = value
+        self.__dict__.pop("_rust_backend", None)
 
     @property
     def embedding(self) -> np.ndarray:
@@ -125,14 +138,14 @@ class StaticModel:
         self._token_mapping = _read_only(value)
 
     def _get_rust_backend(self) -> model2vec_rs.StaticModel:
-        """Get the Rust backend used by `encode`, rebuilding it if the vectors or tokenizer were replaced.
+        """Get the Rust backend used by `encode`, rebuilding it if the vectors or tokenizer were assigned.
 
         Building the backend replaces `embedding` and `weights` with read-only views of the backend's memory
         when their dtypes match.
 
         :return: The Rust backend.
         """
-        key = (self.embedding, self.weights, self.token_mapping, self.tokenizer)
+        key = (self.embedding, self.weights, self.token_mapping)
         cached = self.__dict__.get("_rust_backend")
         if cached is not None and all(old is new for old, new in zip(cached[0], key)):
             return cached[1]
@@ -155,7 +168,7 @@ class StaticModel:
             self.embedding = shared_embedding
         if shared_weights is not None and self.weights is not None and self.weights.dtype == shared_weights.dtype:
             self.weights = shared_weights
-        self._rust_backend = ((self.embedding, self.weights, self.token_mapping, self.tokenizer), backend)
+        self._rust_backend = ((self.embedding, self.weights, self.token_mapping), backend)
         return backend
 
     @property
@@ -334,10 +347,11 @@ class StaticModel:
         :param sentences: The list of sentences to encode.
         :param max_length: The maximum length of the sentences. Any tokens beyond this length will be truncated.
             If this is None, no truncation is done. Note that this is independent of the model's `max_length`.
-        :param **kwargs: Any additional arguments, such as the removed `batch_size`, `show_progress_bar`,
-            `use_multiprocessing` and `multiprocessing_threshold`. These are ignored.
+        :param **kwargs: Any additional arguments. These are ignored. The removed `batch_size`,
+            `show_progress_bar`, `use_multiprocessing` and `multiprocessing_threshold` raise a DeprecationWarning.
         :return: The encoded sentences with an embedding per token.
         """
+        _warn_removed_arguments(kwargs)
         was_single = isinstance(sentences, str)
         sentence_list: list[str] = [sentences] if isinstance(sentences, str) else list(sentences)
         if max_length is not None:
@@ -375,10 +389,11 @@ class StaticModel:
             If this is None, no truncation is done. If not passed, the model's `max_length` is used.
         :param normalize: Whether to normalize the resulting embeddings. If not passed, the model's `normalize`
             setting is used.
-        :param **kwargs: Any additional arguments, such as the removed `show_progress_bar`, `batch_size` and
-            `use_multiprocessing`. These are ignored.
+        :param **kwargs: Any additional arguments. These are ignored. The removed `batch_size`,
+            `show_progress_bar`, `use_multiprocessing` and `multiprocessing_threshold` raise a DeprecationWarning.
         :return: The encoded sentences. If a single sentence was passed, a vector is returned.
         """
+        _warn_removed_arguments(kwargs)
         if isinstance(max_length, _UnsetType):
             max_length = self.max_length
         if normalize is None:
@@ -553,6 +568,25 @@ def _get_unk_token_id(tokenizer: Tokenizer) -> int | None:
     return json.loads(tokenizer.to_str())["model"].get("unk_id")
 
 
+_REMOVED_ARGUMENTS = ("batch_size", "show_progress_bar", "use_multiprocessing", "multiprocessing_threshold")
+
+
+def _warn_removed_arguments(kwargs: Mapping[str, Any], stacklevel: int = 3) -> None:
+    """Warn about removed encoding arguments in `kwargs`.
+
+    :param kwargs: The keyword arguments a method received.
+    :param stacklevel: The stack level of the warning, counted from this function.
+    """
+    removed = [name for name in _REMOVED_ARGUMENTS if name in kwargs]
+    if removed:
+        warnings.warn(
+            f"{', '.join(f'`{name}`' for name in removed)} no longer have any effect and will be removed "
+            "in a future version.",
+            DeprecationWarning,
+            stacklevel=stacklevel,
+        )
+
+
 @overload
 def _read_only(array: np.ndarray) -> np.ndarray: ...
 
@@ -562,10 +596,12 @@ def _read_only(array: np.ndarray | None) -> np.ndarray | None: ...
 
 
 def _read_only(array: np.ndarray | None) -> np.ndarray | None:
-    """Mark an array read-only in place and return it."""
-    if array is not None:
-        array.setflags(write=False)
-    return array
+    """Return a read-only view of an array, leaving the array itself writable."""
+    if array is None or not array.flags.writeable:
+        return array
+    view = array.view()
+    view.setflags(write=False)
+    return view
 
 
 T = TypeVar("T", bound=StaticModel)

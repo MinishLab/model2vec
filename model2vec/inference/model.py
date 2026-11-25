@@ -13,7 +13,7 @@ from safetensors.numpy import load_file, save_file
 
 from model2vec.inference.evaluation import evaluate_single_or_multi_label
 from model2vec.inference.mlp import Activation, Layer, MLPHead
-from model2vec.model import PathLike, StaticModel
+from model2vec.model import PathLike, StaticModel, _warn_removed_arguments
 from model2vec.persistence import save_pretrained
 from model2vec.types import _UNSET, StaticModelConfig, _UnsetType
 
@@ -93,10 +93,11 @@ class StaticModelPipeline:
         :param max_length: The maximum length of the input sequences. If not passed, the encoder model's
             `max_length` is used. Pass `max_length=None` to disable truncation.
         :param threshold: The threshold for multilabel classification. Defaults to 0.5. Ignored if not multilabel.
-        :param **kwargs: Any additional arguments, such as the removed `show_progress_bar`, `batch_size` and
-            `use_multiprocessing`. These are ignored.
+        :param **kwargs: Any additional arguments. These are ignored. The removed `batch_size`,
+            `show_progress_bar`, `use_multiprocessing` and `multiprocessing_threshold` raise a DeprecationWarning.
         :return: The predicted labels or probabilities.
         """
+        _warn_removed_arguments(kwargs)
         encoded = self._encode_and_coerce_to_2d(X, max_length=max_length)
 
         if self.head.activation == Activation.IDENTITY:
@@ -123,11 +124,12 @@ class StaticModelPipeline:
         :param X: The input data to predict. Can be a list of strings or a single string.
         :param max_length: The maximum length of the input sequences. If not passed, the encoder model's
             `max_length` is used. Pass `max_length=None` to disable truncation.
-        :param **kwargs: Any additional arguments, such as the removed `show_progress_bar`, `batch_size` and
-            `use_multiprocessing`. These are ignored.
+        :param **kwargs: Any additional arguments. These are ignored. The removed `batch_size`,
+            `show_progress_bar`, `use_multiprocessing` and `multiprocessing_threshold` raise a DeprecationWarning.
         :return: The predicted labels or probabilities.
         :raises ValueError: If the classifier type is projector.
         """
+        _warn_removed_arguments(kwargs)
         if self.head.activation == Activation.IDENTITY:
             raise ValueError("You are using predict_proba on a projector model. This is not supported.")
         encoded = self._encode_and_coerce_to_2d(X, max_length=max_length)
@@ -142,10 +144,12 @@ class StaticModelPipeline:
         :param X: The texts to predict on.
         :param y: The ground truth labels.
         :param threshold: The threshold for multilabel classification.
-        :param **kwargs: Any additional arguments, such as the removed `batch_size`. These are ignored.
+        :param **kwargs: Any additional arguments. These are ignored. The removed `batch_size`,
+            `show_progress_bar`, `use_multiprocessing` and `multiprocessing_threshold` raise a DeprecationWarning.
         :return: A classification report, as a dictionary.
         :raises ValueError: If the classifier type is projector.
         """
+        _warn_removed_arguments(kwargs)
         if self.head.activation == Activation.IDENTITY:
             raise ValueError("You are using evaluate on a projector model. This is not supported.")
         predictions = self.predict(X, threshold=threshold)

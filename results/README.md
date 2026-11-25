@@ -40,9 +40,9 @@ The results show that [potion-base-32M](https://huggingface.co/minishlab/potion-
 
 The figure below shows the relationship between the number of sentences per second and the average MTEB score. The circle sizes correspond to the number of parameters in the models (larger = more parameters).
 This plot shows that the potion and M2V models are much faster than the other models, while still being competitive in terms of performance with the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) model.
-NOTE: for fairness of comparison, we disabled multiprocessing for Model2Vec for this benchmark. All sentence-transformers models are run with the [sentence-transformers](https://github.com/UKPLab/sentence-transformers) library's default settings for `encode`.
+NOTE: all models encode the same 1,000 Wikipedia articles on CPU. Model2Vec models are truncated to 512 tokens, like [bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5). All sentence-transformers models are run with the [sentence-transformers](https://github.com/UKPLab/sentence-transformers) library's default settings for `encode`. The script is [make_speed_vs_mteb_plot.py](make_speed_vs_mteb_plot.py).
 
-| ![Description](../assets/images/speed_vs_mteb_plot.png) |
+| ![Average MTEB score plotted against samples per second](../assets/images/speed_vs_mteb_plot.svg) |
 |:--:|
 |*Figure: The average MTEB score plotted against sentences per second. The circle size indicates model size.*|
 

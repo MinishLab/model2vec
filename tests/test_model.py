@@ -413,7 +413,7 @@ def test_encode_shares_arrays_with_rust_backend(
 
     shared = dtype in (np.float32, np.int8)
     assert np.shares_memory(model.embedding, backend.embeddings) == shared
-    assert (model.embedding is original) != shared
+    assert np.shares_memory(model.embedding, original) != shared
     assert np.shares_memory(model.weights, backend.weights)
     assert model.embedding.dtype == dtype
     np.testing.assert_array_equal(model.embedding, original)
@@ -422,6 +422,48 @@ def test_encode_shares_arrays_with_rust_backend(
     np.testing.assert_array_equal(model.encode(["word1 word2"]), expected)
     with pytest.raises(ValueError, match="read-only"):
         model.embedding[0] = 0
+
+
+def test_input_arrays_stay_writable(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+    """Test that the model does not make the arrays it is given read-only."""
+    vectors = mock_vectors.copy()
+    weights = np.ones(len(vectors), dtype=np.float32)
+    token_mapping = np.arange(len(vectors))
+    model = StaticModel(vectors=vectors, tokenizer=mock_tokenizer, weights=weights, token_mapping=token_mapping)
+    model.encode(["word1"])
+    for array in (vectors, weights, token_mapping):
+        assert array.flags.writeable
+        array[0] = 0
+
+
+def test_encode_rust_backend_rebuilds_on_tokenizer_assignment(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer
+) -> None:
+    """Test that assigning the tokenizer rebuilds the Rust backend, so in-place changes are used."""
+    from tokenizers.normalizers import Lowercase
+
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    before = model.encode(["WORD1"])
+    backend = model._get_rust_backend()
+    model.tokenizer.normalizer = Lowercase()
+    model.tokenizer = model.tokenizer
+    assert model._get_rust_backend() is not backend
+    after = model.encode(["WORD1"])
+    assert not np.allclose(before, after)
+    np.testing.assert_allclose(after, model.encode(["word1"]))
+
+
+@pytest.mark.parametrize("method", ["encode", "encode_as_sequence"])
+def test_encode_removed_arguments_warn(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, method: str) -> None:
+    """Test that the removed encoding arguments raise a DeprecationWarning, and other arguments do not."""
+    import warnings
+
+    model = StaticModel(vectors=mock_vectors, tokenizer=mock_tokenizer)
+    with pytest.warns(DeprecationWarning, match="`batch_size`, `show_progress_bar`"):
+        getattr(model, method)(["word1"], show_progress_bar=True, batch_size=2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        getattr(model, method)(["word1"], something_else=True)
 
 
 def test_pickle_and_copy_with_rust_backend(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
