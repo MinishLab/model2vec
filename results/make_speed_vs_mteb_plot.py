@@ -51,10 +51,6 @@ RESULTS: list[Result] = [
         45.82,
         120.0,
     ),
-    Result("potion-base-2M", "minishlab/potion-base-2M", "M2V", "Model2Vec", 47.49, 1.875),
-    Result("potion-base-4M", "minishlab/potion-base-4M", "M2V", "Model2Vec", 49.77, 3.75),
-    Result("potion-base-8M", "minishlab/potion-base-8M", "M2V", "Model2Vec", 51.08, 7.5),
-    Result("potion-base-32M", "minishlab/potion-base-32M", "M2V", "Model2Vec", 52.13, 32.3),
     Result("blink-8M", "minishlab/blink-8m", "M2V", "Model2Vec", 55.35, 7.68),
 ]
 
@@ -64,10 +60,6 @@ CACHED_SPEEDS: dict[str, float] = {
     "all-MiniLM-L6-v2": 100.40,
     "bge-base-en-v1.5": 10.72,
     "GloVe 6B 300d": 480.87,
-    "potion-base-2M": 339275.29,
-    "potion-base-4M": 288108.39,
-    "potion-base-8M": 231018.00,
-    "potion-base-32M": 137914.39,
     "blink-8M": 218288.95,
 }
 

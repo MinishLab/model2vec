@@ -147,7 +147,6 @@ We have performed extensive experiments to evaluate the performance of Model2Vec
 - [MMTEB Results](results/README.md#mmteb-results)
 - [Retrieval Results](results/README.md#retrieval-results)
 - [Training Results](results/README.md#training-results)
-- [Ablations](results/README.md#ablations)
 
 ## Acknowledgements
 
