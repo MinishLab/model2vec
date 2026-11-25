@@ -7,8 +7,56 @@ on:
   pull_request:
 
 jobs:
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes outside non-code files
+        id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.event.after }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            range="$PR_BASE...$PR_HEAD"
+          elif [[ -z "$PUSH_BEFORE" || "$PUSH_BEFORE" =~ ^0+$ ]]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          else
+            range="$PUSH_BEFORE..$PUSH_AFTER"
+          fi
+
+          if ! files=$(git diff --no-renames --name-only "$range"); then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          code=false
+          while IFS= read -r file; do
+            case "$file" in
+              "") ;;
+              model2vec/modelcards/*) code=true ;;
+              *.md|assets/*|docs/*|results/*|LICENSE|CITATION.cff) ;;
+              *) code=true ;;
+            esac
+          done <<< "$files"
+
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   test:
     name: Run tests with pytest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -57,3 +105,23 @@ jobs:
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  tests-passed:
+    name: Tests passed
+    needs: [changes, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check test results
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          echo "changes: $CHANGES_RESULT, test: $TEST_RESULT"
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            exit 1
+          fi
+          if [[ "$TEST_RESULT" != "success" && "$TEST_RESULT" != "skipped" ]]; then
+            exit 1
+          fi
