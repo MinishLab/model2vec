@@ -36,7 +36,7 @@ jobs:
             range="$PUSH_BEFORE..$PUSH_AFTER"
           fi
 
-          if ! files=$(git diff --name-only "$range"); then
+          if ! files=$(git diff --no-renames --name-only "$range"); then
             echo "code=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
