@@ -123,6 +123,8 @@ The core idea is to forward pass a vocabulary through a sentence transformer mod
 
 Our official documentation can be found [here](https://minish.ai/packages/model2vec/introduction). This includes in-depth documentation on [inference](https://minish.ai/packages/model2vec/inference), [distillation](https://minish.ai/packages/model2vec/distillation), [training](https://minish.ai/packages/model2vec/training), and [integrations](https://minish.ai/packages/model2vec/integrations).
 
+For details on the Rust backend and which dtypes to use, see [internals](docs/internals.md).
+
 
 ## Model List
 
