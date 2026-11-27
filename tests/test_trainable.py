@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from typing import Any, TypeVar
 from unittest.mock import patch
 
+import datasets
 import numpy as np
 import pytest
 import torch
@@ -1759,8 +1760,11 @@ def test_regressor_fit_on_fixed_size_vector_column(mock_vectors: np.ndarray, moc
     assert model.out_dim == 2
 
 
-def test_fit_rejects_iterable_datasets(mock_vectors: np.ndarray, mock_tokenizer: Tokenizer) -> None:
+def test_fit_rejects_iterable_datasets(
+    mock_vectors: np.ndarray, mock_tokenizer: Tokenizer, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Iterable datasets and their columns have no length, and are rejected."""
+    monkeypatch.setattr(datasets.config, "TORCH_AVAILABLE", False)
     iterable = Dataset.from_dict({"text": _TRAIN_TEXTS, "label": ["a", "b"] * 4}).to_iterable_dataset()
     model = StaticModelForClassification(vectors=torch.from_numpy(mock_vectors).float(), tokenizer=mock_tokenizer)
     with pytest.raises(ValueError, match="X comes from an iterable"):

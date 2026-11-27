@@ -30,7 +30,7 @@ def distill_from_model(
     pca_dims: PCADimType = 256,
     sif_coefficient: float | None = 1e-4,
     token_remove_pattern: str | None = r"\[unused\d+\]",
-    quantize_to: DType | str = DType.Float16,
+    quantize_to: DType | str = DType.Float32,
     pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> StaticModel:
     """Distill a staticmodel from a sentence transformer.
@@ -120,7 +120,7 @@ def random_init(
     dim: int = 256,
     sif_coefficient: float | None = 1e-4,
     token_remove_pattern: str | None = r"\[unused\d+\]",
-    quantize_to: DType | str = DType.Float16,
+    quantize_to: DType | str = DType.Float32,
     seed: int = 42,
     trust_remote_code: bool = False,
 ) -> StaticModel:
@@ -163,7 +163,7 @@ def init_from_tokenizer(
     dim: int = 256,
     sif_coefficient: float | None = 1e-4,
     token_remove_pattern: str | None = r"\[unused\d+\]",
-    quantize_to: DType | str = DType.Float16,
+    quantize_to: DType | str = DType.Float32,
     seed: int = 42,
 ) -> StaticModel:
     """Create a staticmodel with random embeddings from a tokenizer.
@@ -327,7 +327,7 @@ def distill(
     sif_coefficient: float | None = 1e-4,
     token_remove_pattern: str | None = r"\[unused\d+\]",
     trust_remote_code: bool = False,
-    quantize_to: DType | str = DType.Float16,
+    quantize_to: DType | str = DType.Float32,
     pooling: PoolingMode | str = PoolingMode.MEAN,
 ) -> StaticModel:
     """Distill a staticmodel from a sentence transformer.
